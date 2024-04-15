@@ -192,13 +192,6 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-bom</artifactId>
-                <version>${netty.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot</artifactId>
                 <version>${spring-boot.version}</version>
@@ -266,29 +259,9 @@
                 </exclusions>
             </dependency>
             <dependency>
-                <groupId>commons-cli</groupId>
-                <artifactId>commons-cli</artifactId>
-                <version>${commons-cli.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>${commons-lang3.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jline</groupId>
-                <artifactId>jline</artifactId>
-                <version>${jline.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.java.dev.jna</groupId>
-                <artifactId>jna</artifactId>
-                <version>${jna.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-csv</artifactId>
-                <version>${commons-csv.version}</version>
             </dependency>
             <dependency>
                 <groupId>junit</groupId>
@@ -301,34 +274,9 @@
                 <version>${mockito.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-runtime</artifactId>
-                <version>${antlr4.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.osgi</groupId>
                 <artifactId>osgi.cmpn</artifactId>
                 <version>${osgi.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.osgi</groupId>
-                <artifactId>osgi.core</artifactId>
-                <version>${osgi.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ops4j.pax.jdbc</groupId>
-                <artifactId>pax-jdbc-common</artifactId>
-                <version>${pax-jdbc-common.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.xerial.snappy</groupId>
-                <artifactId>snappy-java</artifactId>
-                <version>${snappy-java.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.powermock</groupId>
-                <artifactId>powermock-reflect</artifactId>
-                <version>${powermock.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.flink</groupId>
@@ -348,11 +296,6 @@
             <dependency>
                 <groupId>org.apache.flink</groupId>
                 <artifactId>flink-java</artifactId>
-                <version>${flink.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.flink</groupId>
-                <artifactId>flink-streaming-core</artifactId>
                 <version>${flink.version}</version>
             </dependency>
             <dependency>
@@ -421,11 +364,6 @@
                         <artifactId>jcl-over-slf4j</artifactId>
                     </exclusion>
                 </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-client-api</artifactId>
-                <version>${hadoop.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
@@ -512,11 +450,6 @@
                         <artifactId>netty</artifactId>
                     </exclusion>
                 </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-yarn-registry</artifactId>
-                <version>${hadoop.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.google.code.gson</groupId>
@@ -753,11 +686,6 @@
                 <version>${scala.library.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.bouncycastle</groupId>
-                <artifactId>bcprov-jdk18on</artifactId>
-                <version>1.75</version>
-            </dependency>
-            <dependency>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest_2.11</artifactId>
                 <version>${scalatest.version}</version>
@@ -784,104 +712,6 @@
                 </exclusions>
             </dependency>
             <dependency>
-                <groupId>commons-io</groupId>
-                <artifactId>commons-io</artifactId>
-                <version>${commons-io.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-server</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-server-api</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-common</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-client</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-grpc</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-proto</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-metrics-api</artifactId>
-                <version>${ratis.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ratis</groupId>
-                <artifactId>ratis-thirdparty-misc</artifactId>
-                <version>${ratis-thirdparty-misc.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-collections4</artifactId>
-                <version>${commons.collections4.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>units</artifactId>
-                <version>${airlift-units.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-api</artifactId>
-                <version>${jjwt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.milo</groupId>
-                <artifactId>stack-core</artifactId>
-                <version>${milo.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>com.sun.activation</groupId>
-                        <artifactId>jakarta.activation</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.milo</groupId>
-                <artifactId>stack-server</artifactId>
-                <version>${milo.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.checkerframework</groupId>
-                <artifactId>checker-qual</artifactId>
-                <version>${checker-qual.version}</version>
-            </dependency>
-            <!-- TODO: Deprecated: Use Airline 2 or Picocli instead -->
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>airline</artifactId>
-                <version>${airline.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>javax.inject</groupId>
-                        <artifactId>javax.inject</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>concurrent</artifactId>
-                <version>${airlift.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.eclipse.milo</groupId>
                 <artifactId>sdk-server</artifactId>
                 <version>${milo.version}</version>
@@ -893,109 +723,9 @@
                 </exclusions>
             </dependency>
             <dependency>
-                <groupId>org.reflections</groupId>
-                <artifactId>reflections</artifactId>
-                <version>${reflections.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.moquette</groupId>
-                <artifactId>moquette-broker</artifactId>
-                <version>${moquette.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.lmax</groupId>
-                <artifactId>disruptor</artifactId>
-                <version>${disruptor.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-impl</artifactId>
-                <version>${jjwt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-jackson</artifactId>
-                <version>${jjwt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.nimbusds</groupId>
-                <artifactId>oauth2-oidc-sdk</artifactId>
-                <version>${oauth2-oidc-sdk.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>${httpclient.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.powermock</groupId>
-                <artifactId>powermock-core</artifactId>
-                <version>${powermock.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.powermock</groupId>
-                <artifactId>powermock-module-junit4</artifactId>
-                <version>${powermock.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.powermock</groupId>
-                <artifactId>powermock-api-mockito2</artifactId>
-                <version>${powermock.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.nimbusds</groupId>
-                <artifactId>nimbus-jose-jwt</artifactId>
-                <version>${nimbus-jose-jwt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>cglib</groupId>
-                <artifactId>cglib</artifactId>
-                <version>${cglib.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-jexl3</artifactId>
-                <version>${commons-jexl3.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.github.luben</groupId>
-                <artifactId>zstd-jni</artifactId>
-                <version>${zstd-jni.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.lz4</groupId>
-                <artifactId>lz4-java</artifactId>
-                <version>${lz4-java.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.tukaani</groupId>
-                <artifactId>xz</artifactId>
-                <version>${xz.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.swagger</groupId>
-                <artifactId>swagger-annotations</artifactId>
-                <version>${swagger.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.swagger</groupId>
-                <artifactId>swagger-models</artifactId>
-                <version>${swagger.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.swagger</groupId>
-                <artifactId>swagger-jaxrs</artifactId>
-                <version>${swagger.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>javax.validation</groupId>
-                        <artifactId>validation-api</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>javax.ws.rs</groupId>
-                        <artifactId>jsr311-api</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.rocketmq</groupId>
@@ -1008,204 +738,14 @@
                 <version>${fusesource-mqtt-client.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.eclipse.collections</groupId>
-                <artifactId>eclipse-collections</artifactId>
-                <version>${eclipse-collections.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.collections</groupId>
-                <artifactId>eclipse-collections-api</artifactId>
-                <version>${eclipse-collections.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-math3</artifactId>
-                <version>${commons-math3.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.github.wendykierp</groupId>
-                <artifactId>JTransforms</artifactId>
-                <version>${jtransforms.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.github.stephenc.jcip</groupId>
-                <artifactId>jcip-annotations</artifactId>
-                <version>${jcip-annotations.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.validation</groupId>
-                <artifactId>jakarta.validation-api</artifactId>
-                <version>${jakarta.validation-api.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>commons-codec</groupId>
-                <artifactId>commons-codec</artifactId>
-                <version>${commons-codec.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-pool2</artifactId>
-                <version>${commons-pool2.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.dropwizard.metrics</groupId>
-                <artifactId>metrics-core</artifactId>
-                <version>${dropqizard.metrics.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.dropwizard.metrics</groupId>
-                <artifactId>metrics-jmx</artifactId>
-                <version>${dropqizard.metrics.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-http</artifactId>
-                <version>${jetty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-util</artifactId>
-                <version>${jetty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-server</artifactId>
-                <version>${jetty.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>javax.servlet</groupId>
-                        <artifactId>javax.servlet-api</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.ws.rs</groupId>
-                <artifactId>jakarta.ws.rs-api</artifactId>
-                <version>${jakarta.ws.rs-api.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.containers</groupId>
-                <artifactId>jersey-container-servlet-core</artifactId>
-                <version>${jersey.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-servlet</artifactId>
-                <version>${jetty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.github.ben-manes.caffeine</groupId>
-                <artifactId>caffeine</artifactId>
-                <version>${caffeine.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.minidev</groupId>
-                <artifactId>json-smart</artifactId>
-                <version>${json-smart.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.httpcomponents</groupId>
-                <artifactId>httpcore</artifactId>
-                <version>${httpcore.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.awaitility</groupId>
-                <artifactId>awaitility</artifactId>
-                <version>${awaitility.version}</version>
-            </dependency>
-            <!--
-        TODO: This dependency is only needed to run one single test-case ... possibly refactor?
-        (org.apache.iotdb.db.conf.IoTDBDescriptorTest)
-      -->
-            <dependency>
-                <groupId>org.apache.tomcat.embed</groupId>
-                <artifactId>tomcat-embed-core</artifactId>
-                <version>${tomcat.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.projectreactor.netty</groupId>
-                <artifactId>reactor-netty-http</artifactId>
-                <version>${reactor-netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.projectreactor.netty</groupId>
-                <artifactId>reactor-netty-core</artifactId>
-                <version>${reactor-netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.projectreactor</groupId>
-                <artifactId>reactor-core</artifactId>
-                <version>${reactor.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.reactivestreams</groupId>
-                <artifactId>reactive-streams</artifactId>
-                <version>${reactive-streams.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-classic</artifactId>
                 <version>${logback.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-core</artifactId>
-                <version>${logback.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.micrometer</groupId>
-                <artifactId>micrometer-core</artifactId>
-                <version>${micrometer.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                <artifactId>jackson-jaxrs-json-provider</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.datatype</groupId>
-                <artifactId>jackson-datatype-jsr310</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.media</groupId>
-                <artifactId>jersey-media-multipart</artifactId>
-                <version>${jersey.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.core</groupId>
-                <artifactId>jersey-client</artifactId>
-                <version>${jersey.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.core</groupId>
-                <artifactId>jersey-core</artifactId>
-                <version>${jersey.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.core</groupId>
-                <artifactId>jersey-common</artifactId>
-                <version>${jersey.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.core</groupId>
-                <artifactId>jersey-server</artifactId>
-                <version>${jersey.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jersey.containers</groupId>
-                <artifactId>jersey-container-servlet</artifactId>
-                <version>${jersey.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.rabbitmq</groupId>
@@ -1215,241 +755,241 @@
             <!-- Conflict:
         json-smart (pulls in 9.3),
         cglib (pulls in 7.1)
-      -->
+      -
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm</artifactId>
                 <version>9.3</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         guava (pulls in 2.18.0),
         caffeine (pulls in 2.10.0)
-      -->
+      - ->
             <dependency>
                 <groupId>com.google.errorprone</groupId>
                 <artifactId>error_prone_annotations</artifactId>
                 <version>2.18.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         jackson-json-provider (pulls in 2.15.2),
         jackson-databind (pulls in 2.15.2),
         jackson-databind-jsd310 (pulls in 2.15.2),
         swagger-jaxrs (pulls in 2.14.2)
-      -->
+      - ->
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-core</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         jackson-dataformat-yaml (pulls in 1.33),
         swagger-core (pulls in 2.ß),
         swagger-jaxrs (pulls in 2.0)
-      -->
+      - ->
             <dependency>
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
                 <version>2.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         flink-core (pulls in 2.24.0)
         chill-java (pulls in 2.21)
-      -->
+      - ->
             <dependency>
                 <groupId>com.esotericsoftware.kryo</groupId>
                 <artifactId>kryo</artifactId>
                 <version>2.24.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-common (pulls in 4.2.1)
         woodstox-core (pulls in 4.2)
-      -->
+      - ->
             <dependency>
                 <groupId>org.codehaus.woodstox</groupId>
                 <artifactId>stax2-api</artifactId>
                 <version>4.2.1</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 2.2.11)
         jersey-json (pulls in 2.2.2)
-      -->
+      - ->
             <dependency>
                 <groupId>javax.xml.bind</groupId>
                 <artifactId>jaxb-api</artifactId>
                 <version>2.2.11</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 1.21)
         hadoop-common (pulls in 1.21)
         avro (pulls in 1.4.1)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
                 <version>1.26.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 4.0 and 3.0)
-      -->
+      - ->
             <dependency>
                 <groupId>com.google.inject.extensions</groupId>
                 <artifactId>guice-servlet</artifactId>
                 <version>4.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 9.4.51.v20230217)
         hadoop-common (pulls in 9.4.52.v20230823)
-      -->
+      - ->
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-io</artifactId>
                 <version>9.4.52.v20230823</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-common (pulls in 1.2 and 1.1.3)
-      -->
+      - ->
             <dependency>
                 <groupId>commons-logging</groupId>
                 <artifactId>commons-logging</artifactId>
                 <version>1.2</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 3.0 and 4.0)
-      -->
+      - ->
             <dependency>
                 <groupId>com.google.inject</groupId>
                 <artifactId>guice</artifactId>
                 <version>4.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 2.12.7 and 2.15.2)
-      -->
+      - ->
             <dependency>
                 <groupId>com.fasterxml.jackson.module</groupId>
                 <artifactId>jackson-module-jaxb-annotations</artifactId>
                 <version>2.15.2</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-common (pulls in 1.9 and 1.10.0)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-text</artifactId>
                 <version>1.10.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-mapreduce-client-core (pulls in 1.2.2)
         hadoop-common (pulls in 1.2.1)
-      -->
+      - ->
             <dependency>
                 <groupId>jakarta.activation</groupId>
                 <artifactId>jakarta.activation-api</artifactId>
                 <version>1.2.2</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         spring-boot (pulls in 5.3.19)
         everything else (pulls in 5.3.30)
-      -->
+      - ->
             <dependency>
                 <groupId>org.springframework</groupId>
                 <artifactId>spring-core</artifactId>
                 <version>5.3.30</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 3.3.6 and 3.1.0)
         hadoop-common (pulls in 3.3.6)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-auth</artifactId>
                 <version>${hadoop.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 3.3.6 and 3.1.0)
         hive-connector (pulls in 3.3.6)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-yarn-api</artifactId>
                 <version>${hadoop.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 3.3.6 and 3.1.0)
         hadoop-mapreduce-client-core (pulls in 3.3.6)
         hadoop-mapreduce-client-core (pulls in 3.3.6)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-yarn-common</artifactId>
                 <version>${hadoop.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-serde (pulls in 3.1.0)
         hadoop-mapreduce-client-core (pulls in 3.3.6)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
                 <version>${hadoop.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 3.3.6 and 3.1.0)
         hadoop-common (pulls in 3.3.6)
         hadoop-mapreduce-client-core (pulls in 3.3.6)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-annotations</artifactId>
                 <version>${hadoop.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-serde (pulls in 1.5.4)
         hadoop-common (puss in 1.1)
-      -->
+      - ->
             <dependency>
                 <groupId>org.codehaus.jettison</groupId>
                 <artifactId>jettison</artifactId>
                 <version>1.5.4</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-common (pulls in 9.3.20.v20170531)
         hadoop-mapreduce-client-core (pulls in 9.4.51.v20230217)
-      -->
+      - ->
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-client</artifactId>
                 <version>9.4.51.v20230217</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hadoop-common (pulls in 3.6.3)
         hive-exe (pulls in 3.4.6 and 3.6.3)
         hive-serde (pulls in 3.4.6 and 3.6.3)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.zookeeper</groupId>
                 <artifactId>zookeeper</artifactId>
                 <version>3.7.2</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-common (pulls in 9.3.20.v20170531)
         hadoop-common (pulls in 9.4.51.v20230217)
-      -->
+      - ->
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-webapp</artifactId>
                 <version>9.4.51.v20230217</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-serde (pulls in 1.8.2)
         hadoop-mapreduce-client-core (pulls in 1.7.7)
         hadoop-common (pulls in 1.7.7)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro</artifactId>
                 <version>1.11.3</version>
                 <exclusions>
-                    <!-- Jackson moved from codehaus to fasterxml and is now the new version -->
+                    <!- - Jackson moved from codehaus to fasterxml and is now the new version - ->
                     <exclusion>
                         <groupId>org.codehaus.jackson</groupId>
                         <artifactId>jackson-core-asl</artifactId>
@@ -1460,16 +1000,16 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         avro-mapred (pulls in vulnerable version of jackson)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro-mapred</artifactId>
                 <version>1.8.2</version>
                 <classifier>hadoop2</classifier>
                 <exclusions>
-                    <!-- Jackson moved from codehaus to fasterxml and is now the new version -->
+                    <!- - Jackson moved from codehaus to fasterxml and is now the new version - ->
                     <exclusion>
                         <groupId>org.codehaus.jackson</groupId>
                         <artifactId>jackson-core-asl</artifactId>
@@ -1480,15 +1020,15 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         parquet-hadoop (pulls in vulnerable version of jackson)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.parquet</groupId>
                 <artifactId>parquet-hadoop</artifactId>
                 <version>1.10.1</version>
                 <exclusions>
-                    <!-- Jackson moved from codehaus to fasterxml and is now the new version and for the codehaus version CVEs were reported -->
+                    <!- - Jackson moved from codehaus to fasterxml and is now the new version and for the codehaus version CVEs were reported - ->
                     <exclusion>
                         <groupId>org.codehaus.jackson</groupId>
                         <artifactId>jackson-core-asl</artifactId>
@@ -1499,81 +1039,81 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-serde (pulls in 9.4.51.v20230217)
         hive-common (pulls in 9.4.52.v20230823)
-      -->
+      - ->
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-util-ajax</artifactId>
                 <version>${jetty.version}</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-serde (pulls in 2.12.0)
         hadoop-common (pulls in 5.2.0)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-framework</artifactId>
                 <version>5.2.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 5.2.0 and 2.12.0)
         hadoop-common (pulls in 5.2.0)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-recipes</artifactId>
                 <version>5.2.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 5.2.0 and 2.12.0)
         hadoop-common (pulls in 5.2.0)
-      -->
+      - ->
             <dependency>
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-client</artifactId>
                 <version>5.2.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-serde (pulls in 1.2.22)
         hadoop-mapreduce-client-core (pulls in 1.2.22 and 1.2.19)
-      -->
+      - ->
             <dependency>
                 <groupId>ch.qos.reload4j</groupId>
                 <artifactId>reload4j</artifactId>
                 <version>1.2.22</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 2.8.1)
         hive-serde (pulls in 2.9.9)
         hive-common (pulls in 2.9.9)
-      -->
+      - ->
             <dependency>
                 <groupId>joda-time</groupId>
                 <artifactId>joda-time</artifactId>
                 <version>2.9.9</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 3.9.0 and 3.6)
         hadoop-common (pulls in 3.9.0)
-      -->
+      - ->
             <dependency>
                 <groupId>commons-net</groupId>
                 <artifactId>commons-net</artifactId>
                 <version>3.9.0</version>
             </dependency>
-            <!-- Conflict:
+            <!- - Conflict:
         hive-exec (pulls in 3.5.2 and 3.3)
-      -->
+      - ->
             <dependency>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr-runtime</artifactId>
                 <version>3.5.2</version>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         hadoop-mapreduce-client-core (pulls in vulnerable version)
-      -->
+      - ->
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-stdlib</artifactId>
@@ -1594,17 +1134,17 @@
                 <artifactId>kotlin-stdlib-jdk8</artifactId>
                 <version>1.9.10</version>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         hadoop-mapreduce-client-core (pulls in vulnerable version)
-      -->
+      - ->
             <dependency>
                 <groupId>com.squareup.okio</groupId>
                 <artifactId>okio</artifactId>
                 <version>3.5.0</version>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         hadoop-mapreduce-client-core (pulls in vulnerable version)
-      -->
+      - ->
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
@@ -1615,9 +1155,9 @@
                 <artifactId>protobuf-java-util</artifactId>
                 <version>3.24.3</version>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         hive-exec (pulls in vulnerable version)
-      -->
+      - ->
             <dependency>
                 <groupId>org.codehaus.janino</groupId>
                 <artifactId>janino</artifactId>
@@ -1628,9 +1168,9 @@
                 <artifactId>commons-compiler</artifactId>
                 <version>3.1.10</version>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
         zeppelin-interpreter (pulls in vulnerable version)
-      -->
+      - ->
             <dependency>
                 <groupId>io.atomix</groupId>
                 <artifactId>atomix</artifactId>
@@ -1661,9 +1201,9 @@
                 <artifactId>atomix-raft</artifactId>
                 <version>3.1.12</version>
             </dependency>
-            <!-- Security Issue:
+            <!- - Security Issue:
        zeppelin-interpreter (pulls in vulnerable version)
-     -->
+     - ->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-configuration2</artifactId>
@@ -1700,7 +1240,7 @@
                 <groupId>org.glassfish.jersey.inject</groupId>
                 <artifactId>jersey-hk2</artifactId>
                 <version>${jersey.version}</version>
-            </dependency>
+            </dependency-->
         </dependencies>
     </dependencyManagement>
     <build>
@@ -1752,8 +1292,6 @@
                             <exclude>**/.git/**</exclude>
                             <exclude>**/.mvn/**</exclude>
                             <exclude>**/.gitignore</exclude>
-                            <exclude>**/.gitmodules</exclude>
-                            <exclude>**/.git-blame-ignore-revs</exclude>
                             <!-- Maven related files -->
                             <exclude>**/target/**</exclude>
                             <!-- Eclipse related files -->
@@ -1763,16 +1301,8 @@
                             <!-- IntelliJ related files -->
                             <exclude>**/.idea/**</exclude>
                             <exclude>**/*.iml</exclude>
-                            <!-- Runtime log -->
-                            <exclude>**/*.log</exclude>
                             <!-- Exclude CVS files -->
                             <exclude>**/*.cvs</exclude>
-                            <!-- licenses -->
-                            <exclude>licenses/*</exclude>
-                            <!-- only for Travis CI with WinOS-->
-                            <exclude>hadoopbin</exclude>
-                            <exclude>windowssystem32</exclude>
-                            <exclude>.ignore</exclude>
                             <!-- generated by Github -->
                             <exclude>**/.github/**</exclude>
                             <!-- figures -->
@@ -1790,27 +1320,8 @@
                             <exclude>**/*.json</exclude>
                             <!-- the zeppelin export file format-->
                             <exclude>**/*.zpln</exclude>
-                            <!-- exclude go.mod, go.sum and rpc/* in iotdb-client-go submodule-->
-                            <exclude>**/go.mod</exclude>
-                            <exclude>**/go.sum</exclude>
-                            <exclude>client-go/rpc/*</exclude>
-                            <!-- python -->
-                            <exclude>.pytest_cache/**</exclude>
-                            <exclude>venv/**</exclude>
-                            <exclude>apache_iotdb.egg-info/**</exclude>
-                            <exclude>**/iotdb/thrift/__init__.py</exclude>
-                            <exclude>**/iotdb/thrift/rpc/__init__.py</exclude>
-                            <exclude>**/iotdb/thrift/common/__init__.py</exclude>
-                            <!-- Java SPI uses files in resources/META-INF/services-->
-                            <exclude>**/resources/META-INF/services/**</exclude>
                             <!-- grafana plugin -->
                             <exclude>**/yarn.lock</exclude>
-                            <!-- site-->
-                            <exclude>**/redirects</exclude>
-                            <exclude>**/.eslintignore</exclude>
-                            <exclude>**/palette.styl</exclude>
-                            <exclude>**/RightMenu.vue</exclude>
-                            <exclude>**/pnpm-lock.yaml</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
@@ -1840,16 +1351,6 @@
                             <phase>validate</phase>
                         </execution>
                     </executions>
-                </plugin>
-                <plugin>
-                    <groupId>com.googlecode.maven-download-plugin</groupId>
-                    <artifactId>download-maven-plugin</artifactId>
-                    <version>1.7.1</version>
-                </plugin>
-                <plugin>
-                    <groupId>com.googlecode.cmake-maven-project</groupId>
-                    <artifactId>cmake-maven-plugin</artifactId>
-                    <version>3.26.3-b1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -1882,44 +1383,9 @@
                     <version>3.2.1</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>exec-maven-plugin</artifactId>
-                    <version>3.1.0</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-assembly-plugin</artifactId>
-                    <version>${maven.assembly.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.cyclonedx</groupId>
-                    <artifactId>cyclonedx-maven-plugin</artifactId>
-                    <version>2.7.9</version>
-                </plugin>
-                <plugin>
-                    <groupId>net.nicoulaj.maven.plugins</groupId>
-                    <artifactId>checksum-maven-plugin</artifactId>
-                    <version>1.11</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.jacoco</groupId>
-                    <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>0.8.10</version>
-                </plugin>
-                <plugin>
-                    <groupId>com.coderplus.maven.plugins</groupId>
-                    <artifactId>copy-rename-maven-plugin</artifactId>
-                    <version>1.0.1</version>
-                </plugin>
-                <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>3.5.0</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-resources-plugin</artifactId>
-                    <version>3.3.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -1927,69 +1393,14 @@
                     <version>3.6.0</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.apache.thrift.tools</groupId>
-                    <artifactId>maven-thrift-plugin</artifactId>
-                    <version>0.1.11</version>
-                </plugin>
-                <plugin>
-                    <groupId>com.bazaarvoice.maven.plugins</groupId>
-                    <artifactId>process-exec-maven-plugin</artifactId>
-                    <version>0.9</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>build-helper-maven-plugin</artifactId>
-                    <version>3.4.0</version>
-                </plugin>
-                <plugin>
                     <groupId>org.apache.felix</groupId>
                     <artifactId>maven-bundle-plugin</artifactId>
                     <version>${felix.version}</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.eclipse.m2e</groupId>
-                    <artifactId>lifecycle-mapping</artifactId>
-                    <version>1.0.0</version>
-                </plugin>
-                <plugin>
-                    <groupId>com.github.eirslett</groupId>
-                    <artifactId>frontend-maven-plugin</artifactId>
-                    <version>1.14.0</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-antrun-plugin</artifactId>
-                    <version>3.1.0</version>
-                </plugin>
-                <plugin>
                     <groupId>org.scala-tools</groupId>
                     <artifactId>maven-scala-plugin</artifactId>
                     <version>2.15.2</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.antlr</groupId>
-                    <artifactId>antlr4-maven-plugin</artifactId>
-                    <version>${antlr4.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.drill.tools</groupId>
-                    <artifactId>drill-fmpp-maven-plugin</artifactId>
-                    <version>${drill.freemarker.maven.plugin.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-clean-plugin</artifactId>
-                    <version>3.3.2</version>
-                </plugin>
-                <plugin>
-                    <groupId>pl.project13.maven</groupId>
-                    <artifactId>git-commit-id-plugin</artifactId>
-                    <version>4.9.10</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.openapitools</groupId>
-                    <artifactId>openapi-generator-maven-plugin</artifactId>
-                    <version>${openapi.generator.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>au.com.acegi</groupId>
@@ -2005,45 +1416,6 @@
                 <configuration>
                     <skip>${spotless.skip}</skip>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.eluder.coveralls</groupId>
-                <artifactId>coveralls-maven-plugin</artifactId>
-                <configuration>
-                    <jacocoReports>
-                        <jacocoReport>code-coverage/target/jacoco-merged-reports/jacoco.xml</jacocoReport>
-                    </jacocoReports>
-                    <sourceEncoding>UTF-8</sourceEncoding>
-                    <sourceDirectories>
-                        <!-- put all source folders not in src/main/java here-->
-                        <sourceDirectory>iotdb-core/antlr/target/generated-sources/antlr4</sourceDirectory>
-                        <sourceDirectory>iotdb-protocol/thrift-datanode/target/generated-sources/thrift</sourceDirectory>
-                        <sourceDirectory>iotdb-protocol/thrift-commons/target/generated-sources/thrift</sourceDirectory>
-                        <sourceDirectory>iotdb-protocol/thrift-confignode/target/generated-sources/thrift</sourceDirectory>
-                        <sourceDirectory>iotdb-protocol/thrift-consensus/target/generated-sources/thrift</sourceDirectory>
-                        <sourceDirectory>iotdb-protocol/openapi/target/generated-sources/java/src/gen/java</sourceDirectory>
-                        <sourceDirectory>iotdb-protocol/openapi/target/generated-sources/java/src/main/java</sourceDirectory>
-                        <sourceDirectory>iotdb-core/datanode/target/generated-sources/freemarker/</sourceDirectory>
-                    </sourceDirectories>
-                </configuration>
-                <!-- JDK11 removes the following libs. We have to add them-->
-                <dependencies>
-                    <dependency>
-                        <groupId>javax.xml.bind</groupId>
-                        <artifactId>jaxb-api</artifactId>
-                        <version>2.4.0-b180830.0359</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>com.sun.xml.bind</groupId>
-                        <artifactId>jaxb-core</artifactId>
-                        <version>2.3.0</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>com.sun.xml.bind</groupId>
-                        <artifactId>jaxb-impl</artifactId>
-                        <version>2.3.6</version>
-                    </dependency>
-                </dependencies>
             </plugin>
             <!--
         Strange things usually happen if you run with a too low Java version.
@@ -2382,10 +1754,9 @@
         </mailingList>
     </mailingLists>
     <scm>
-        <connection>scm:git:ssh://git@github.com/apache/iotdb.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/apache/iotdb.git</developerConnection>
-        <url>ssh://git@github.com:apache/iotdb.git</url>
-        <tag>rel/0.10</tag>
+        <connection>scm:git:ssh://git@github.com/apache/iotdb-extras.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/apache/iotdb-extras.git</developerConnection>
+        <url>ssh://git@github.com:apache/iotdb-extras.git</url>
     </scm>
     <issueManagement>
         <system>Jira</system>
@@ -2395,112 +1766,13 @@
     Needed for fetching lt_downsampling_java8 (which is used by library-udf)
     (Adding this in the root or when building other parts, this transitive dependency can be fetched)
   -->
-    <repositories>
+    <!--repositories>
         <repository>
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
         </repository>
-    </repositories>
-    <!-- Only configure the site distribution as the rest is handled by the apache parent -->
-    <distributionManagement>
-        <site>
-            <id>apache.website</id>
-            <url>scm:git:https://gitbox.apache.org/repos/asf/iotdb-website.git</url>
-        </site>
-    </distributionManagement>
+    </repositories-->
     <profiles>
-        <!--
-      A set of profiles defining the different properties needed to download and run thrift
-      They are automatically activated depending on the OS you are using.
-    -->
-        <profile>
-            <id>.os-unix</id>
-            <activation>
-                <os>
-                    <name>Linux</name>
-                    <family>unix</family>
-                    <arch>!aarch64</arch>
-                </os>
-            </activation>
-            <properties>
-                <cmake.generator>Unix Makefiles</cmake.generator>
-                <os.classifier>linux-x86_64</os.classifier>
-                <thrift.executable>thrift</thrift.executable>
-            </properties>
-        </profile>
-        <profile>
-            <id>.os-unix-arm</id>
-            <activation>
-                <os>
-                    <name>Linux</name>
-                    <family>unix</family>
-                    <arch>aarch64</arch>
-                </os>
-            </activation>
-            <properties>
-                <cmake.generator>Unix Makefiles</cmake.generator>
-                <os.classifier>linux-aarch64</os.classifier>
-                <thrift.executable>thrift</thrift.executable>
-            </properties>
-        </profile>
-        <profile>
-            <id>.os-mac</id>
-            <activation>
-                <os>
-                    <family>mac</family>
-                    <arch>!aarch64</arch>
-                </os>
-            </activation>
-            <properties>
-                <boost.include.dir>/usr/local/include</boost.include.dir>
-                <cmake.generator>Unix Makefiles</cmake.generator>
-                <os.classifier>mac-x86_64</os.classifier>
-                <thrift.executable>thrift</thrift.executable>
-            </properties>
-        </profile>
-        <profile>
-            <id>.os-mac-arm</id>
-            <activation>
-                <os>
-                    <family>mac</family>
-                    <arch>aarch64</arch>
-                </os>
-            </activation>
-            <properties>
-                <boost.include.dir>/opt/homebrew/opt/boost/include</boost.include.dir>
-                <cmake.generator>Unix Makefiles</cmake.generator>
-                <os.classifier>mac-aarch64</os.classifier>
-                <thrift.executable>thrift</thrift.executable>
-            </properties>
-        </profile>
-        <profile>
-            <id>.os-windows</id>
-            <activation>
-                <os>
-                    <family>windows</family>
-                    <arch>!aarch64</arch>
-                </os>
-            </activation>
-            <properties>
-                <cmake.generator>Visual Studio 17 2022</cmake.generator>
-                <os.classifier>windows-x86_64</os.classifier>
-                <thrift.executable>Release/thrift.exe</thrift.executable>
-            </properties>
-        </profile>
-        <profile>
-            <id>.os-windows-arm</id>
-            <activation>
-                <os>
-                    <family>windows</family>
-                    <arch>aarch64</arch>
-                </os>
-            </activation>
-            <properties>
-                <cmake.generator>Visual Studio 17 2022</cmake.generator>
-                <os.classifier>windows-aarch64</os.classifier>
-                <thrift.executable>Release/thrift.exe</thrift.executable>
-            </properties>
-        </profile>
         <profile>
             <id>.java-9-and-above</id>
             <activation>
@@ -2560,119 +1832,6 @@
                 <spotless.skip>true</spotless.skip>
             </properties>
         </profile>
-        <!-- Little helper profile that will disable running the cmake tests when the maven tests are being skipped -->
-        <profile>
-            <id>.skipTests</id>
-            <activation>
-                <property>
-                    <name>skipTests</name>
-                </property>
-            </activation>
-            <properties>
-                <ctest.skip.tests>true</ctest.skip.tests>
-            </properties>
-        </profile>
-        <!--
-      Self activating profile, that activates itself as soon as a "src/main/thrift" directory is found.
-      The different plugins here download the thrift executable matching the current os, make that
-      executable (on mac and unix/linux) and run the code generation.
-
-      Note to the Download: The download-maven-plugin checks if a resource is previously downloaded
-      and only downloads each file once. It caches downloaded files in:
-      {maven local repo}/.cache/download-maven-plugin
-    -->
-        <profile>
-            <id>.thrift-generation</id>
-            <activation>
-                <file>
-                    <exists>src/main/thrift</exists>
-                </file>
-            </activation>
-            <properties>
-                <thrift.exec.absolute.path>${project.build.directory}/thrift/bin/${thrift.executable}</thrift.exec.absolute.path>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>get-thrift</id>
-                                <goals>
-                                    <goal>unpack</goal>
-                                </goals>
-                                <phase>generate-sources</phase>
-                                <configuration>
-                                    <artifactItems>
-                                        <artifactItem>
-                                            <groupId>org.apache.iotdb.tools</groupId>
-                                            <artifactId>iotdb-tools-thrift</artifactId>
-                                            <version>${iotdb-tools-thrift.version}</version>
-                                            <classifier>${os.classifier}</classifier>
-                                            <type>zip</type>
-                                            <overWrite>true</overWrite>
-                                            <outputDirectory>${project.build.directory}/thrift</outputDirectory>
-                                        </artifactItem>
-                                    </artifactItems>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.thrift.tools</groupId>
-                        <artifactId>maven-thrift-plugin</artifactId>
-                        <configuration>
-                            <thriftExecutable>${thrift.exec.absolute.path}</thriftExecutable>
-                            <thriftSourceRoot>${project.basedir}/src/main/thrift</thriftSourceRoot>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>generate-thrift-sources-java</id>
-                                <goals>
-                                    <goal>compile</goal>
-                                </goals>
-                                <phase>generate-sources</phase>
-                                <configuration>
-                                    <generator>java</generator>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>generate-thrift-sources-python</id>
-                                <goals>
-                                    <goal>compile</goal>
-                                </goals>
-                                <phase>generate-sources</phase>
-                                <configuration>
-                                    <generator>py</generator>
-                                    <includes>**/common.thrift,**/client.thrift,**/datanode.thrift,**/confignode.thrift</includes>
-                                    <outputDirectory>${project.build.directory}/generated-sources-python/</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>generate-thrift-sources-go</id>
-                                <goals>
-                                    <goal>compile</goal>
-                                </goals>
-                                <phase>generate-sources</phase>
-                                <configuration>
-                                    <generator>go</generator>
-                                    <includes>**/common.thrift,**/client.thrift</includes>
-                                    <outputDirectory>${project.build.directory}/generated-sources-go</outputDirectory>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <!-- Enable integration-testsuite on demand, as this takes quite a long time to run -->
-        <profile>
-            <id>with-integration-tests</id>
-            <modules>
-                <module>integration-test</module>
-            </modules>
-        </profile>
         <!-- Make sure the source assembly has the right name -->
         <profile>
             <id>apache-release</id>
@@ -2695,7 +1854,7 @@
                   See  https://issues.apache.org/jira/browse/MNG-5454  sigh.
                 -->
                                 <configuration combine.self="append">
-                                    <finalName>apache-iotdb-${project.version}</finalName>
+                                    <finalName>apache-iotdb-extras-${project.version}</finalName>
                                     <archive>
                                         <manifest>
                                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
@@ -2747,169 +1906,12 @@
                                         <fileSet>
                                             <directory>${project.build.directory}</directory>
                                             <includes>
-                                                <include>apache-iotdb-${project.version}-source-release.zip</include>
+                                                <include>apache-iotdb-extras-${project.version}-source-release.zip</include>
                                             </includes>
                                         </fileSet>
                                     </fileSets>
                                     <failIfNoFiles>false</failIfNoFiles>
                                 </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <!-- code coverage for ut and it, and then merge them together.-->
-        <profile>
-            <id>with-code-coverage</id>
-            <modules>
-                <module>code-coverage</module>
-            </modules>
-            <build>
-                <plugins>
-                    <!--
-            Jacoco is a code coverage analysis plugin when tests run.
-            (not a static code analysis tool)
-          -->
-                    <plugin>
-                        <groupId>org.jacoco</groupId>
-                        <artifactId>jacoco-maven-plugin</artifactId>
-                        <configuration>
-                            <excludes>
-                                <exclude>org/apache/iotdb/service/sync/thrift/*</exclude>
-                                <exclude>org/apache/iotdb/service/rpc/thrift/*</exclude>
-                                <exclude>org/apache/iotdb/db/qp/sql/*</exclude>
-                            </excludes>
-                            <rules>
-                                <rule implementation="org.jacoco.maven.RuleConfiguration">
-                                    <element>BUNDLE</element>
-                                    <limits>　　
-                                        <!-- Cover methodes >=30%. (the plugin does not support
-                                        ignore getter and setter and toString etc..) -->
-                                        <limit implementation="org.jacoco.report.check.Limit">
-                                            <counter>METHOD</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.00</minimum>
-                                        </limit>
-                                        <!-- if-else, swtich etc.. >=70% -->
-                                        <limit implementation="org.jacoco.report.check.Limit">
-                                            <counter>BRANCH</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.00</minimum>
-                                        </limit>
-                                        <!-- class files >=95% -->
-                                        <limit implementation="org.jacoco.report.check.Limit">
-                                            <counter>CLASS</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.00</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-                            </rules>
-                        </configuration>
-                        <executions>
-                            <!-- see https://natritmeyer.com/howto/reporting-aggregated-unit-and-integration-test-coverage-with-jacoco/-->
-                            <!-- For UT-->
-                            <execution>
-                                <id>prepare-ut</id>
-                                <goals>
-                                    <goal>prepare-agent</goal>
-                                </goals>
-                                <configuration>
-                                    <destFile>${project.build.directory}/${project.build.finalName}-jacoco-unit-tests.exec</destFile>
-                                    <propertyName>surefire.jacoco.args</propertyName>
-                                </configuration>
-                            </execution>
-                            <!-- attached to Maven test phase -->
-                            <execution>
-                                <id>ut-report</id>
-                                <goals>
-                                    <goal>report</goal>
-                                    <goal>check</goal>
-                                </goals>
-                                <phase>test</phase>
-                                <configuration>
-                                    <dataFile>${project.build.directory}/${project.build.finalName}-jacoco-unit-tests.exec</dataFile>
-                                    <outputDirectory>${project.build.directory}/jacoco-unit-reports</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <!-- For IT-->
-                            <execution>
-                                <id>before-integration-test-execution</id>
-                                <goals>
-                                    <goal>prepare-agent</goal>
-                                </goals>
-                                <phase>pre-integration-test</phase>
-                                <configuration>
-                                    <destFile>${project.build.directory}/${project.build.finalName}-jacoco-integration-tests.exec</destFile>
-                                    <propertyName>failsafe.jacoco.args</propertyName>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>after-integration-test-execution</id>
-                                <goals>
-                                    <goal>report</goal>
-                                    <goal>check</goal>
-                                </goals>
-                                <phase>integration-test</phase>
-                                <configuration>
-                                    <dataFile>${project.build.directory}/${project.build.finalName}-jacoco-integration-tests.exec</dataFile>
-                                    <outputDirectory>${project.build.directory}/jacoco-integration-reports</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>merge-unit-and-integration</id>
-                                <goals>
-                                    <goal>merge</goal>
-                                </goals>
-                                <phase>post-integration-test</phase>
-                                <configuration>
-                                    <fileSets>
-                                        <fileSet>
-                                            <directory>${project.build.directory}/</directory>
-                                            <includes>
-                                                <include>*.exec</include>
-                                            </includes>
-                                        </fileSet>
-                                    </fileSets>
-                                    <destFile>${project.build.directory}/${project.build.finalName}-merged.exec</destFile>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>create-merged-report</id>
-                                <goals>
-                                    <goal>report</goal>
-                                    <goal>check</goal>
-                                </goals>
-                                <phase>post-integration-test</phase>
-                                <configuration>
-                                    <dataFile>${project.build.directory}/${project.build.finalName}-merged.exec</dataFile>
-                                    <outputDirectory>${project.build.directory}/jacoco-merged-reports</outputDirectory>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <!-- overwrite argLine-->
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <argLine>${argLine} @{surefire.jacoco.args} -Xmx1024m</argLine>
-                        </configuration>
-                    </plugin>
-                    <!-- for IT-->
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-failsafe-plugin</artifactId>
-                        <configuration>
-                            <argLine>${argLine} @{failsafe.jacoco.args} -Xmx1024m</argLine>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>integration-test</goal>
-                                    <goal>verify</goal>
-                                </goals>
                             </execution>
                         </executions>
                     </plugin>

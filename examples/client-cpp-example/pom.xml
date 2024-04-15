@@ -154,4 +154,110 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <!--
+      A set of profiles defining the different properties needed to download and run thrift
+      They are automatically activated depending on the OS you are using.
+    -->
+        <profile>
+            <id>.os-unix</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <family>unix</family>
+                    <arch>!aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <cmake.generator>Unix Makefiles</cmake.generator>
+                <os.classifier>linux-x86_64</os.classifier>
+                <thrift.executable>thrift</thrift.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>.os-unix-arm</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <family>unix</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <cmake.generator>Unix Makefiles</cmake.generator>
+                <os.classifier>linux-aarch64</os.classifier>
+                <thrift.executable>thrift</thrift.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>.os-mac</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>!aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <boost.include.dir>/usr/local/include</boost.include.dir>
+                <cmake.generator>Unix Makefiles</cmake.generator>
+                <os.classifier>mac-x86_64</os.classifier>
+                <thrift.executable>thrift</thrift.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>.os-mac-arm</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <boost.include.dir>/opt/homebrew/opt/boost/include</boost.include.dir>
+                <cmake.generator>Unix Makefiles</cmake.generator>
+                <os.classifier>mac-aarch64</os.classifier>
+                <thrift.executable>thrift</thrift.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>.os-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                    <arch>!aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <cmake.generator>Visual Studio 17 2022</cmake.generator>
+                <os.classifier>windows-x86_64</os.classifier>
+                <thrift.executable>Release/thrift.exe</thrift.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>.os-windows-arm</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <cmake.generator>Visual Studio 17 2022</cmake.generator>
+                <os.classifier>windows-aarch64</os.classifier>
+                <thrift.executable>Release/thrift.exe</thrift.executable>
+            </properties>
+        </profile>
+        <!-- Little helper profile that will disable running the cmake tests when the maven tests are being skipped -->
+        <profile>
+            <id>.skipTests</id>
+            <activation>
+                <property>
+                    <name>skipTests</name>
+                </property>
+            </activation>
+            <properties>
+                <ctest.skip.tests>true</ctest.skip.tests>
+            </properties>
+        </profile>
+    </profiles>
 </project>
