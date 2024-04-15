@@ -6,13 +6,13 @@ on:
       - master
       - "new_*"
     paths:
-      - 'iotdb-connector/grafana-plugin/**'
+      - 'connectors/grafana-plugin/**'
   pull_request:
     branches:
       - master
       - "new_*"
     paths:
-      - 'iotdb-connector/grafana-plugin/**'
+      - 'connectors/grafana-plugin/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -58,11 +58,11 @@ jobs:
 
       - name: Install dependencies and Build and test frontend
         run: |
-          cd iotdb-connector/grafana-plugin/
+          cd connectors/grafana-plugin/
           yarn install --frozen-lockfile
           yarn build
 
       - name: Install dependencies and Build backend
         run: |
-          cd iotdb-connector/grafana-plugin/
+          cd connectors/grafana-plugin/
           ./backend-compile.sh
