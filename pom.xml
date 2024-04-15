@@ -34,6 +34,7 @@
     <description>This is the secondary repository that builds the examples and integration modules for IoTDB.</description>
     <modules>
         <module>connectors</module>
+        <module>distributions</module>
         <module>examples</module>
     </modules>
     <properties>

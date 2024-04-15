@@ -28,7 +28,7 @@
     </parent>
     <artifactId>iotdb-connector</artifactId>
     <packaging>pom</packaging>
-    <name>IoTDB: Connector</name>
+    <name>IoTDB Extras: Connector</name>
     <modules>
         <module>flink-iotdb-connector</module>
         <module>flink-sql-iotdb-connector</module>

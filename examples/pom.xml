@@ -28,7 +28,7 @@
     </parent>
     <artifactId>iotdb-examples</artifactId>
     <packaging>pom</packaging>
-    <name>IoTDB: Examples</name>
+    <name>IoTDB Extras: Examples</name>
     <modules>
         <module>kafka</module>
         <module>rocketmq</module>
