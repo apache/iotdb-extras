@@ -1,1 +1,7 @@
+
+# Maven related
 target/
+
+# IntelliJ relaged
+.idea/
+*.iml
