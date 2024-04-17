@@ -35,12 +35,9 @@
         <module>tsfile</module>
         <module>hadoop</module>
         <module>flink</module>
-        <module>mqtt-customize</module>
-        <module>pipe-opc-ua-sink</module>
         <module>pulsar</module>
         <module>rabbitmq</module>
         <module>flink-sql</module>
-        <module>pipe-count-point-processor</module>
     </modules>
     <build>
         <pluginManagement>
