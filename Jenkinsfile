@@ -66,7 +66,7 @@ pipeline {
             }
             steps {
                 echo 'Building and Unit Test...'
-                sh "mvn ${MVN_TEST_FAIL_IGNORE} clean install -DskipITs"
+                sh "mvn ${MVN_TEST_FAIL_IGNORE} clean install"
             }
             post {
                 always {
