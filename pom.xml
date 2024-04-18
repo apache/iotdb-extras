@@ -1323,6 +1323,7 @@
                             <exclude>**/*.zpln</exclude>
                             <!-- grafana plugin -->
                             <exclude>**/yarn.lock</exclude>
+                            <exclude>licenses/**</exclude>
                         </excludes>
                     </configuration>
                 </plugin>

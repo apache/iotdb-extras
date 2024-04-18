@@ -9,7 +9,7 @@
     "License"); you may not use this file except in compliance
     with the License.  You may obtain a copy of the License at
 
-        http://www.apache.org/licenses/LICENSE-2.0
+      http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing,
     software distributed under the License is distributed on an
@@ -19,20 +19,15 @@
     under the License.
 
 -->
-<assembly>
-    <id>grafana-plugin-bin</id>
-    <formats>
-        <format>dir</format>
-        <format>zip</format>
-    </formats>
-    <baseDirectory>apache-iotdb-${project.version}-grafana-plugin-bin</baseDirectory>
-    <fileSets>
-        <fileSet>
-            <directory>${maven.multiModuleProjectDirectory}/connectors/grafana-plugin/dist</directory>
-            <outputDirectory>iotdb-grafana-plugin/${file.separator}</outputDirectory>
-        </fileSet>
-    </fileSets>
-    <componentDescriptors>
-        <componentDescriptor>common-files.xml</componentDescriptor>
-    </componentDescriptors>
-</assembly>
+<extensions xmlns="http://maven.apache.org/EXTENSIONS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.0.0 http://maven.apache.org/xsd/core-extensions-1.0.0.xsd">
+    <extension>
+        <groupId>com.gradle</groupId>
+        <artifactId>gradle-enterprise-maven-extension</artifactId>
+        <version>1.19.2</version>
+    </extension>
+    <extension>
+        <groupId>com.gradle</groupId>
+        <artifactId>common-custom-user-data-maven-extension</artifactId>
+        <version>1.12.4</version>
+    </extension>
+</extensions>

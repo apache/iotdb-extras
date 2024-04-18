@@ -21,18 +21,12 @@
 -->
 <component xmlns="http://maven.apache.org/ASSEMBLY-COMPONENT/2.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/ASSEMBLY-COMPONENT/2.1.0 http://maven.apache.org/xsd/assembly-component-2.1.0.xsd">
     <fileSets>
-        <!--fileSet>
+        <fileSet>
             <directory>${maven.multiModuleProjectDirectory}/licenses</directory>
             <outputDirectory>licenses</outputDirectory>
-        </fileSet-->
+        </fileSet>
     </fileSets>
     <files>
-        <!--file>
-            <source>${maven.multiModuleProjectDirectory}/README.md</source>
-        </file>
-        <file>
-            <source>${maven.multiModuleProjectDirectory}/README_ZH.md</source>
-        </file>
         <file>
             <source>${maven.multiModuleProjectDirectory}/LICENSE-binary</source>
             <destName>LICENSE</destName>
@@ -41,8 +35,5 @@
             <source>${maven.multiModuleProjectDirectory}/NOTICE-binary</source>
             <destName>NOTICE</destName>
         </file>
-        <file>
-            <source>${maven.multiModuleProjectDirectory}/RELEASE_NOTES.md</source>
-        </file-->
     </files>
 </component>
