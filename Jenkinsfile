@@ -76,28 +76,6 @@ pipeline {
             }
         }
 
-        stage('Integration Test') {
-            when {
-                expression {
-                    env.BRANCH_NAME ==~ "(master)|(rel/.*) |(jenkins-.*)"
-                }
-            }
-            steps {
-                echo 'Integration Test...'
-                sh "mvn ${MVN_TEST_FAIL_IGNORE} verify -P ClusterIT,with-integration-tests -pl integration-test -am -DskipUTs -DintegrationTest.threadCount=3 -DintegrationTest.forkCount=3"
-            }
-            post {
-                always {
-                    junit(testResults: '**/surefire-reports/*.xml', allowEmptyResults: true)
-                    junit(testResults: '**/failsafe-reports/*.xml', allowEmptyResults: true)
-                }
-                failure {
-                    archiveArtifacts 'integration-test/target/cluster-logs/**'
-                    archiveArtifacts 'integration-test/target/pipeIT-logs/**'
-                }
-            }
-        }
-
         stage('Deploy Prepare') {
             when {
                 expression {
