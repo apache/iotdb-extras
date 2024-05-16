@@ -18,6 +18,7 @@
  */
 package org.apache.iotdb.hive;
 
+import jakarta.annotation.Nullable;
 import org.apache.iotdb.hadoop.tsfile.record.HDFSTSRecord;
 
 import org.apache.hadoop.conf.Configuration;
@@ -34,8 +35,6 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.Writable;
-
-import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;

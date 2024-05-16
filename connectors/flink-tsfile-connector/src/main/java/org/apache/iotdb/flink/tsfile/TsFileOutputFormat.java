@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.flink.tsfile;
 
+import jakarta.annotation.Nullable;
 import org.apache.iotdb.flink.tsfile.util.TSFileConfigUtil;
 import org.apache.iotdb.hadoop.fileSystem.HDFSOutput;
 import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
@@ -32,8 +33,6 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.util.HadoopUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-
-import javax.annotation.Nullable;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
