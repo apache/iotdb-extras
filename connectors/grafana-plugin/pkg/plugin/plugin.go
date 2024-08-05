@@ -292,24 +292,26 @@ func (d *IoTDBDataSource) query(cxt context.Context, pCtx backend.PluginContext,
 	// create data frame response.
 	frame := data.NewFrame("response")
 	for i := 0; i < len(queryDataResp.Expressions); i++ {
-		if queryDataResp.Timestamps == nil || len(queryDataResp.Timestamps) == 0 {
-			times := make([]time.Time, 1)
-			tmp := make([]float64, 1)
-			frame.Fields = append(frame.Fields,
-				data.NewField("time", nil, times),
-				data.NewField(queryDataResp.Expressions[i], nil, tmp),
-			)
-			continue
+		if queryDataResp.Timestamps != nil && len(queryDataResp.Timestamps) > 0 {
+			times := make([]time.Time, len(queryDataResp.Timestamps))
+			for c := 0; c < len(queryDataResp.Timestamps); c++ {
+				times[c] = time.Unix(0, queryDataResp.Timestamps[c]*1000000)
+			}
+			if queryDataResp.Values != nil && len(queryDataResp.Values) > 0 {
+				values := recoverType(queryDataResp.Values[i])
+				frame.Fields = append(frame.Fields,
+					data.NewField("time", nil, times),
+					data.NewField(queryDataResp.Expressions[i], nil, values),
+				)
+			}
+		} else {
+			if queryDataResp.Values != nil && len(queryDataResp.Values) > 0 {
+				values := recoverType(queryDataResp.Values[i])
+				frame.Fields = append(frame.Fields,
+					data.NewField(queryDataResp.Expressions[i], nil, values),
+				)
+			}
 		}
-		times := make([]time.Time, len(queryDataResp.Timestamps))
-		for c := 0; c < len(queryDataResp.Timestamps); c++ {
-			times[c] = time.Unix(0, queryDataResp.Timestamps[c]*1000000)
-		}
-		values := recoverType(queryDataResp.Values[i])
-		frame.Fields = append(frame.Fields,
-			data.NewField("time", nil, times),
-			data.NewField(queryDataResp.Expressions[i], nil, values),
-		)
 	}
 
 	response.Frames = append(response.Frames, frame)
