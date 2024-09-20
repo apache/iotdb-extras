@@ -34,7 +34,7 @@ go_path=${check_results/GOPATH=/}
 echo GOPATH="$go_path"
 
 # Get the grafana-plugin-sdk (This also fetches mage 1.15.0)
-go get -u github.com/grafana/grafana-plugin-sdk-go@v0.193.0
+go get -u github.com/grafana/grafana-plugin-sdk-go@v0.250.0
 # As we might have updated the Grafana plugin dependency, update the go.sum file
 go mod tidy
 
