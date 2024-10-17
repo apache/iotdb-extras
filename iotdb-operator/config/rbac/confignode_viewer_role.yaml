@@ -1,0 +1,23 @@
+# permissions for end users to view confignodes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: iotdb-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: confignode-viewer-role
+rules:
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes/status
+  verbs:
+  - get
