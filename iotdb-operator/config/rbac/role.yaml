@@ -5,6 +5,68 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - iotdb.apache.org
   resources:
   - datanodes

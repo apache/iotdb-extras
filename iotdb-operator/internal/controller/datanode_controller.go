@@ -47,6 +47,9 @@ type DataNodeReconciler struct {
 //+kubebuilder:rbac:groups=iotdb.apache.org,resources=datanodes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=iotdb.apache.org,resources=datanodes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=iotdb.apache.org,resources=datanodes/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

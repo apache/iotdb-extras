@@ -44,6 +44,13 @@ type ConfigNodeReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// +kubebuilder:rbac:groups=iotdb.apache.org,resources=confignodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=iotdb.apache.org,resources=confignodes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=iotdb.apache.org,resources=confignodes/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+
 // Reconcile function compares the state specified by the ConfigNode object against the actual cluster state.
 func (r *ConfigNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
