@@ -1,0 +1,169 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: datanodes.iotdb.apache.org
+spec:
+  group: iotdb.apache.org
+  names:
+    kind: DataNode
+    listKind: DataNodeList
+    plural: datanodes
+    singular: datanode
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: DataNode is the Schema for the datanodes API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DataNodeSpec defines the desired state of DataNode
+            properties:
+              envs:
+                additionalProperties:
+                  type: string
+                type: object
+              image:
+                description: Image is the Docker image for the IoTDB instance
+                type: string
+              replicas:
+                description: Replicas is the number of instances to deploy
+                type: integer
+              resources:
+                description: Resources defines the compute resources (requests/limits)
+                properties:
+                  limits:
+                    description: Limits is the upper limit of resources
+                    properties:
+                      cpu:
+                        description: CPU requested or limited in the format (e.g.,
+                          500m)
+                        type: string
+                      memory:
+                        description: Memory requested or limited in the format (e.g.,
+                          1Gi)
+                        type: string
+                    required:
+                    - cpu
+                    - memory
+                    type: object
+                  requests:
+                    description: Requests is the amount of compute resources required.
+                    properties:
+                      cpu:
+                        description: CPU requested or limited in the format (e.g.,
+                          500m)
+                        type: string
+                      memory:
+                        description: Memory requested or limited in the format (e.g.,
+                          1Gi)
+                        type: string
+                    required:
+                    - cpu
+                    - memory
+                    type: object
+                required:
+                - limits
+                - requests
+                type: object
+              service:
+                description: Service defines the Kubernetes Service to be created
+                properties:
+                  ports:
+                    additionalProperties:
+                      format: int32
+                      type: integer
+                    description: Ports are the map of Service ports
+                    type: object
+                  type:
+                    description: Type determines how the Service is exposed
+                    type: string
+                required:
+                - ports
+                - type
+                type: object
+              volumeClaimTemplates:
+                description: VolumeClaimTemplates allow the creation of persistent
+                  volume claims
+                items:
+                  description: VolumeClaimTemplate specifies data volume specifications
+                    of the storage.
+                  properties:
+                    spec:
+                      description: Spec defines the desired characteristics of a volume
+                        requested by a pod author.
+                      properties:
+                        accessModes:
+                          items:
+                            type: string
+                          type: array
+                        name:
+                          description: AccessModes contains all ways the volume can
+                            be mounted
+                          type: string
+                        resources:
+                          description: Resources represents the minimum resources
+                            required
+                          properties:
+                            requests:
+                              description: Requests is the amount of compute resources
+                                required.
+                              properties:
+                                storage:
+                                  description: Requests is the amount of compute resources
+                                    required.
+                                  type: string
+                              required:
+                              - storage
+                              type: object
+                          required:
+                          - requests
+                          type: object
+                        storageClassName:
+                          description: A label query over volumes to consider for
+                            binding.
+                          type: string
+                      required:
+                      - accessModes
+                      - name
+                      - resources
+                      - storageClassName
+                      type: object
+                  required:
+                  - spec
+                  type: object
+                type: array
+            required:
+            - image
+            - replicas
+            - resources
+            - volumeClaimTemplates
+            type: object
+          status:
+            description: DataNodeStatus defines the observed state of DataNode
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

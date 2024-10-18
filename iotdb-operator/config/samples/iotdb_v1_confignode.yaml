@@ -1,0 +1,24 @@
+apiVersion: iotdb.apache.org/v1
+kind: ConfigNode
+metadata:
+  name: iotdb-confignode
+spec:
+  image: apache/iotdb:1.3.2-confignode
+  replicas: 1
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+  envs:
+    cn_internal_port: "10710"
+  volumeClaimTemplates:
+    - spec:
+        name: confignode-storage
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 1Gi
