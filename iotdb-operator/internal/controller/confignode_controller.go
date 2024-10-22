@@ -1,5 +1,5 @@
 /*
-Copyright 2024 luke.miao.
+Copyright 2024.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	. "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -79,12 +78,13 @@ func (r *ConfigNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		} else if err != nil {
 			return ctrl.Result{}, err
-		}
-
-		// Ensure the service is up-to-date
-		if !reflect.DeepEqual(existingService, service) {
-			if err := r.Update(ctx, &service); err != nil {
-				return ctrl.Result{}, err
+		} else {
+			// Ensure the service is up-to-date
+			if !reflect.DeepEqual(existingService.Spec, service.Spec) {
+				service.ResourceVersion = existingService.ResourceVersion
+				if err := r.Update(ctx, &service); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 		}
 	}
@@ -92,23 +92,27 @@ func (r *ConfigNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Ensure StatefulSet exists and is up-to-date
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		current := &appsv1.StatefulSet{}
-		if err := r.Get(ctx, types.NamespacedName{Name: configNode.Name, Namespace: configNode.Namespace}, current); err != nil {
-			if errors.IsNotFound(err) {
-				statefulset := r.constructStateFulSetForConfigNode(&configNode)
-				return r.Create(ctx, statefulset)
+		err := r.Get(ctx, types.NamespacedName{Name: configNode.Name, Namespace: configNode.Namespace}, current)
+		if err != nil && errors.IsNotFound(err) {
+			stateFulSet := r.constructStateFulSetForConfigNode(&configNode)
+			if err := r.Create(ctx, stateFulSet); err != nil {
+				return err
 			}
+			return nil
+		} else if err != nil {
 			return err
 		}
 
-		updatedStatefulset := r.constructStateFulSetForConfigNode(&configNode)
-		if !reflect.DeepEqual(current.Spec, updatedStatefulset.Spec) {
-			return r.Update(ctx, updatedStatefulset)
+		updatedStateFulSet := r.constructStateFulSetForConfigNode(&configNode)
+		if !reflect.DeepEqual(current.Spec, updatedStateFulSet.Spec) {
+			updatedStateFulSet.ResourceVersion = current.ResourceVersion
+			return r.Update(ctx, updatedStateFulSet)
 		}
 		return nil
 	})
 
 	if err != nil {
-		logger.Error(err, "Failed to update Statefulset for IoTDB ConfigNode")
+		logger.Error(err, "Failed to update StateFulSet for IoTDB ConfigNode")
 		return ctrl.Result{}, err
 	}
 
@@ -150,84 +154,79 @@ func (r *ConfigNodeReconciler) constructStateFulSetForConfigNode(configNode *iot
 	envVars[envNum+1] = corev1.EnvVar{Name: "cn_seed_config_node", Value: val1}
 	envVars[envNum+2] = corev1.EnvVar{Name: "cn_internal_address", Value: val2}
 
-	if len(configNode.Spec.VolumeClaimTemplates) == 1 {
-		volumeClaimTemplates := make([]corev1.PersistentVolumeClaim, len(configNode.Spec.VolumeClaimTemplates))
-		pvcTemplate := configNode.Spec.VolumeClaimTemplates[0]
-		pvcName := pvcTemplate.Spec.Name
-		volumeClaimTemplates[0] = *r.constructPVCForConfigNode(configNode, pvcTemplate, pvcName)
-		statefulset := &appsv1.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ConfigNodeName,
-				Namespace: configNode.Namespace,
-				Labels:    labels,
+	pvcTemplate := *r.constructPVCForConfigNode(configNode)
+	pvcName := pvcTemplate.Name
+	statefulset := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ConfigNodeName,
+			Namespace: configNode.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
 			},
-			Spec: appsv1.StatefulSetSpec{
-				Replicas: &replicas,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: labels,
+			ServiceName: ConfigNodeName + "-headless",
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
 				},
-				ServiceName: ConfigNodeName + "-headless",
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: labels,
-					},
-					Spec: corev1.PodSpec{
-						Affinity: &corev1.Affinity{
-							PodAntiAffinity: &corev1.PodAntiAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: labels,
-										},
-										TopologyKey: "kubernetes.io/hostname",
+				Spec: corev1.PodSpec{
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: labels,
 									},
-								},
-							},
-						},
-						Containers: []corev1.Container{
-							{
-								Name:            ConfigNodeName,
-								Image:           configNode.Spec.Image,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								Ports: []corev1.ContainerPort{
-									{Name: "internal", ContainerPort: 10710},
-									{Name: "consensus", ContainerPort: 10720},
-								},
-								Resources: corev1.ResourceRequirements{
-									Limits: corev1.ResourceList{
-										corev1.ResourceCPU:    resource.MustParse(configNode.Spec.Resources.Limits.CPU),
-										corev1.ResourceMemory: resource.MustParse(configNode.Spec.Resources.Limits.Memory),
-									},
-									Requests: corev1.ResourceList{
-										corev1.ResourceCPU:    resource.MustParse(configNode.Spec.Resources.Limits.CPU),
-										corev1.ResourceMemory: resource.MustParse(configNode.Spec.Resources.Limits.Memory),
-									},
-								},
-								Env: envVars,
-								VolumeMounts: []corev1.VolumeMount{
-									{Name: pvcName, MountPath: "/iotdb/data", SubPath: "data"},
-									{Name: pvcName, MountPath: "/iotdb/logs", SubPath: "logs"},
-									{Name: pvcName, MountPath: "/iotdb/ext", SubPath: "ext"},
-									{Name: pvcName, MountPath: "/iotdb/.env", SubPath: ".env"},
-									{Name: pvcName, MountPath: "/iotdb/activation", SubPath: "activation"},
+									TopologyKey: "kubernetes.io/hostname",
 								},
 							},
 						},
 					},
+					Containers: []corev1.Container{
+						{
+							Name:            ConfigNodeName,
+							Image:           configNode.Spec.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{Name: "internal", ContainerPort: 10710},
+								{Name: "consensus", ContainerPort: 10720},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    *configNode.Spec.Resources.Limits.Cpu(),
+									corev1.ResourceMemory: *configNode.Spec.Resources.Limits.Memory(),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    *configNode.Spec.Resources.Limits.Cpu(),
+									corev1.ResourceMemory: *configNode.Spec.Resources.Limits.Memory(),
+								},
+							},
+							Env: envVars,
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: pvcName, MountPath: "/iotdb/data", SubPath: "data"},
+								{Name: pvcName, MountPath: "/iotdb/logs", SubPath: "logs"},
+								{Name: pvcName, MountPath: "/iotdb/ext", SubPath: "ext"},
+								{Name: pvcName, MountPath: "/iotdb/.env", SubPath: ".env"},
+								{Name: pvcName, MountPath: "/iotdb/activation", SubPath: "activation"},
+							},
+						},
+					},
 				},
-				VolumeClaimTemplates: volumeClaimTemplates,
 			},
-		}
-		controllerutil.SetControllerReference(configNode, statefulset, r.Scheme)
-		return statefulset
-	} else {
-		//todo add check
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{pvcTemplate},
+		},
 	}
-	return nil
+	err := SetControllerReference(configNode, statefulset, r.Scheme)
+	if err != nil {
+		return nil
+	}
+	return statefulset
 }
 
 func (r *ConfigNodeReconciler) constructServicesForConfigNode(configNode *iotdbv1.ConfigNode) ([]corev1.Service, error) {
-	// 创建Headless Service
 	headlessService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ConfigNodeName + "-headless",
@@ -253,15 +252,15 @@ func (r *ConfigNodeReconciler) constructServicesForConfigNode(configNode *iotdbv
 			},
 		},
 	}
-	controllerutil.SetControllerReference(configNode, headlessService, r.Scheme)
+	err := SetControllerReference(configNode, headlessService, r.Scheme)
+	if err != nil {
+		return nil, err
+	}
 
 	services := []corev1.Service{*headlessService}
-
-	// 检查是否需要创建NodePort Service
 	if configNode.Spec.Service != nil && len(configNode.Spec.Service.Ports) > 0 {
 		for key, value := range configNode.Spec.Service.Ports {
 			if key == "cn_metric_prometheus_reporter_port" {
-				// 创建NodePort Service
 				nodePortService := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      ConfigNodeName,
@@ -283,42 +282,30 @@ func (r *ConfigNodeReconciler) constructServicesForConfigNode(configNode *iotdbv
 						},
 					},
 				}
-				controllerutil.SetControllerReference(configNode, nodePortService, r.Scheme)
+				err := SetControllerReference(configNode, nodePortService, r.Scheme)
+				if err != nil {
+					return nil, err
+				}
 				services = append(services, *nodePortService)
 			}
 		}
 	}
-
 	return services, nil
 }
 
-func (r *ConfigNodeReconciler) constructPVCForConfigNode(configNode *iotdbv1.ConfigNode, template iotdbv1.VolumeClaimTemplate, pvcName string) *corev1.PersistentVolumeClaim {
-	accessModes := make([]corev1.PersistentVolumeAccessMode, len(template.Spec.AccessModes))
-	for i, mode := range template.Spec.AccessModes {
-		accessModes[i] = corev1.PersistentVolumeAccessMode(mode)
-	}
-
-	resourceRequirements := corev1.VolumeResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceStorage: resource.MustParse(template.Spec.Resources.Requests.Storage),
-		},
-	}
+func (r *ConfigNodeReconciler) constructPVCForConfigNode(configNode *iotdbv1.ConfigNode) *corev1.PersistentVolumeClaim {
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
+			Name:      ConfigNodeName,
 			Namespace: configNode.Namespace,
 			Labels:    map[string]string{"app": ConfigNodeName},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes:      accessModes,
-			Resources:        resourceRequirements,
-			StorageClassName: &template.Spec.StorageClassName,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": pvcName},
-			},
-		},
+		Spec: configNode.Spec.VolumeClaimTemplate,
 	}
-	controllerutil.SetControllerReference(configNode, pvc, r.Scheme)
+	err := SetControllerReference(configNode, pvc, r.Scheme)
+	if err != nil {
+		return nil
+	}
 	return pvc
 }
 

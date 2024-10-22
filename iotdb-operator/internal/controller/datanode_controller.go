@@ -1,5 +1,5 @@
 /*
-Copyright 2024 luke.miao.
+Copyright 2024.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	. "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,15 +50,7 @@ type DataNodeReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the DataNode object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
+// Reconcile function compares the state specified by the DataNode object against the actual cluster state.
 func (r *DataNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
@@ -87,36 +78,42 @@ func (r *DataNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 		} else if err != nil {
 			return ctrl.Result{}, err
-		}
-
-		// Ensure the service is up-to-date
-		if !reflect.DeepEqual(existingService, service) {
-			if err := r.Update(ctx, &service); err != nil {
-				return ctrl.Result{}, err
+		} else {
+			// Ensure the service is up-to-date
+			if !reflect.DeepEqual(existingService.Spec, service.Spec) {
+				service.ResourceVersion = existingService.ResourceVersion
+				if err := r.Update(ctx, &service); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 		}
+
 	}
 
 	// Ensure StatefulSet exists and is up-to-date
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		current := &appsv1.StatefulSet{}
 		if err := r.Get(ctx, types.NamespacedName{Name: dataNode.Name, Namespace: dataNode.Namespace}, current); err != nil {
-			if errors.IsNotFound(err) {
-				statefulset := r.constructStateFulSetForDataNode(&dataNode)
-				return r.Create(ctx, statefulset)
+			if err != nil && errors.IsNotFound(err) {
+				stateFulSet := r.constructStateFulSetForDataNode(&dataNode)
+				if err := r.Create(ctx, stateFulSet); err != nil {
+					return err
+				}
+				return nil
 			}
 			return err
 		}
 
-		updatedStatefulset := r.constructStateFulSetForDataNode(&dataNode)
-		if !reflect.DeepEqual(current.Spec, updatedStatefulset.Spec) {
-			return r.Update(ctx, updatedStatefulset)
+		updatedStateFulSet := r.constructStateFulSetForDataNode(&dataNode)
+		if !reflect.DeepEqual(current.Spec, updatedStateFulSet.Spec) {
+			updatedStateFulSet.ResourceVersion = current.ResourceVersion
+			return r.Update(ctx, updatedStateFulSet)
 		}
 		return nil
 	})
 
 	if err != nil {
-		logger.Error(err, "Failed to update Statefulset for IoTDB DataNode")
+		logger.Error(err, "Failed to update StateFulSet for IoTDB DataNode")
 		return ctrl.Result{}, err
 	}
 
@@ -166,89 +163,84 @@ func (r *DataNodeReconciler) constructStateFulSetForDataNode(dataNode *iotdbv1.D
 	envVars[envNum+1] = corev1.EnvVar{Name: "dn_seed_config_node", Value: val1}
 	envVars[envNum+2] = corev1.EnvVar{Name: "dn_internal_address", Value: val2}
 
-	if len(dataNode.Spec.VolumeClaimTemplates) == 1 {
-		volumeClaimTemplates := make([]corev1.PersistentVolumeClaim, len(dataNode.Spec.VolumeClaimTemplates))
-		pvcTemplate := dataNode.Spec.VolumeClaimTemplates[0]
-		pvcName := pvcTemplate.Spec.Name
-		volumeClaimTemplates[0] = *r.constructPVCForDataNode(dataNode, pvcTemplate)
-		statefulset := &appsv1.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DataNodeName,
-				Namespace: dataNode.Namespace,
-				Labels:    labels,
+	pvcTemplate := *r.constructPVCForDataNode(dataNode)
+	pvcName := pvcTemplate.Name
+	statefulset := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DataNodeName,
+			Namespace: dataNode.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
 			},
-			Spec: appsv1.StatefulSetSpec{
-				Replicas: &replicas,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: labels,
+			ServiceName: DataNodeName + "-headless",
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
 				},
-				ServiceName: DataNodeName + "-headless",
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: labels,
-					},
-					Spec: corev1.PodSpec{
-						Affinity: &corev1.Affinity{
-							PodAntiAffinity: &corev1.PodAntiAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: labels,
-										},
-										TopologyKey: "kubernetes.io/hostname",
+				Spec: corev1.PodSpec{
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: labels,
 									},
-								},
-							},
-						},
-						Containers: []corev1.Container{
-							{
-								Name:            DataNodeName,
-								Image:           dataNode.Spec.Image,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								Ports: []corev1.ContainerPort{
-									{Name: "rpc-port", ContainerPort: 6667},
-									{Name: "internal-port", ContainerPort: 10730},
-									{Name: "exchange-port", ContainerPort: 10740},
-									{Name: "schema-port", ContainerPort: 10750},
-									{Name: "data-port", ContainerPort: 10760},
-									{Name: "rest-port", ContainerPort: 18080},
-									{Name: "metric-port", ContainerPort: 9092},
-								},
-								Resources: corev1.ResourceRequirements{
-									Limits: corev1.ResourceList{
-										corev1.ResourceCPU:    resource.MustParse(dataNode.Spec.Resources.Limits.CPU),
-										corev1.ResourceMemory: resource.MustParse(dataNode.Spec.Resources.Limits.Memory),
-									},
-									Requests: corev1.ResourceList{
-										corev1.ResourceCPU:    resource.MustParse(dataNode.Spec.Resources.Limits.CPU),
-										corev1.ResourceMemory: resource.MustParse(dataNode.Spec.Resources.Limits.Memory),
-									},
-								},
-								Env: envVars,
-								VolumeMounts: []corev1.VolumeMount{
-									{Name: pvcName, MountPath: "/iotdb/data", SubPath: "data"},
-									{Name: pvcName, MountPath: "/iotdb/logs", SubPath: "logs"},
-									{Name: pvcName, MountPath: "/iotdb/ext", SubPath: "ext"},
-									{Name: pvcName, MountPath: "/iotdb/.env", SubPath: ".env"},
-									{Name: pvcName, MountPath: "/iotdb/activation", SubPath: "activation"},
+									TopologyKey: "kubernetes.io/hostname",
 								},
 							},
 						},
 					},
+					Containers: []corev1.Container{
+						{
+							Name:            DataNodeName,
+							Image:           dataNode.Spec.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{Name: "rpc-port", ContainerPort: 6667},
+								{Name: "internal-port", ContainerPort: 10730},
+								{Name: "exchange-port", ContainerPort: 10740},
+								{Name: "schema-port", ContainerPort: 10750},
+								{Name: "data-port", ContainerPort: 10760},
+								{Name: "rest-port", ContainerPort: 18080},
+								{Name: "metric-port", ContainerPort: 9092},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    *dataNode.Spec.Resources.Limits.Cpu(),
+									corev1.ResourceMemory: *dataNode.Spec.Resources.Limits.Memory(),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    *dataNode.Spec.Resources.Limits.Cpu(),
+									corev1.ResourceMemory: *dataNode.Spec.Resources.Limits.Memory(),
+								},
+							},
+							Env: envVars,
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: pvcName, MountPath: "/iotdb/data", SubPath: "data"},
+								{Name: pvcName, MountPath: "/iotdb/logs", SubPath: "logs"},
+								{Name: pvcName, MountPath: "/iotdb/ext", SubPath: "ext"},
+								{Name: pvcName, MountPath: "/iotdb/.env", SubPath: ".env"},
+								{Name: pvcName, MountPath: "/iotdb/activation", SubPath: "activation"},
+							},
+						},
+					},
 				},
-				VolumeClaimTemplates: volumeClaimTemplates,
 			},
-		}
-		controllerutil.SetControllerReference(dataNode, statefulset, r.Scheme)
-		return statefulset
-	} else {
-		//todo add check
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{pvcTemplate},
+		},
 	}
-	return nil
+	err := SetControllerReference(dataNode, statefulset, r.Scheme)
+	if err != nil {
+		return nil
+	}
+	return statefulset
 }
 
 func (r *DataNodeReconciler) constructServiceForDataNode(dataNode *iotdbv1.DataNode) ([]corev1.Service, error) {
-	// 创建Headless Service
 	headlessService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DataNodeName + "-headless",
@@ -299,7 +291,10 @@ func (r *DataNodeReconciler) constructServiceForDataNode(dataNode *iotdbv1.DataN
 			},
 		},
 	}
-	controllerutil.SetControllerReference(dataNode, headlessService, r.Scheme)
+	err := SetControllerReference(dataNode, headlessService, r.Scheme)
+	if err != nil {
+		return nil, err
+	}
 
 	services := []corev1.Service{*headlessService}
 
@@ -353,41 +348,29 @@ func (r *DataNodeReconciler) constructServiceForDataNode(dataNode *iotdbv1.DataN
 					},
 				},
 			}
-			controllerutil.SetControllerReference(dataNode, nodePortService, r.Scheme)
+			err := SetControllerReference(dataNode, nodePortService, r.Scheme)
+			if err != nil {
+				return nil, err
+			}
 			services = append(services, *nodePortService)
 		}
 	}
 	return services, nil
 }
 
-func (r *DataNodeReconciler) constructPVCForDataNode(dataNode *iotdbv1.DataNode, template iotdbv1.VolumeClaimTemplate) *corev1.PersistentVolumeClaim {
-	pvcName := template.Spec.Name
-	accessModes := make([]corev1.PersistentVolumeAccessMode, len(template.Spec.AccessModes))
-	for i, mode := range template.Spec.AccessModes {
-		accessModes[i] = corev1.PersistentVolumeAccessMode(mode)
-	}
-
-	resourceRequirements := corev1.VolumeResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceStorage: resource.MustParse(template.Spec.Resources.Requests.Storage),
-		},
-	}
+func (r *DataNodeReconciler) constructPVCForDataNode(dataNode *iotdbv1.DataNode) *corev1.PersistentVolumeClaim {
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
+			Name:      DataNodeName,
 			Namespace: dataNode.Namespace,
 			Labels:    map[string]string{"app": DataNodeName},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes:      accessModes,
-			Resources:        resourceRequirements,
-			StorageClassName: &template.Spec.StorageClassName,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": pvcName},
-			},
-		},
+		Spec: dataNode.Spec.VolumeClaimTemplate,
 	}
-	controllerutil.SetControllerReference(dataNode, pvc, r.Scheme)
+	err := SetControllerReference(dataNode, pvc, r.Scheme)
+	if err != nil {
+		return nil
+	}
 	return pvc
 }
 
@@ -395,5 +378,7 @@ func (r *DataNodeReconciler) constructPVCForDataNode(dataNode *iotdbv1.DataNode,
 func (r *DataNodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&iotdbv1.DataNode{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

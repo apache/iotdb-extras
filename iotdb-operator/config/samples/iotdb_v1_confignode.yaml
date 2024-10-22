@@ -14,11 +14,9 @@ spec:
       cpu: 500m
   envs:
     cn_internal_port: "10710"
-  volumeClaimTemplates:
-    - spec:
-        name: confignode-storage
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: "standard"
-        resources:
-          requests:
-            storage: 1Gi
+  volumeClaimTemplate:
+    accessModes: ["ReadWriteOnce"]
+    storageClassName: ""
+    resources:
+      requests:
+        storage: 1Gi

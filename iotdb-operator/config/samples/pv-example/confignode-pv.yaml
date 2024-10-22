@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: datanode-storage1
+  name: confignode-storage1
   labels:
-    app: datanode-storage
+    app: confignode-storage
 spec:
   capacity:
     storage: 1Gi
-  storageClassName: standard
+  storageClassName: ""
   accessModes:
     - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Delete
+  persistentVolumeReclaimPolicy: Retain
   hostPath:
-    path: /data/k8s_iotdb/data/datanode1
+    path: /data/k8s_iotdb/data/confignode1
     type: DirectoryOrCreate

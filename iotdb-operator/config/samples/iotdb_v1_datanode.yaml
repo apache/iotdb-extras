@@ -4,7 +4,7 @@ metadata:
   name: iotdb-datanode
 spec:
   image: apache/iotdb:1.3.2-datanode
-  replicas: 2
+  replicas: 1
   resources:
     requests:
       memory: 1Gi
@@ -18,11 +18,9 @@ spec:
     type: NodePort
     ports:
       dn_rpc_port: 30667
-  volumeClaimTemplates:
-    - spec:
-        name: datanode-storage
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: "standard"
-        resources:
-          requests:
-            storage: 1Gi
+  volumeClaimTemplate:
+    accessModes: [ "ReadWriteOnce" ]
+    storageClassName: ""
+    resources:
+      requests:
+        storage: 1Gi

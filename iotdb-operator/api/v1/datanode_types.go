@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +30,7 @@ type DataNodeSpec struct {
 	Replicas int `json:"replicas"`
 
 	// Resources defines the compute resources (requests/limits)
-	Resources ResourceRequirements `json:"resources"`
+	Resources corev1.ResourceRequirements `json:"resources"`
 
 	Envs map[string]string `json:"envs,omitempty"`
 
@@ -37,7 +38,7 @@ type DataNodeSpec struct {
 	Service *ServiceSpec `json:"service,omitempty"`
 
 	// VolumeClaimTemplates allow the creation of persistent volume claims
-	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates"`
+	VolumeClaimTemplate corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplate"`
 }
 
 // DataNodeStatus defines the observed state of DataNode
