@@ -136,6 +136,18 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ConfigNode")
 		os.Exit(1)
 	}
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = (&iotdbv1.ConfigNode{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ConfigNode")
+			os.Exit(1)
+		}
+	}
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = (&iotdbv1.DataNode{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "DataNode")
+			os.Exit(1)
+		}
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
