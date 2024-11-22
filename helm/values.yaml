@@ -1,0 +1,44 @@
+# Default values for iotdb-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: "iotdb"
+fullnameOverride: "iotdb"
+
+image:
+  repository: nexus.infra.timecho.com:8143/timecho/iotdb-enterprise
+  pullPolicy: IfNotPresent
+  tag: 1.3.3.2-standalone
+
+storage:
+  className: local-storage
+
+datanode:
+  name: datanode
+  nodeCount: 3
+  enableRestService: true
+  storageCapacity: 200Gi
+  resources:
+    requests:
+      memory: 8Gi
+      cpu: 4000m
+    limits:
+      memory: 16Gi
+      cpu: 8000m
+
+confignode:
+  name: confignode
+  nodeCount: 3
+  storageCapacity: 100Gi
+  resources:
+    requests:
+      memory: 2048Mi
+      cpu: 2000m
+    limits:
+      memory: 4096Mi
+      cpu: 4000m
+  configNodeConsensusProtocolClass: org.apache.iotdb.consensus.ratis.RatisConsensus
+  schemaReplicationFactor: 3
+  schemaRegionConsensusProtocolClass: org.apache.iotdb.consensus.ratis.RatisConsensus
+  dataReplicationFactor: 2
+  dataRegionConsensusProtocolClass: org.apache.iotdb.consensus.iot.IoTConsensus

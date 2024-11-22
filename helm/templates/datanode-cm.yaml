@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.datanode.name }}-cm
+  namespace: {{ .Release.Namespace }}
+data:
+  iotdb-system.properties: |
+    dn_rpc_address=<HOSTNAME>.{{ .Values.datanode.name }}-svc.{{ .Release.Namespace }}
+    dn_internal_address=<HOSTNAME>.{{ .Values.datanode.name }}-svc.{{ .Release.Namespace }}
+    dn_seed_config_node={{ .Values.confignode.name }}-0.{{ .Values.confignode.name }}-svc.{{ .Release.Namespace }}:10710
+    enable_rest_service={{ .Values.datanode.enableRestService }}
