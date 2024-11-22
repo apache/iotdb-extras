@@ -1,0 +1,115 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.datanode.name }}-svc
+  labels:
+    app: {{ .Values.datanode.name }}
+spec:
+  type: NodePort
+  ports:
+    - port: 6667
+      targetPort: 6667
+      name: rpc
+  selector:
+    app: {{ .Values.datanode.name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.datanode.name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.datanode.name }}
+  serviceName: {{ .Values.datanode.name }}-svc
+  replicas: {{ .Values.datanode.nodeCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.datanode.name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      initContainers:
+      - name: init-datanode
+        image: busybox
+        command: [ 'sh', '-c', 'mkdir -p /iotdb/ && touch /iotdb/.env' ]
+        volumeMounts:
+        - name: map-datanode
+          mountPath: /iotdb
+      containers:
+      - name: datanode
+        image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag }}
+        command: ["/bin/bash", "-c", "/iotdb/sbin/entrypoint.sh datanode;cp /iotdb/.env /iotdb/activation/.env"]
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.datanode.name }}-cm
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: dn_rpc_address
+            value: "$(POD_NAME).{{ .Values.datanode.name }}-svc.{{ .Release.Namespace }}"
+          - name: dn_internal_address
+            value: "$(POD_NAME).{{ .Values.datanode.name }}-svc.{{ .Release.Namespace }}"
+        ports:
+        - containerPort: 80
+          name: web
+        - containerPort: 6667
+          name: rpc
+        - containerPort: 18080
+          name: rest
+        - containerPort: 10730
+          name: internal
+        - containerPort: 10740
+          name: mpp-exchange
+        - containerPort: 10750
+          name: schema-cons
+        - containerPort: 10760
+          name: data-cons
+        volumeMounts:
+        - name: map-datanode
+          mountPath: /iotdb/data
+          subPath: data
+        - name: map-datanode
+          mountPath: /iotdb/ext
+          subPath: ext
+        - name: map-datanode
+          mountPath: /iotdb/logs
+          subPath: logs
+        - name: map-datanode
+          mountPath: /iotdb/.env
+          subPath: .env
+        resources:
+          requests:
+            cpu: {{ .Values.datanode.resources.requests.cpu }}
+            memory: {{ .Values.datanode.resources.requests.memory }}
+  volumeClaimTemplates:
+    - metadata:
+        name: map-datanode
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: {{ .Values.storage.className }}
+        resources:
+          requests:
+            storage: {{ .Values.datanode.storageCapacity }}

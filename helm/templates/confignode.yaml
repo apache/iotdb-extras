@@ -1,0 +1,105 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.confignode.name }}-svc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.confignode.name }}
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      name: rpc
+  selector:
+    app: {{ .Values.confignode.name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.confignode.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.confignode.name }}
+  serviceName: {{ .Values.confignode.name }}-svc
+  replicas: {{ .Values.confignode.nodeCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.confignode.name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      initContainers:
+      - name: init-confignode
+        image: busybox
+        command: [ 'sh', '-c', 'mkdir -p /iotdb/ && touch /iotdb/.env' ]
+        volumeMounts:
+        - name: map-confignode
+          mountPath: /iotdb
+      containers:
+      - name: confignode
+        image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag }}
+        command: ["/bin/bash", "-c", "/iotdb/sbin/entrypoint.sh confignode"]
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.confignode.name }}-cm
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: cn_internal_address
+            value: "$(POD_NAME).{{ .Values.confignode.name }}-svc.{{ .Release.Namespace }}"
+        ports:
+        - containerPort: 80
+          name: web
+        - containerPort: 10710
+          name: internal
+        - containerPort: 10720
+          name: consensus
+        volumeMounts:
+        - name: map-confignode
+          mountPath: /iotdb/data
+          subPath: data
+        - name: map-confignode
+          mountPath: /iotdb/ext
+          subPath: ext
+        - name: map-confignode
+          mountPath: /iotdb/logs
+          subPath: logs
+        - name: map-confignode
+          mountPath: /iotdb/.env
+          subPath: .env
+        resources:
+          requests:
+            cpu: {{ .Values.confignode.resources.requests.cpu }}
+            memory: {{ .Values.confignode.resources.requests.memory }}
+  volumeClaimTemplates:
+    - metadata:
+        name: map-confignode
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: {{ .Values.storage.className }}
+        resources:
+          requests:
+            storage: {{ .Values.confignode.storageCapacity }}
