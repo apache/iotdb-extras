@@ -159,7 +159,7 @@
         <sonar.junit.reportPaths>target/surefire-reports,target/failsafe-reports</sonar.junit.reportPaths>
         <sonar.organization>apache</sonar.organization>
         <spark-scala.2.11.version>2.4.8</spark-scala.2.11.version>
-        <spark-scala.2.12.version>3.5.0</spark-scala.2.12.version>
+        <spark-scala.2.12.version>3.5.1</spark-scala.2.12.version>
         <!-- Override this to `true`, if you want to disable spotless -->
         <spotless.skip>false</spotless.skip>
         <!-- This was the last version to support Java 8 -->
