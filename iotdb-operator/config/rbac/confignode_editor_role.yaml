@@ -1,0 +1,27 @@
+# permissions for end users to edit confignodes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: iotdb-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: confignode-editor-role
+rules:
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes/status
+  verbs:
+  - get
