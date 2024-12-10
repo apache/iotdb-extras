@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -325,7 +326,7 @@ func recoverType(m []interface{}) interface{} {
 			tmp := make([]float64, len(m))
 			for i := range m {
 				if m[i] == nil {
-					tmp[i] = 0
+					tmp[i] = math.NaN()
 				} else {
 					tmp[i] = m[i].(float64)
 				}
@@ -340,7 +341,9 @@ func recoverType(m []interface{}) interface{} {
 		case bool:
 			tmp := make([]float64, len(m))
 			for i := range m {
-				if m[i].(bool) {
+				if m[i] == nil {
+					tmp[i] = math.NaN()
+				} else if m[i].(bool) {
 					tmp[i] = 1
 				} else {
 					tmp[i] = 0
@@ -351,7 +354,7 @@ func recoverType(m []interface{}) interface{} {
 			tmp := make([]float64, len(m))
 			for i := range m {
 				if m[i] == nil {
-					tmp[i] = 0
+					tmp[i] = math.NaN()
 				} else {
 					tmp[i] = m[i].(float64)
 				}
