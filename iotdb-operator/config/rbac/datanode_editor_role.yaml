@@ -1,0 +1,27 @@
+# permissions for end users to edit datanodes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: iotdb-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: datanode-editor-role
+rules:
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - datanodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - datanodes/status
+  verbs:
+  - get
