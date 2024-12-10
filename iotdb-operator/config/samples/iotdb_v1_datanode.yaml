@@ -1,0 +1,26 @@
+apiVersion: iotdb.apache.org/v1
+kind: DataNode
+metadata:
+  name: iotdb-datanode
+spec:
+  image: apache/iotdb:1.3.2-datanode
+  replicas: 1
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+  envs:
+    dn_internal_port: "10730"
+  service:
+    type: NodePort
+    ports:
+      dn_rpc_port: 30667
+  volumeClaimTemplate:
+    accessModes: [ "ReadWriteOnce" ]
+    storageClassName: ""
+    resources:
+      requests:
+        storage: 1Gi

@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- iotdb_v1_datanode.yaml
+- iotdb_v1_confignode.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

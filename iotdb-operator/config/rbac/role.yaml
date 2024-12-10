@@ -1,0 +1,102 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - confignodes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - datanodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - datanodes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - iotdb.apache.org
+  resources:
+  - datanodes/status
+  verbs:
+  - get
+  - patch
+  - update
