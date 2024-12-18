@@ -313,6 +313,7 @@ func (d *IoTDBDataSource) query(cxt context.Context, pCtx backend.PluginContext,
 				)
 			}
 		}
+
 	}
 
 	response.Frames = append(response.Frames, frame)
