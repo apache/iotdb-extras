@@ -1321,6 +1321,9 @@
                             <exclude>**/*.json</exclude>
                             <!-- the zeppelin export file format-->
                             <exclude>**/*.zpln</exclude>
+                            <!-- exclude go.mod, go.sum submodule-->
+                            <exclude>**/go.mod</exclude>
+                            <exclude>**/go.sum</exclude>
                             <!-- grafana plugin -->
                             <exclude>**/yarn.lock</exclude>
                             <exclude>licenses/**</exclude>
