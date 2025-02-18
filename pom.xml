@@ -28,7 +28,7 @@
     </parent>
     <groupId>org.apache.iotdb</groupId>
     <artifactId>iotdb-extras-parent</artifactId>
-    <version>1.3.2-SNAPSHOT</version>
+    <version>1.3.2</version>
     <packaging>pom</packaging>
     <name>Apache IoTDB Project Extras Parent POM</name>
     <description>This is the secondary repository that builds the examples and integration modules for IoTDB.</description>
@@ -1321,6 +1321,9 @@
                             <exclude>**/*.json</exclude>
                             <!-- the zeppelin export file format-->
                             <exclude>**/*.zpln</exclude>
+                            <!-- exclude go.mod, go.sum submodule-->
+                            <exclude>**/go.mod</exclude>
+                            <exclude>**/go.sum</exclude>
                             <!-- grafana plugin -->
                             <exclude>**/yarn.lock</exclude>
                             <exclude>licenses/**</exclude>
