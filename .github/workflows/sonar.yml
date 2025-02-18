@@ -62,4 +62,4 @@ jobs:
           -Dsonar.projectKey=apache_iotdb_extras \
           -Dsonar.host.url=https://sonarcloud.io \
           -Dsonar.token=${{ secrets.SONARCLOUD_TOKEN }} \
-          -DskipTests -pl '!distribution' -am
+          -DskipTests -pl '!distributions' -am
