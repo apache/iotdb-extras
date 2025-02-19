@@ -1,0 +1,43 @@
+name: Static Code Analysis
+
+on:
+  push:
+    branches:
+      - master
+      - "new_*"
+    paths-ignore:
+      - "docs/**"
+      - 'site/**'
+  pull_request:
+    branches:
+      - master
+      - "new_*"
+    paths-ignore:
+      - "docs/**"
+      - 'site/**'
+  # allow manually run the action:
+  workflow_dispatch:
+
+jobs:
+  code-analyze:
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java', 'go', 'typescript' ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-extended
+
+      - name: Auto Build
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
