@@ -37,6 +37,7 @@
         <module>distributions</module>
         <module>examples</module>
         <module>iotdb-collector</module>
+        <module>mybatis-generator-plugin</module>
     </modules>
     <properties>
         <!-- Explicitly set a variable used by all dependencies to the IoTDB dependencies, as the release plugin will not update these on a release -->

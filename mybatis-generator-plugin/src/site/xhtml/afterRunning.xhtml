@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+       Copyright 2006-2022 the original author or authors.
+
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+
+          https://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Tasks After Running MyBatis Generator</title>
+  <link rel="stylesheet" type="text/css" href="mbgstyle.css" />
+</head>
+<body>
+<h1>Tasks After Running MyBatis Generator</h1>
+<p>After you run MyBatis Generator (MBG), you will need to create or modify
+   other MyBatis configuration
+   artifacts.  The main task is to create or modify a MapperConfig.xml file.</p>
+
+<h2>Updating the MapperConfig.xml File (MyBatis 3.x)</h2>
+<p>MyBatis 3.x uses an XML file, commonly named <code>MapperConfig.xml</code>,
+to specify
+information for a database connection, a transaction management scheme, and XML mapper
+files that will be used in a MyBatis session.  MBG cannot create this file for you
+because it knows nothing about your execution environment.  However, some of the
+items in this file relate directly to MBG generated items.  Please refer to
+the standard MyBatis data mapper developer guide for details about the different
+configuration options.</p>
+
+<p>MBG specific needs in the configuration file are as follows:</p>
+<ul>
+  <li>MBG generated XML mapper files must be listed</li>
+</ul>
+
+<p>For example, suppose that MBG has generated an XML mapper file called
+<code>MyTableMapper.xml</code>, and that the file has been placed in the
+<code>test.xml</code> package
+of your project.  The <code>MapperConfig.xml</code> file should have these entries:</p>
+<pre>
+  &lt;?xml version="1.0" encoding="UTF-8"?&gt;
+  &lt;!DOCTYPE configuration
+    PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-config.dtd"&gt;
+
+  &lt;configuration&gt;
+    &lt;!-- Setup the transaction manager and data source that are
+         appropriate for your environment
+    --&gt;
+    &lt;environments default"..."&gt;
+      &lt;environment id"..."&gt;
+        &lt;transactionManager type="..."&gt;
+        &lt;/transactionManager&gt;
+        &lt;dataSource type="..."&gt;
+        &lt;/dataSource&gt;
+      &lt;/environment&gt;
+    &lt;/environments&gt;
+
+    &lt;mappers&gt;
+      &lt;!-- XML mapper files should be listed here --&gt;
+      &lt;mapper resource="test/xml/MyTable_SqlMap.xml" /&gt;
+    &lt;/mappers&gt;
+
+  &lt;/configuration&gt;
+</pre>
+
+<p>If there is more than one XML mapper file (as is quite common),
+then the files can be listed in any order with repeated <code>&lt;mapper&gt;</code>
+elements after the <code>&lt;mappers&gt;</code> element.</p>
+
+<p>If you use Java based configuration, or Spring, then you will need to register mappers with your configuration
+in the manner applicable for your environment.</p>
+
+</body>
+</html>

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+       Copyright 2006-2022 the original author or authors.
+
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+
+          https://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Introduction to MyBatis Generator</title>
+  <link rel="stylesheet" type="text/css" href="mbgstyle.css" />
+</head>
+<body>
+<h1>Introduction to MyBatis Generator</h1>
+<p>MyBatis Generator (MBG) is a code generator for MyBatis <a target="_blank" href="http://mybatis.org">MyBatis</a>.
+ It will generate code for all versions of MyBatis.
+ It will introspect a database
+ table (or many tables) and will generate artifacts that can be used to
+ access the table(s).  This lessens the initial nuisance of setting up objects and configuration
+ files to interact with database tables.  MBG seeks to make a major impact on the large
+ percentage of database operations that are simple CRUD (Create, Retrieve, Update, Delete).  You will
+ still need to hand code SQL and objects for join queries, or stored procedures.
+</p>
+<p>MBG generates code in different styles, and for different languages, depending on how it is configured. For example,
+MBG can generate Java or Kotlin code. And MBG can generate MyBatis3 compatible XML - althought that is now considered
+a legacy use of MBG. The newer styles of generated code do not require XML.</p>
+<p>Depending on how it is configured, MyBatis Generator may generate:</p>
+<ul>
+  <li>Java or Kotlin classes that match the table structure.  This may include:
+    <ul>
+      <li>a class to match the primary key of the table (if there is a primary key)</li>
+      <li>a class to match the non-primary key fields of the table (except BLOB fields)</li>
+      <li>a class to include the BLOB fields of a table (if the table has BLOB fields)</li>
+      <li>a class to enable dynamic selects, updates, and deletes</li>
+    </ul>
+    <p>There is an inheritance relationship between these classes as appropriate.
+       Note that the generator may be configured to generate different types of POJO hierarchies -
+       for example, you may choose to generate a single domain object for each table if you so
+       desire.</p>
+  </li>
+  <li>In some cases, MBG will generate MyBatis3 Compatible SQL Map XML Files. MBG generates SQL for simple
+   CRUD functions on each table in a configuration.  The generated SQL
+   statements include:
+    <ul>
+      <li>insert</li>
+      <li>update by primary key</li>
+      <li>update by example (using a dynamic where clause)</li>
+      <li>delete by primary key</li>
+      <li>delete by example (using a dynamic where clause)</li>
+      <li>select by primary key</li>
+      <li>select by example (using a dynamic where clause)</li>
+      <li>count by example</li>
+    </ul>
+   <p>There are different variations of these statements depending on the
+   structure of the table (for example, if the table doesn't have a primary key,
+   then MBG will not generate an update by primary key function).</p>
+  </li>
+  <li>Java or Kotlin client classes, interfaces, and Kotlin extension methods that make appropriate use of the
+    above objects.  The generation of client classes is optional.
+    MBG will generate a mapper interface that works with the MyBatis 3.x mapper infrastructure</li>
+</ul>
+
+<p>MyBatis generator is designed to run well in an iterative development environment, and
+  can be included as an Ant task, or a Maven plugin, in a continuous
+  build environment.
+  Important things to note when running MBG iteratively include:</p>
+
+<ol>
+  <li>MBG will automatically merge XML files if there is an existing file
+      with the same name as the newly generated XML file.  MBG will not overwrite
+      any custom changes you make to the XML files it generates.
+      You can run it over and over again without fear of losing custom changes to you XML.
+      MBG will replace any XML elements that were generated in a previous run.
+      </li>
+  <li>MBG will <b>not</b> merge Java files, it can either overwrite existing files
+      or save newly generated files with a different unique name.  If you make changes
+      to the generated Java files and run MBG iteratively you will have to
+      merge the changes by hand.  When run as an
+      <a target="_blank" href="http://www.eclipse.org">Eclipse</a>
+      plugin, then MBG can automatically merge Java files.</li>
+  <li>MBG will <b>not</b> merge Kotlin files, it can either overwrite existing files
+      or save newly generated files with a different unique name.  If you make changes
+      to the generated Kotlin files and run MBG iteratively you will have to
+      merge the changes by hand.</li>
+</ol>
+
+<h2>Running with Eclipse</h2>
+<p>When running as an Eclipse feature the generator can also merge Java files and save
+user modifications to the generated Java files.  The generator uses the Eclipse Java parser and
+AST walker to accomplish this.  The Eclipse feature also has a few user interface enhancements
+that make the generator somewhat easier to run. Lastly, the Eclipse feature contributes
+a full user manual for the generator to the Eclipse help system.</p>
+<p>The Eclipse feature can be found on the Eclipse marketplace here:
+  <a href="https://marketplace.eclipse.org/content/mybatis-generator">https://marketplace.eclipse.org/content/mybatis-generator</a>.
+</p>
+<h2>Dependencies</h2>
+<p>MBG has no dependencies beyond the JRE.  Java 8 or
+above is required.  Also, a JDBC driver that implements the
+DatabaseMetaData interface, especially the <code>getColumns</code> and
+<code>getPrimaryKeys</code> methods is required.</p>
+
+<h2>Generated Code Dependencies</h2>
+<p>MBG will generate code in different styles. This is controlled by the "targetRuntime" attribute of a
+    &lt;context&gt; element. All runtimes generate code that is dependent on
+    <a href="https://mybatis.org/mybatis-3/">MyBatis</a>.
+    Some of the runtimes generate code that is also dependent on
+    <a href="https://mybatis.org/mybatis-dynamic-sql/">MyBatis Dynamic SQL</a>.
+    The following table shows the required dependencies in the generated code.</p>
+
+<table>
+    <tr>
+        <th>Runtime</th>
+        <th>MyBatis Generator Version</th>
+        <th>MyBatis Version</th>
+        <th>MyBatis Dynamic SQL Version</th>
+    </tr>
+    <tr>
+        <td>MyBatis3, MyBatis3Simple</td>
+        <td>Any</td>
+        <td>3.0+</td>
+        <td>N/A</td>
+    </tr>
+    <tr>
+        <td>MyBatis3DynamicSQL</td>
+        <td>1.3.6 - 1.3.7</td>
+        <td>3.4.2+</td>
+        <td>1.1.0 - 1.2.1</td>
+    </tr>
+    <tr>
+        <td>MyBatis3DynamicSQL, MyBatis3Kotlin</td>
+        <td>1.4.0</td>
+        <td>3.4.2+</td>
+        <td>1.1.3+</td>
+    </tr>
+    <tr>
+        <td>MyBatis3DynamicSQL</td>
+        <td>1.4.1+</td>
+        <td>3.4.2+</td>
+        <td>1.3.1+</td>
+    </tr>
+    <tr>
+        <td>MyBatis3Kotlin</td>
+        <td>1.4.1+</td>
+        <td>3.4.2+</td>
+        <td>1.4.0+</td>
+    </tr>
+</table>
+
+<h2>Support</h2>
+<p>Support for MyBatis Generator is provided through the MyBatis user mailing list.
+You may subscribe to or view the mailing list through Google code here:</p>
+
+<blockquote>
+  <p>
+  <a target="_blank" href="http://groups.google.com/group/mybatis-user">http://groups.google.com/group/mybatis-user</a>
+  </p>
+</blockquote>
+
+<p>If you think you have found a bug, please ask a question about it on the user list first,
+before creating a new ticket.  If you find a bug, or have a new feature request,
+you may open a new issue at GitHub here:</p>
+
+<blockquote>
+  <p>
+  <a target="_blank" href="https://github.com/mybatis/generator/issues">
+    https://github.com/mybatis/generator/issues
+  </a>
+  </p>
+</blockquote>
+
+</body>
+</html>

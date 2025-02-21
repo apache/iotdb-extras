@@ -1,7 +1,11 @@
 
 # Maven related
 target/
-
 # IntelliJ relaged
 .idea/
 *.iml
+.settings/
+.classpath
+.project
+*.iml
+.DS_Store
