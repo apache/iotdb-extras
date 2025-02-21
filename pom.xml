@@ -1504,6 +1504,11 @@
                     <artifactId>xml-format-maven-plugin</artifactId>
                     <version>3.2.2</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.openapitools</groupId>
+                    <artifactId>openapi-generator-maven-plugin</artifactId>
+                    <version>${openapi.generator.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>

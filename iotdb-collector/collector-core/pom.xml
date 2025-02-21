@@ -106,12 +106,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <configuration>
-                    <ignoredDependencies>
+                    <usedDependencies>
                         <!-- For some reason the plugin complains if this artifact is included -->
-                        <ignoredDependency>org.eclipse.jetty:jetty-http</ignoredDependency>
-                        <ignoredDependency>org.eclipse.jetty:jetty-util</ignoredDependency>
-                        <ignoredDependency>org.glassfish.jersey.inject:jersey-hk2</ignoredDependency>
-                    </ignoredDependencies>
+                        <usedDependency>org.eclipse.jetty:jetty-http</usedDependency>
+                        <usedDependency>org.eclipse.jetty:jetty-util</usedDependency>
+                        <usedDependency>org.glassfish.jersey.inject:jersey-hk2</usedDependency>
+                    </usedDependencies>
                 </configuration>
             </plugin>
         </plugins>
