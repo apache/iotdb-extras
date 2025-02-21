@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE generatorConfiguration PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN" "http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+
 <!--
 
        Copyright 2006-2025 the original author or authors.
@@ -16,49 +17,31 @@
        limitations under the License.
 
 -->
-<!DOCTYPE generatorConfiguration
-        PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN"
-        "http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
-
 <generatorConfiguration>
-
     <!-- 请替换本地jar路径 -->
-    <classPathEntry location="/Users/rongli/JavaCode/apache/iotdb/iotdb-client/jdbc/target/iotdb-jdbc-2.0.2-SNAPSHOT-jar-with-dependencies.jar"/>
-
+    <classPathEntry location="/iotdb/iotdb-client/jdbc/target/iotdb-jdbc-2.0.2-SNAPSHOT-jar-with-dependencies.jar"/>
     <!-- mvn mybatis-generator:generate hierarchical/flat-->
     <context id="myBatis3Simple" targetRuntime="MyBatis3Simple" defaultModelType="flat">
-<!--        <property name="suppressAllComments" value="true"/>-->
-<!--        <property name="useActualColumnNames" value="false"/>-->
-<!--        &lt;!&ndash; 格式化java代码 &ndash;&gt;-->
-<!--        <property name="javaFormatter" value="org.mybatis.generator.api.dom.DefaultJavaFormatter"/>-->
-<!--        &lt;!&ndash; 格式化XML代码 &ndash;&gt;-->
-<!--        <property name="xmlFormatter" value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
-
+        <!--        <property name="suppressAllComments" value="true"/>-->
+        <!--        <property name="useActualColumnNames" value="false"/>-->
+        <!--        &lt;!&ndash; 格式化java代码 &ndash;&gt;-->
+        <!--        <property name="javaFormatter" value="org.mybatis.generator.api.dom.DefaultJavaFormatter"/>-->
+        <!--        &lt;!&ndash; 格式化XML代码 &ndash;&gt;-->
+        <!--        <property name="xmlFormatter" value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
         <!-- 配置插件 -->
-        <plugin type="org.mybatis.generator.plugins.SerializablePlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.LombokPlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.LimitOffsetPlugin"></plugin>
-
-        <plugin type="org.mybatis.generator.plugins.DeleteByTimePlugin"></plugin>
-<!--        <plugin type="org.mybatis.generator.plugins.SelectConditionPlugin"></plugin>-->
-<!--        <plugin type="org.mybatis.generator.plugins.CacheNamespacePlugin"></plugin>-->
-<!--        <plugin type="org.mybatis.generator.plugins.CachePlugin"></plugin>-->
-<!--        <plugin type="org.mybatis.generator.plugins.CaseInsensitiveLikePlugin"></plugin>-->
-        <plugin type="org.mybatis.generator.plugins.EqualsHashCodePlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.FluentBuilderMethodsPlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.IgnoreViewsPlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.MapperAnnotationPlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.InsertBatchPlugin"></plugin>
-        <!--        <plugin type="org.mybatis.generator.plugins.MapperConfigPlugin"></plugin>-->
-        <!--        <plugin type="org.mybatis.generator.plugins.RenameExampleClassPlugin"></plugin>-->
-        <plugin type="org.mybatis.generator.plugins.RowBoundsPlugin"></plugin>
-<!--        <plugin type="org.mybatis.generator.plugins.ToStringPlugin"></plugin>-->
-        <plugin type="org.mybatis.generator.plugins.UnmergeableXmlMappersPlugin"></plugin>
-        <plugin type="org.mybatis.generator.plugins.VirtualPrimaryKeyPlugin"></plugin>
-<!--        <commentGenerator type="generator.org.apache.iotdb.mybatis.plugin.CNCommentGenerator">-->
-<!--            &lt;!&ndash; 是否去除自动生成的注释 true：是 ： false:否 &ndash;&gt;-->
-<!--            <property name="suppressAllComments" value="true"/>-->
-<!--        </commentGenerator>-->
+        <plugin type="org.mybatis.generator.plugins.SerializablePlugin"/>
+        <plugin type="org.mybatis.generator.plugins.LombokPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.LimitOffsetPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.DeleteByTimePlugin"/>
+        <plugin type="org.mybatis.generator.plugins.EqualsHashCodePlugin"/>
+        <plugin type="org.mybatis.generator.plugins.MapperAnnotationPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.InsertBatchPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.UnmergeableXmlMappersPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.VirtualPrimaryKeyPlugin"/>
+        <!--        <commentGenerator type="generator.org.apache.iotdb.mybatis.plugin.CNCommentGenerator">-->
+        <!--            &lt;!&ndash; 是否去除自动生成的注释 true：是 ： false:否 &ndash;&gt;-->
+        <!--            <property name="suppressAllComments" value="true"/>-->
+        <!--        </commentGenerator>-->
         <commentGenerator type="org.mybatis.generator.internal.SwaggerCommentGenerator">
             <!-- 是否去除自动生成的注释 true：是 ： false:否 -->
             <property name="suppressAllComments" value="true"/>
@@ -66,28 +49,21 @@
             <property name="addRemarkComments" value="true"/>
         </commentGenerator>
         <!--数据库连接的信息：驱动类、连接地址、用户名、密码 -->
-        <jdbcConnection driverClass="org.apache.iotdb.jdbc.IoTDBDriver"
-                        connectionURL="jdbc:iotdb://127.0.0.1:6667/test?sql_dialect=table"
-                        userId="root"
-                        password="root">
-        </jdbcConnection>
-
+        <jdbcConnection driverClass="org.apache.iotdb.jdbc.IoTDBDriver" connectionURL="jdbc:iotdb://127.0.0.1:6667/test?sql_dialect=table" userId="root" password="root"></jdbcConnection>
         <!-- java类解析器,最多配置一个  -->
         <javaTypeResolver type="org.mybatis.generator.internal.types.IoTDBJavaTypeResolver">
             <property name="forceBigDecimals" value="false"/>
         </javaTypeResolver>
-
         <!-- 配置model生成位置 -->
-        <javaModelGenerator targetPackage="org.apache.iotdb.mybatis_generator.model" targetProject="iotdb">
-<!--            <property name="rootClass" value="org.apache.iotdb.generator.model"/>-->
-<!--            构造方法/setting 加入参数-->
+        <javaModelGenerator targetPackage="org.apache.iotdb.mybatis.generator.model" targetProject="iotdb">
+            <!--            <property name="rootClass" value="org.apache.iotdb.generator.model"/>-->
+            <!--            构造方法/setting 加入参数-->
             <property name="enableSubPackages" value="true"/>
-<!--            对数据库查询结果进行 trim操作，默认 false-->
+            <!--            对数据库查询结果进行 trim操作，默认 false-->
             <property name="trimStrings" value="true"/>
         </javaModelGenerator>
-
         <!-- 配置xml生成位置 -->
-        <sqlMapGenerator targetPackage="org.apache.iotdb.mybatis_generator.xml" targetProject="iotdb">
+        <sqlMapGenerator targetPackage="org.apache.iotdb.mybatis.generator.xml" targetProject="iotdb">
             <!--sqlMapGenerator的property子属性只有一个可以配置的属性值enableSubPackages
                     enableSubPackages：默认是false
                         如果是true，MBG会根据catalog和schema来生成子包
@@ -95,37 +71,28 @@
             -->
             <property name="enableSubPackages" value="true"/>
         </sqlMapGenerator>
-
         <!-- 配置mapper.xml生成位置 -->
-<!--        如果使用的是MyBatis3配置，有以下三个值：-->
-<!--        ANNOTATEDMAPPER：基于注解的Mapper接口，不会有对应的XML映射文件-->
-<!--        MIXEDMAPPER：XML和注解的混合形式，相比ANNOTATEDMAPPER方式，SqlProvider注解方法会被XML替代。-->
-<!--        XMLMAPPER:所有的方法都写在XML中，接口调用需要依赖XML文件。-->
-        <javaClientGenerator type="XMLMAPPER" targetPackage="org.apache.iotdb.mybatis_generator.mapper" targetProject="iotdb">
+        <!--        如果使用的是MyBatis3配置，有以下三个值：-->
+        <!--        ANNOTATEDMAPPER：基于注解的Mapper接口，不会有对应的XML映射文件-->
+        <!--        MIXEDMAPPER：XML和注解的混合形式，相比ANNOTATEDMAPPER方式，SqlProvider注解方法会被XML替代。-->
+        <!--        XMLMAPPER:所有的方法都写在XML中，接口调用需要依赖XML文件。-->
+        <javaClientGenerator type="XMLMAPPER" targetPackage="org.apache.iotdb.mybatis.generator.mapper" targetProject="iotdb">
             <property name="enableSubPackages" value="true"/>
         </javaClientGenerator>
-
         <!-- 配置表信息 -->
-<!--        <table schema="test" tableName="connection" domainObjectName="Connection">-->
-<!--            &lt;!&ndash; 主键 &ndash;&gt;-->
-<!--            <property name="virtualKeyColumns" value="time" />-->
-<!--        </table>-->
-<!--        <table schema="test" tableName="query" domainObjectName="Query">-->
-<!--            &lt;!&ndash; 主键 &ndash;&gt;-->
-<!--            <property name="virtualKeyColumns" value="time" />-->
-<!--        </table>-->
-        <table schema="test" tableName="mix3" domainObjectName="Mix"
-               enableSelectByPrimaryKey="true"
-               enableInsert="true"
-               enableDeleteByPrimaryKey="true"
-                >
+        <!--        <table schema="test" tableName="connection" domainObjectName="Connection">-->
+        <!--            &lt;!&ndash; 主键 &ndash;&gt;-->
+        <!--            <property name="virtualKeyColumns" value="time" />-->
+        <!--        </table>-->
+        <!--        <table schema="test" tableName="query" domainObjectName="Query">-->
+        <!--            &lt;!&ndash; 主键 &ndash;&gt;-->
+        <!--            <property name="virtualKeyColumns" value="time" />-->
+        <!--        </table>-->
+        <table schema="test" tableName="mix3" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true">
             <!-- 主键 -->
-            <property name="virtualKeyColumns" value="time,device_id,deivce_name,device_tag" />
-<!--            <generatedKey column="user_id,info_id" sqlStatement="JDBC"/>-->
-<!--            <generatedKey column="time" sqlStatement="IoTDB" identity="true"/>-->
+            <property name="virtualKeyColumns" value="time,device_id,deivce_name,device_tag"/>
             <!-- 强转数据库字段类型 -->
-            <columnOverride column="time" jdbcType="TIMESTAMP"/>
+            <!--            <columnOverride column="template" jdbcType="FLOAT"/>-->
         </table>
     </context>
-
 </generatorConfiguration>
