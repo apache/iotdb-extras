@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.iotdb.mybatis.plugin;
 
 import org.mybatis.generator.api.IntrospectedColumn;
@@ -28,27 +27,38 @@ import java.util.List;
 
 public class LombokPlugin extends PluginAdapter {
 
-    @Override
-    public boolean validate(List<String> list) {
-        return true;
-    }
+  @Override
+  public boolean validate(List<String> list) {
+    return true;
+  }
 
-    @Override
-    public boolean modelBaseRecordClassGenerated(TopLevelClass topLevelClass, IntrospectedTable introspectedTable) {
-        topLevelClass.addImportedType("lombok.Data");
+  @Override
+  public boolean modelBaseRecordClassGenerated(
+      TopLevelClass topLevelClass, IntrospectedTable introspectedTable) {
+    topLevelClass.addImportedType("lombok.Data");
 
-        topLevelClass.addAnnotation("@Data");
+    topLevelClass.addAnnotation("@Data");
 
-        return true;
-    }
+    return true;
+  }
 
-    @Override
-    public boolean modelSetterMethodGenerated(Method method, TopLevelClass topLevelClass, IntrospectedColumn introspectedColumn, IntrospectedTable introspectedTable, ModelClassType modelClassType) {
-        return false;
-    }
+  @Override
+  public boolean modelSetterMethodGenerated(
+      Method method,
+      TopLevelClass topLevelClass,
+      IntrospectedColumn introspectedColumn,
+      IntrospectedTable introspectedTable,
+      ModelClassType modelClassType) {
+    return false;
+  }
 
-    @Override
-    public boolean modelGetterMethodGenerated(Method method, TopLevelClass topLevelClass, IntrospectedColumn introspectedColumn, IntrospectedTable introspectedTable, ModelClassType modelClassType) {
-        return false;
-    }
+  @Override
+  public boolean modelGetterMethodGenerated(
+      Method method,
+      TopLevelClass topLevelClass,
+      IntrospectedColumn introspectedColumn,
+      IntrospectedTable introspectedTable,
+      ModelClassType modelClassType) {
+    return false;
+  }
 }

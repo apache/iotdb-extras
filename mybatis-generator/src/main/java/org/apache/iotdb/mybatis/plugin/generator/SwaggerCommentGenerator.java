@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-
 package org.apache.iotdb.mybatis.plugin.generator;
 
 import org.apache.iotdb.mybatis.plugin.util.DateUtil;
+
 import org.mybatis.generator.api.IntrospectedColumn;
 import org.mybatis.generator.api.IntrospectedTable;
 import org.mybatis.generator.api.dom.java.CompilationUnit;
@@ -33,109 +33,118 @@ import java.util.Date;
 import java.util.Properties;
 
 public class SwaggerCommentGenerator extends DefaultCommentGenerator {
-    private Properties properties;
-    private boolean addRemarkComments = false;
-    private static final String API_MODEL_FULL_CLASS_NAME = "io.swagger.v3.oas.annotations.media.Schema";
+  private Properties properties;
+  private boolean addRemarkComments = false;
+  private static final String API_MODEL_FULL_CLASS_NAME =
+      "io.swagger.v3.oas.annotations.media.Schema";
 
-    @Override
-    public void addConfigurationProperties(Properties properties) {
-        super.addConfigurationProperties(properties);
-        this.addRemarkComments = StringUtility.isTrue(properties.getProperty("addRemarkComments"));
-        this.properties = new Properties();
-        this.properties.putAll(properties);
+  @Override
+  public void addConfigurationProperties(Properties properties) {
+    super.addConfigurationProperties(properties);
+    this.addRemarkComments = StringUtility.isTrue(properties.getProperty("addRemarkComments"));
+    this.properties = new Properties();
+    this.properties.putAll(properties);
+  }
+
+  @Override
+  public void addFieldComment(
+      Field field, IntrospectedTable introspectedTable, IntrospectedColumn introspectedColumn) {
+    String remarks = introspectedColumn.getRemarks();
+    if (addRemarkComments && StringUtility.stringHasValue(remarks)) {
+      addFieldJavaDoc(field, introspectedColumn);
+      if (remarks.contains("\"")) {
+        remarks = remarks.replace("\"", "'");
+      }
+      field.addJavaDocLine("@Schema(title = \"" + remarks + "\")");
+    }
+  }
+
+  private void addFieldJavaDoc(Field field, IntrospectedColumn introspectedColumn) {
+
+    StringBuffer sb = new StringBuffer();
+    sb.append("/**\n    ");
+    sb.append(" * field: ");
+    sb.append(introspectedColumn.getActualColumnName());
+    String remarks = introspectedColumn.getRemarks();
+    if (StringUtility.stringHasValue(remarks)) {
+      sb.append("，");
+      sb.append(remarks);
     }
 
-    @Override
-    public void addFieldComment(Field field, IntrospectedTable introspectedTable, IntrospectedColumn introspectedColumn) {
-        String remarks = introspectedColumn.getRemarks();
-        if (addRemarkComments && StringUtility.stringHasValue(remarks)) {
-            addFieldJavaDoc(field, introspectedColumn);
-            if (remarks.contains("\"")) {
-                remarks = remarks.replace("\"", "'");
-            }
-            field.addJavaDocLine("@Schema(title = \"" + remarks + "\")");
-        }
+    sb.append("\n     */");
+    field.addJavaDocLine(sb.toString());
+  }
+
+  @Override
+  public void addModelClassComment(
+      TopLevelClass topLevelClass, IntrospectedTable introspectedTable) {
+    StringBuilder sb = new StringBuilder();
+
+    topLevelClass.addJavaDocLine("/**");
+    topLevelClass.addJavaDocLine(" *");
+
+    String remarks = introspectedTable.getRemarks();
+    if (StringUtility.stringHasValue(remarks)) {
+      String[] remarkLines = remarks.split(System.getProperty("line.separator"));
+      for (String remarkLine : remarkLines) {
+        topLevelClass.addJavaDocLine(" * " + remarkLine);
+      }
+      sb.append(" * ");
     }
 
-    private void addFieldJavaDoc(Field field, IntrospectedColumn introspectedColumn) {
+    sb.append("table: ");
+    sb.append(introspectedTable.getFullyQualifiedTable());
+    sb.append(" of model class");
+    topLevelClass.addJavaDocLine(sb.toString());
+    topLevelClass.addJavaDocLine(" *");
 
-        StringBuffer sb = new StringBuffer();
-        sb.append("/**\n    ");
-        sb.append(" * field: ");
-        sb.append(introspectedColumn.getActualColumnName());
-        String remarks = introspectedColumn.getRemarks();
-        if (StringUtility.stringHasValue(remarks)) {
-            sb.append("，");
-            sb.append(remarks);
-        }
-
-        sb.append("\n     */");
-        field.addJavaDocLine(sb.toString());
+    String author = "IoTDB";
+    if (properties.containsKey("author")) {
+      author = properties.getProperty("author");
     }
 
-    @Override
-    public void addModelClassComment(TopLevelClass topLevelClass, IntrospectedTable introspectedTable) {
-        StringBuilder sb = new StringBuilder();
+    topLevelClass.addJavaDocLine(" * @author " + author);
+    topLevelClass.addJavaDocLine(" * @date " + DateUtil.date2Str(new Date()));
+    topLevelClass.addJavaDocLine(" */");
+    FullyQualifiedJavaType serializable = new FullyQualifiedJavaType("java.io.Serializable");
 
-        topLevelClass.addJavaDocLine("/**");
-        topLevelClass.addJavaDocLine(" *");
+    topLevelClass.addImportedType(serializable);
+    topLevelClass.addSuperInterface(serializable);
 
-        String remarks = introspectedTable.getRemarks();
-        if (StringUtility.stringHasValue(remarks)) {
-            String[] remarkLines = remarks.split(System.getProperty("line.separator"));
-            for (String remarkLine : remarkLines) {
-                topLevelClass.addJavaDocLine(" * " + remarkLine);
-            }
-            sb.append(" * ");
-        }
+    final FullyQualifiedJavaType fullyQualifiedJavaType = new FullyQualifiedJavaType("long");
+    Field serialVersionUID = new Field("serialVersionUID", fullyQualifiedJavaType);
+    serialVersionUID.setVisibility(JavaVisibility.PRIVATE);
+    serialVersionUID.setStatic(true);
+    serialVersionUID.setFinal(true);
+    serialVersionUID.setName("serialVersionUID");
+    serialVersionUID.setType(fullyQualifiedJavaType);
+    serialVersionUID.setInitializationString("1L");
+    sb = new StringBuilder();
+    sb.append("/**\n    ");
+    sb.append(" * class serial version id\n    ");
+    sb.append(" */");
+    serialVersionUID.addJavaDocLine(sb.toString());
 
-        sb.append("table: ");
-        sb.append(introspectedTable.getFullyQualifiedTable());
-        sb.append(" of model class");
-        topLevelClass.addJavaDocLine(sb.toString());
-        topLevelClass.addJavaDocLine(" *");
+    topLevelClass.addField(serialVersionUID);
+    topLevelClass.addImportedType(API_MODEL_FULL_CLASS_NAME);
+    topLevelClass.addAnnotation(
+        "@Schema(title = \""
+            + introspectedTable.getFullyQualifiedTable()
+            + "\", description = \""
+            + remarks
+            + "\")");
+  }
 
-        String author = "IoTDB";
-        if (properties.containsKey("author")) {
-            author = properties.getProperty("author");
-        }
+  @Override
+  public void addJavaFileComment(CompilationUnit compilationUnit) {
+    compilationUnit.addFileCommentLine("/**");
 
-        topLevelClass.addJavaDocLine(" * @author " + author);
-        topLevelClass.addJavaDocLine(" * @date " + DateUtil.date2Str(new Date()));
-        topLevelClass.addJavaDocLine(" */");
-        FullyQualifiedJavaType serializable = new FullyQualifiedJavaType("java.io.Serializable");
+    String copyright = " * Copyright From 2025, IoTDB.";
+    compilationUnit.addFileCommentLine(copyright);
 
-        topLevelClass.addImportedType(serializable);
-        topLevelClass.addSuperInterface(serializable);
-
-        final FullyQualifiedJavaType fullyQualifiedJavaType = new FullyQualifiedJavaType("long");
-        Field serialVersionUID = new Field("serialVersionUID",fullyQualifiedJavaType);
-        serialVersionUID.setVisibility(JavaVisibility.PRIVATE);
-        serialVersionUID.setStatic(true);
-        serialVersionUID.setFinal(true);
-        serialVersionUID.setName("serialVersionUID");
-        serialVersionUID.setType(fullyQualifiedJavaType);
-        serialVersionUID.setInitializationString("1L");
-        sb = new StringBuilder();
-        sb.append("/**\n    ");
-        sb.append(" * class serial version id\n    ");
-        sb.append(" */");
-        serialVersionUID.addJavaDocLine(sb.toString());
-
-        topLevelClass.addField(serialVersionUID);
-        topLevelClass.addImportedType(API_MODEL_FULL_CLASS_NAME);
-        topLevelClass.addAnnotation("@Schema(title = \"" + introspectedTable.getFullyQualifiedTable() + "\", description = \"" + remarks + "\")");
-    }
-
-    @Override
-    public void addJavaFileComment(CompilationUnit compilationUnit) {
-        compilationUnit.addFileCommentLine("/**");
-
-        String copyright = " * Copyright From 2025, IoTDB.";
-        compilationUnit.addFileCommentLine(copyright);
-
-        compilationUnit.addFileCommentLine(" * ");
-        compilationUnit.addFileCommentLine(" * " + compilationUnit.getType().getShortNameWithoutTypeArguments() + ".java");
-        compilationUnit.addFileCommentLine(" */");
-    }
+    compilationUnit.addFileCommentLine(" * ");
+    compilationUnit.addFileCommentLine(
+        " * " + compilationUnit.getType().getShortNameWithoutTypeArguments() + ".java");
+    compilationUnit.addFileCommentLine(" */");
+  }
 }
