@@ -14,7 +14,7 @@
 				<dependencies>
 					<dependency>
 						<groupId>org.apache.iotdb</groupId>
-						<artifactId>iotdb-mybatis-generator</artifactId>
+						<artifactId>mybatis-generator-plugin</artifactId>
 						<version>1.3.2-SNAPSHOT</version>
 					</dependency>
 				</dependencies>
