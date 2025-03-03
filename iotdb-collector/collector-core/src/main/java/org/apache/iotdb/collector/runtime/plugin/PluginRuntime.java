@@ -17,15 +17,27 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.runtime.plugin;
 
-public class ApiServiceOptions extends Options {
+public class PluginRuntime {
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  public boolean createPlugin() {
+    return true;
+  }
+
+  public boolean alterPlugin() {
+    return true;
+  }
+
+  public boolean startPlugin() {
+    return true;
+  }
+
+  public boolean stopPlugin() {
+    return true;
+  }
+
+  public boolean dropPlugin() {
+    return true;
+  }
 }

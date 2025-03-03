@@ -17,15 +17,8 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.plugin.api;
 
-public class ApiServiceOptions extends Options {
+import org.apache.iotdb.pipe.api.PipeSource;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
-}
+public interface CollectorSource extends StoppablePlugin, PipeSource {}

@@ -17,15 +17,6 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.api.v1.plugin.impl;
 
-public class ApiServiceOptions extends Options {
-
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
-}
+public class PluginApiServiceRequestValidationHandler {}

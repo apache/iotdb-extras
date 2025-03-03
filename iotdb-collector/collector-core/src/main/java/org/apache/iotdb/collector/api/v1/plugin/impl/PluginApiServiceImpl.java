@@ -1,0 +1,64 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.iotdb.collector.api.v1.plugin.impl;
+
+import org.apache.iotdb.collector.api.v1.plugin.PluginApiService;
+import org.apache.iotdb.collector.api.v1.plugin.model.AlterPluginRequest;
+import org.apache.iotdb.collector.api.v1.plugin.model.CreatePluginRequest;
+import org.apache.iotdb.collector.api.v1.plugin.model.DropPluginRequest;
+import org.apache.iotdb.collector.api.v1.plugin.model.StartPluginRequest;
+import org.apache.iotdb.collector.api.v1.plugin.model.StopPluginRequest;
+import org.apache.iotdb.collector.service.RuntimeService;
+
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
+
+public class PluginApiServiceImpl extends PluginApiService {
+
+  @Override
+  public Response createPlugin(
+      final CreatePluginRequest createPluginRequest, final SecurityContext securityContext) {
+    return Response.ok("create plugin").entity(RuntimeService.plugin().createPlugin()).build();
+  }
+
+  @Override
+  public Response alterPlugin(
+      final AlterPluginRequest alterPluginRequest, final SecurityContext securityContext) {
+    return Response.ok("alter plugin").entity(RuntimeService.plugin().alterPlugin()).build();
+  }
+
+  @Override
+  public Response startPlugin(
+      final StartPluginRequest startPluginRequest, final SecurityContext securityContext) {
+    return Response.ok("start plugin").entity(RuntimeService.plugin().startPlugin()).build();
+  }
+
+  @Override
+  public Response stopPlugin(
+      final StopPluginRequest stopPluginRequest, final SecurityContext securityContext) {
+    return Response.ok("stop plugin").entity(RuntimeService.plugin().stopPlugin()).build();
+  }
+
+  @Override
+  public Response dropPlugin(
+      final DropPluginRequest dropPluginRequest, final SecurityContext securityContext) {
+    return Response.ok("drop plugin").entity(RuntimeService.plugin().dropPlugin()).build();
+  }
+}

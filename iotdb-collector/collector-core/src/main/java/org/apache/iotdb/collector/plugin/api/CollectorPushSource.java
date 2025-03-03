@@ -17,15 +17,25 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.plugin.api;
 
-public class ApiServiceOptions extends Options {
+import org.apache.iotdb.pipe.api.collector.EventCollector;
+import org.apache.iotdb.pipe.api.event.Event;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+public abstract class CollectorPushSource implements CollectorSource {
+
+  protected final EventCollector collector;
+
+  public CollectorPushSource(final EventCollector collector) {
+    this.collector = collector;
+  }
+
+  @Override
+  public final Event supply() {
+    throw new UnsupportedOperationException();
+  }
+
+  public final void supply(final Event event) throws Exception {
+    collector.collect(event);
+  }
 }

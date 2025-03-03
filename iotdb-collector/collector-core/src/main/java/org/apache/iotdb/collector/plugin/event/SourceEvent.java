@@ -17,15 +17,29 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.plugin.event;
 
-public class ApiServiceOptions extends Options {
+import org.apache.iotdb.pipe.api.event.Event;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+public class SourceEvent implements Event {
+  private String name;
+
+  public SourceEvent() {}
+
+  public SourceEvent(final String name) {
+    this.name = name;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(final String name) {
+    this.name = name;
+  }
+
+  @Override
+  public String toString() {
+    return "SourceEvent [name=" + name + "]";
+  }
 }

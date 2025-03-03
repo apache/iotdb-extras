@@ -17,15 +17,27 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.runtime.task.exception;
 
-public class ApiServiceOptions extends Options {
+import com.lmax.disruptor.ExceptionHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+public class DisruptorTaskExceptionHandler implements ExceptionHandler<Object> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DisruptorTaskExceptionHandler.class);
+
+  @Override
+  public void handleEventException(Throwable ex, long sequence, Object event) {
+    LOGGER.error("Event processing failed [seq={}, event={}]", sequence, event, ex);
+  }
+
+  @Override
+  public void handleOnStartException(Throwable ex) {
+    LOGGER.error("Failed to start disruptor", ex);
+  }
+
+  @Override
+  public void handleOnShutdownException(Throwable ex) {
+    LOGGER.error("Failed to shutdown disruptor", ex);
+  }
 }
