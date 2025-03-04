@@ -25,39 +25,54 @@ import org.apache.iotdb.pipe.api.PipeSink;
 
 import com.lmax.disruptor.WorkHandler;
 
-public class TaskEventConsumer implements WorkHandler<TaskEventContainer> {
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
+
+public class EventConsumer implements WorkHandler<EventContainer> {
 
   private final PipePlugin plugin;
-  private final TaskEventCollector collector;
-  private final TaskEventConsumerController consumerController;
+  private final EventCollector collector;
 
-  public TaskEventConsumer(
-      final PipePlugin plugin,
-      final TaskEventCollector collector,
-      final TaskEventConsumerController consumerController) {
-    this.plugin = plugin;
-    this.collector = collector;
-    this.consumerController = consumerController;
+  private final AtomicBoolean running = new AtomicBoolean(true);
+
+  private static final long PARK_NANOS = 100_000_000L;
+
+  public void pause() {
+    running.set(false);
   }
 
-  public TaskEventConsumer(
-      final PipePlugin plugin, final TaskEventConsumerController consumerController) {
-    this(plugin, null, consumerController);
+  public void resume() {
+    running.set(true);
+  }
+
+  public boolean shouldRun() {
+    while (!running.get()) {
+      LockSupport.parkNanos(PARK_NANOS);
+    }
+    return running.get();
+  }
+
+  public EventConsumer(
+      final PipePlugin plugin,
+      final EventCollector collector) {
+    this.plugin = plugin;
+    this.collector = collector;
+  }
+
+  public EventConsumer(
+      final PipePlugin plugin) {
+    this(plugin, null);
   }
 
   @Override
-  public void onEvent(final TaskEventContainer taskEventContainer) throws Exception {
-    if (!consumerController.shouldRun()) {
+  public void onEvent(final EventContainer eventContainer) throws Exception {
+    if (!shouldRun()) {
       return;
     }
     if (plugin instanceof PipeProcessor) {
-      ((PipeProcessor) plugin).process(taskEventContainer.getEvent(), this.collector);
+      ((PipeProcessor) plugin).process(eventContainer.getEvent(), this.collector);
     } else if (plugin instanceof PipeSink) {
-      ((PipeSink) plugin).transfer(taskEventContainer.getEvent());
+      ((PipeSink) plugin).transfer(eventContainer.getEvent());
     }
-  }
-
-  public TaskEventConsumerController getConsumerController() {
-    return consumerController;
   }
 }

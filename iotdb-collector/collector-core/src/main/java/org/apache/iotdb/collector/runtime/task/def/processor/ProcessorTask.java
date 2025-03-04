@@ -24,10 +24,10 @@ import org.apache.iotdb.collector.plugin.processor.DoNothingProcessor;
 import org.apache.iotdb.collector.runtime.plugin.PluginFactory;
 import org.apache.iotdb.collector.runtime.task.def.Task;
 import org.apache.iotdb.collector.runtime.task.def.sink.SinkTask;
-import org.apache.iotdb.collector.runtime.task.execution.DisruptorTaskExceptionHandler;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventCollector;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumer;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventContainer;
+import org.apache.iotdb.collector.runtime.task.execution.EventConsumerExceptionHandler;
+import org.apache.iotdb.collector.runtime.task.execution.EventCollector;
+import org.apache.iotdb.collector.runtime.task.execution.EventConsumer;
+import org.apache.iotdb.collector.runtime.task.execution.EventContainer;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -41,12 +41,12 @@ import java.util.Optional;
 
 public class ProcessorTask extends Task {
 
-  private Disruptor<TaskEventContainer> processorDisruptor;
-  private TaskEventConsumer[] eventConsumers;
+  private Disruptor<EventContainer> processorDisruptor;
+  private EventConsumer[] eventConsumers;
 
   private final PipeParameters parameters;
   private final int processParallelismNum;
-  private final TaskEventCollector collector;
+  private final EventCollector collector;
 
   public ProcessorTask(final Map<String, String> processorAttributes, final SinkTask sinkTask) {
     this.parameters = new PipeParameters(processorAttributes);
@@ -54,13 +54,13 @@ public class ProcessorTask extends Task {
         this.parameters.getIntOrDefault(
             TaskRuntimeOptions.TASK_PROCESS_PARALLELISM_NUM.key(),
             TaskRuntimeOptions.TASK_PROCESS_PARALLELISM_NUM.value());
-    this.collector = new TaskEventCollector(sinkTask.getSinkRingBuffer());
+    this.collector = new EventCollector(sinkTask.getSinkRingBuffer());
 
     this.initProcessorDisruptor();
   }
 
   @Override
-  public void create() {
+  public void createInternal() {
     if (this.processorDisruptor == null) {
       this.initProcessorDisruptor();
     }
@@ -71,7 +71,7 @@ public class ProcessorTask extends Task {
             processParallelismNum,
             collector);
 
-    this.processorDisruptor.setDefaultExceptionHandler(new DisruptorTaskExceptionHandler());
+    this.processorDisruptor.setDefaultExceptionHandler(new EventConsumerExceptionHandler());
     this.processorDisruptor.handleEventsWithWorkerPool(this.eventConsumers);
     this.processorDisruptor.start();
   }
@@ -79,7 +79,7 @@ public class ProcessorTask extends Task {
   private void initProcessorDisruptor() {
     this.processorDisruptor =
         new Disruptor<>(
-            TaskEventContainer::new,
+            EventContainer::new,
             this.parameters.getIntOrDefault(
                 TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE.key(),
                 TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE.value()),
@@ -89,28 +89,28 @@ public class ProcessorTask extends Task {
   }
 
   @Override
-  public void start() throws Exception {
-    for (final TaskEventConsumer consumer : this.eventConsumers) {
-      consumer.getConsumerController().resume();
+  public void startInternal() throws Exception {
+    for (final EventConsumer consumer : this.eventConsumers) {
+      consumer.resume();
     }
   }
 
   @Override
-  public void stop() {
-    for (final TaskEventConsumer consumer : this.eventConsumers) {
-      consumer.getConsumerController().pause();
+  public void stopInternal() {
+    for (final EventConsumer consumer : this.eventConsumers) {
+      consumer.pause();
     }
   }
 
   @Override
-  public void drop() {
+  public void dropInternal() {
     if (this.processorDisruptor != null) {
       this.processorDisruptor.shutdown();
       this.processorDisruptor = null;
     }
   }
 
-  public Optional<RingBuffer<TaskEventContainer>> getProcessorRingBuffer() {
+  public Optional<RingBuffer<EventContainer>> getProcessorRingBuffer() {
     if (this.processorDisruptor != null) {
       return Optional.of(this.processorDisruptor.getRingBuffer());
     }

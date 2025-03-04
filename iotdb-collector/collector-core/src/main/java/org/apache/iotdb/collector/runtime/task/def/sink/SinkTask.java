@@ -19,13 +19,17 @@
 
 package org.apache.iotdb.collector.runtime.task.def.sink;
 
+import com.lmax.disruptor.WorkHandler;
 import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.plugin.sink.SessionSink;
 import org.apache.iotdb.collector.runtime.plugin.PluginFactory;
 import org.apache.iotdb.collector.runtime.task.def.Task;
-import org.apache.iotdb.collector.runtime.task.execution.DisruptorTaskExceptionHandler;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumer;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventContainer;
+import org.apache.iotdb.collector.runtime.task.execution.EventCollector;
+import org.apache.iotdb.collector.runtime.task.execution.EventConsumerExceptionHandler;
+import org.apache.iotdb.collector.runtime.task.execution.EventConsumer;
+import org.apache.iotdb.collector.runtime.task.execution.EventContainer;
+import org.apache.iotdb.pipe.api.PipePlugin;
+import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -35,73 +39,66 @@ import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 public class SinkTask extends Task {
 
-  private Disruptor<TaskEventContainer> sinkDisruptor;
-  private TaskEventConsumer[] eventConsumers;
-  private final PipeParameters parameters;
-  private final int sinkParallelismNum;
+  private static class SinkConsumer implements WorkHandler<EventContainer> {
+
+    private final PipeSink sink;
+
+    private SinkConsumer(final PipeSink sink) {
+      this.sink = sink;
+    }
+
+    @Override
+    public void onEvent(EventContainer event) throws Exception {
+      sink.transfer(event.getEvent());
+    }
+  }
+
+  private final Disruptor<EventContainer> disruptor;
+  private final int parallelism;
 
   public SinkTask(final Map<String, String> processorAttributes) {
-    this.parameters = new PipeParameters(processorAttributes);
-    this.sinkParallelismNum =
-        this.parameters.getIntOrDefault(
+    final PipeParameters parameters = new PipeParameters(processorAttributes);
+    parallelism =
+        parameters.getIntOrDefault(
             TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.key(),
             TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.value());
-
-    this.initSinkDisruptor();
+    disruptor = new Disruptor<>(
+        EventContainer::new,
+        parallelism,
+        DaemonThreadFactory.INSTANCE,
+        ProducerType.MULTI,
+        new BlockingWaitStrategy());
   }
 
   @Override
-  public void create() {
-    if (this.sinkDisruptor == null) {
-      this.initSinkDisruptor();
-    }
-
-    this.eventConsumers =
-        this.getConsumer(PluginFactory.createInstance(SessionSink.class), sinkParallelismNum, null);
-
-    this.sinkDisruptor.setDefaultExceptionHandler(new DisruptorTaskExceptionHandler());
-    this.sinkDisruptor.handleEventsWithWorkerPool(this.eventConsumers);
-    this.sinkDisruptor.start();
-  }
-
-  private void initSinkDisruptor() {
-    this.sinkDisruptor =
-        new Disruptor<>(
-            TaskEventContainer::new,
-            this.parameters.getIntOrDefault(
-                TaskRuntimeOptions.TASK_SINK_RING_BUFFER_SIZE.key(),
-                TaskRuntimeOptions.TASK_SINK_RING_BUFFER_SIZE.value()),
-            DaemonThreadFactory.INSTANCE,
-            ProducerType.MULTI,
-            new BlockingWaitStrategy());
+  public void createInternal() {
+    disruptor.setDefaultExceptionHandler(new EventConsumerExceptionHandler());
+    disruptor.handleEventsWithWorkerPool(Stream.generate(() -> new SinkConsumer(PluginFactory.createInstance(SessionSink.class)))
+        .limit(parallelism)
+        .toArray(SinkConsumer[]::new));
   }
 
   @Override
-  public void start() throws Exception {
-    for (final TaskEventConsumer consumer : this.eventConsumers) {
-      consumer.getConsumerController().resume();
-    }
+  public void startInternal() {
+    disruptor.start();
   }
 
   @Override
-  public void stop() {
-    for (final TaskEventConsumer consumer : this.eventConsumers) {
-      consumer.getConsumerController().pause();
-    }
+  public void stopInternal() {
+    disruptor.halt();
   }
 
   @Override
-  public void drop() {
-    if (this.sinkDisruptor != null) {
-      this.sinkDisruptor.shutdown();
-      this.sinkDisruptor = null;
-    }
+  public void dropInternal() {
+    disruptor.shutdown();
   }
 
-  public RingBuffer<TaskEventContainer> getSinkRingBuffer() {
-    return this.sinkDisruptor.getRingBuffer();
+  public RingBuffer<EventContainer> getSinkRingBuffer() {
+    return this.disruptor.getRingBuffer();
   }
 }

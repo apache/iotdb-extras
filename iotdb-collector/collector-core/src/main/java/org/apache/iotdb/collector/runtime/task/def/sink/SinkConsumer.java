@@ -17,20 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.execution;
+package org.apache.iotdb.collector.runtime.task.def.sink;
 
-import org.apache.iotdb.pipe.api.event.Event;
-
-public class TaskEventContainer implements Event {
-  private Event event;
-
-  public TaskEventContainer() {}
-
-  public Event getEvent() {
-    return event;
-  }
-
-  public void setEvent(final Event event) {
-    this.event = event;
-  }
+public class SinkConsumer {
 }

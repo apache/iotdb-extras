@@ -21,7 +21,7 @@ package org.apache.iotdb.collector.runtime.task.def.source;
 
 import org.apache.iotdb.collector.plugin.source.HttpPushSource;
 import org.apache.iotdb.collector.runtime.task.def.processor.ProcessorTask;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventCollector;
+import org.apache.iotdb.collector.runtime.task.execution.EventCollector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +32,7 @@ public class PushSourceTask extends SourceTask {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PushSourceTask.class);
 
-  private final TaskEventCollector collector;
+  private final EventCollector collector;
 
   public PushSourceTask(
       final String taskId,
@@ -41,14 +41,14 @@ public class PushSourceTask extends SourceTask {
     super(taskId, sourceParams, processorTask);
 
     this.collector =
-        new TaskEventCollector(
+        new EventCollector(
             processorTask.getProcessorRingBuffer().isPresent()
                 ? processorTask.getProcessorRingBuffer().get()
                 : null);
   }
 
   @Override
-  public void create() {
+  public void createInternal() {
     createSourceTask();
     for (int i = 0; i < sourceParallelismNum; i++) {
       // use sourceAttribute later

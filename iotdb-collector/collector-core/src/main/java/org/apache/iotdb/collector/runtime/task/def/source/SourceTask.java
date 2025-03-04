@@ -67,7 +67,7 @@ public abstract class SourceTask extends Task {
   }
 
   @Override
-  public void start() throws Exception {
+  public void startInternal() throws Exception {
     SOURCE_TASK_STATUS.computeIfPresent(taskId, (taskId, status) -> TaskState.Running);
     SOURCE_TASK
         .get(taskId)
@@ -82,7 +82,7 @@ public abstract class SourceTask extends Task {
   }
 
   @Override
-  public synchronized void stop() {
+  public synchronized void stopInternal() {
     SOURCE_TASK_STATUS.computeIfPresent(taskId, (taskId, status) -> TaskState.Stopped);
     SOURCE_TASK
         .get(taskId)
@@ -97,8 +97,8 @@ public abstract class SourceTask extends Task {
   }
 
   @Override
-  public void drop() {
-    stop();
+  public void dropInternal() {
+    stopInternal();
     SOURCE_TASK.remove(taskId);
     SOURCE_TASK_STATUS.remove(taskId);
     SOURCE_EXECUTOR_SERVICE.remove(taskId).shutdown();

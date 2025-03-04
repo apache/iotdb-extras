@@ -19,27 +19,17 @@
 
 package org.apache.iotdb.collector.runtime.task.execution;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
+import org.apache.iotdb.pipe.api.event.Event;
 
-public class TaskEventConsumerController {
+public class EventContainer implements Event {
 
-  private final AtomicBoolean running = new AtomicBoolean(true);
+  private Event event;
 
-  private static final long PARK_NANOS = 100_000_000L;
-
-  public void pause() {
-    running.set(false);
+  public Event getEvent() {
+    return event;
   }
 
-  public void resume() {
-    running.set(true);
-  }
-
-  public boolean shouldRun() {
-    while (!running.get()) {
-      LockSupport.parkNanos(PARK_NANOS);
-    }
-    return running.get();
+  public void setEvent(final Event event) {
+    this.event = event;
   }
 }

@@ -19,25 +19,25 @@
 
 package org.apache.iotdb.collector.runtime.task.execution;
 
-import com.lmax.disruptor.ExceptionHandler;
+import org.apache.iotdb.pipe.api.event.Event;
+
+import com.lmax.disruptor.RingBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DisruptorTaskExceptionHandler implements ExceptionHandler<Object> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DisruptorTaskExceptionHandler.class);
+public class EventCollector implements org.apache.iotdb.pipe.api.collector.EventCollector {
 
-  @Override
-  public void handleEventException(Throwable ex, long sequence, Object event) {
-    LOGGER.error("Event processing failed [seq={}, event={}]", sequence, event, ex);
+  private static final Logger LOGGER = LoggerFactory.getLogger(EventCollector.class);
+
+  private final RingBuffer<EventContainer> ringBuffer;
+
+  public EventCollector(final RingBuffer<EventContainer> ringBuffer) {
+    this.ringBuffer = ringBuffer;
   }
 
   @Override
-  public void handleOnStartException(Throwable ex) {
-    LOGGER.error("Failed to start disruptor", ex);
-  }
-
-  @Override
-  public void handleOnShutdownException(Throwable ex) {
-    LOGGER.error("Failed to shutdown disruptor", ex);
+  public void collect(final Event event) {
+    ringBuffer.publishEvent((container, sequence, o) -> container.setEvent(event), event);
+    LOGGER.info("successfully publish event {}", event);
   }
 }

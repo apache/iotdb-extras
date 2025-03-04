@@ -43,7 +43,7 @@ public class PullSourceTask extends SourceTask {
   }
 
   @Override
-  public void create() {
+  public void createInternal() {
     createSourceTask();
     for (int i = 0; i < sourceParallelismNum; i++) {
       // use sourceAttribute later

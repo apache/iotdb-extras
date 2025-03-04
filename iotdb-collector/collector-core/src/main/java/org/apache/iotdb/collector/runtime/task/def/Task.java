@@ -19,40 +19,80 @@
 
 package org.apache.iotdb.collector.runtime.task.def;
 
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventCollector;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumer;
-import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumerController;
+import org.apache.iotdb.collector.runtime.task.execution.EventCollector;
+import org.apache.iotdb.collector.runtime.task.execution.EventConsumer;
 import org.apache.iotdb.pipe.api.PipePlugin;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 
 public abstract class Task {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Task.class);
 
-  public abstract void create() throws Exception;
+  private static final long CHECK_RUNNING_INTERVAL_NANOS = 100_000_000L;
+  private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
-  public abstract void start() throws Exception;
-
-  public abstract void stop() throws Exception;
-
-  public abstract void drop() throws Exception;
-
-  protected TaskEventConsumer[] getConsumer(
-      final PipePlugin plugin, final int consumerNum, final TaskEventCollector collector) {
-    return Stream.generate(() -> createConsumer(plugin, collector))
-        .limit(consumerNum)
-        .toArray(TaskEventConsumer[]::new);
+  public void resume() {
+    isRunning.set(true);
   }
 
-  private TaskEventConsumer createConsumer(
-      final PipePlugin plugin, final TaskEventCollector collector) {
-    return Objects.nonNull(collector)
-        ? new TaskEventConsumer(plugin, collector, new TaskEventConsumerController())
-        : new TaskEventConsumer(plugin, new TaskEventConsumerController());
+  public void pause() {
+    isRunning.set(false);
   }
+
+  public void waitUntilRunning() {
+    while (!isRunning.get()) {
+      LockSupport.parkNanos(CHECK_RUNNING_INTERVAL_NANOS);
+    }
+  }
+
+  public final void create() {
+    try {
+      resume();
+      createInternal();
+    } catch (final Exception e) {
+      LOGGER.warn("Failed to create task", e);
+    }
+  }
+
+  public abstract void createInternal() throws Exception;
+
+  public final void start() {
+    try {
+      resume();
+      startInternal();
+    } catch (final Exception e) {
+      LOGGER.warn("Failed to start task", e);
+    }
+  }
+
+  public abstract void startInternal() throws Exception;
+
+  public final void stop() {
+    try {
+      pause();
+      stopInternal();
+    } catch (final Exception e) {
+      LOGGER.warn("Failed to stop task", e);
+    }
+  }
+
+  public abstract void stopInternal() throws Exception;
+
+  public final void drop() {
+    try {
+      pause();
+      dropInternal();
+    } catch (final Exception e) {
+      LOGGER.warn("Failed to drop task", e);
+    }
+  }
+
+  public abstract void dropInternal() throws Exception;
 }
