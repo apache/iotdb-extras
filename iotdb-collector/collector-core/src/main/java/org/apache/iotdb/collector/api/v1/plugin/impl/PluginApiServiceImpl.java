@@ -25,7 +25,6 @@ import org.apache.iotdb.collector.api.v1.plugin.model.CreatePluginRequest;
 import org.apache.iotdb.collector.api.v1.plugin.model.DropPluginRequest;
 import org.apache.iotdb.collector.api.v1.plugin.model.StartPluginRequest;
 import org.apache.iotdb.collector.api.v1.plugin.model.StopPluginRequest;
-import org.apache.iotdb.collector.service.RuntimeService;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
@@ -35,30 +34,30 @@ public class PluginApiServiceImpl extends PluginApiService {
   @Override
   public Response createPlugin(
       final CreatePluginRequest createPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("create plugin").entity(RuntimeService.plugin().createPlugin()).build();
+    return Response.ok("create plugin").build();
   }
 
   @Override
   public Response alterPlugin(
       final AlterPluginRequest alterPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("alter plugin").entity(RuntimeService.plugin().alterPlugin()).build();
+    return Response.ok("alter plugin").build();
   }
 
   @Override
   public Response startPlugin(
       final StartPluginRequest startPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("start plugin").entity(RuntimeService.plugin().startPlugin()).build();
+    return Response.ok("start plugin").build();
   }
 
   @Override
   public Response stopPlugin(
       final StopPluginRequest stopPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("stop plugin").entity(RuntimeService.plugin().stopPlugin()).build();
+    return Response.ok("stop plugin").build();
   }
 
   @Override
   public Response dropPlugin(
       final DropPluginRequest dropPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("drop plugin").entity(RuntimeService.plugin().dropPlugin()).build();
+    return Response.ok("drop plugin").build();
   }
 }

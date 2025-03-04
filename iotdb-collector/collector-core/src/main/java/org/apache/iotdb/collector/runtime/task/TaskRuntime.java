@@ -33,11 +33,11 @@ import javax.ws.rs.core.Response;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TaskRuntime {
+public class TaskRuntime implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskRuntime.class);
 
-  private static final Map<String, TaskRepository> TASK_REPOSITORY_MAP = new ConcurrentHashMap<>();
+  private final Map<String, TaskRepository> tasks = new ConcurrentHashMap<>();
 
   public Response createTask(
       final String taskId,
@@ -56,7 +56,7 @@ public class TaskRuntime {
       final SourceTask sourceTask = new PushSourceTask(taskId, sourceAttribute, processorTask);
       final TaskRepository taskRepository = new TaskRepository(sourceTask, processorTask, sinkTask);
 
-      TASK_REPOSITORY_MAP.put(taskId, taskRepository);
+      tasks.put(taskId, taskRepository);
       taskRepository.create();
 
       LOGGER.info("Successfully created task {}", taskId);
@@ -82,7 +82,7 @@ public class TaskRuntime {
           .build();
     }
 
-    TASK_REPOSITORY_MAP.get(taskId).start();
+    tasks.get(taskId).start();
     LOGGER.info("Task {} started successfully", taskId);
     return Response.status(Response.Status.OK)
         .entity(String.format("task %s start successfully", taskId))
@@ -97,7 +97,7 @@ public class TaskRuntime {
     }
 
     try {
-      final TaskRepository taskRepository = TASK_REPOSITORY_MAP.get(taskId);
+      final TaskRepository taskRepository = tasks.get(taskId);
       if (taskRepository != null) {
         taskRepository.stop();
       }
@@ -121,7 +121,7 @@ public class TaskRuntime {
           .build();
     }
 
-    TASK_REPOSITORY_MAP.remove(taskId).drop();
+    tasks.remove(taskId).drop();
     LOGGER.info("Task {} dropped successfully", taskId);
     return Response.status(Response.Status.OK)
         .entity(String.format("task %s drop successfully", taskId))
@@ -129,10 +129,13 @@ public class TaskRuntime {
   }
 
   private boolean validateTaskIsExist(final String taskId) {
-    if (TASK_REPOSITORY_MAP.containsKey(taskId)) {
+    if (tasks.containsKey(taskId)) {
       return true;
     }
     LOGGER.warn("Task {} not found", taskId);
     return false;
   }
+
+  @Override
+  public void close() throws Exception {}
 }

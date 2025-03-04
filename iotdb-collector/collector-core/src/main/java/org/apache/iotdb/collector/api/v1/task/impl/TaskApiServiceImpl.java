@@ -37,12 +37,15 @@ public class TaskApiServiceImpl extends TaskApiService {
       final CreateTaskRequest createTaskRequest, final SecurityContext securityContext) {
     TaskApiServiceRequestValidationHandler.validateCreateRequest(createTaskRequest);
 
-    return RuntimeService.task()
-        .createTask(
-            createTaskRequest.getTaskId(),
-            createTaskRequest.getSourceAttribute(),
-            createTaskRequest.getProcessorAttribute(),
-            createTaskRequest.getSinkAttribute());
+    return RuntimeService.task().isPresent()
+        ? RuntimeService.task()
+            .get()
+            .createTask(
+                createTaskRequest.getTaskId(),
+                createTaskRequest.getSourceAttribute(),
+                createTaskRequest.getProcessorAttribute(),
+                createTaskRequest.getSinkAttribute())
+        : Response.serverError().entity("Task runtime is down").build();
   }
 
   @Override
@@ -56,7 +59,9 @@ public class TaskApiServiceImpl extends TaskApiService {
       final StartTaskRequest startTaskRequest, final SecurityContext securityContext) {
     TaskApiServiceRequestValidationHandler.validateStartRequest(startTaskRequest);
 
-    return RuntimeService.task().startTask(startTaskRequest.getTaskId());
+    return RuntimeService.task().isPresent()
+        ? RuntimeService.task().get().startTask(startTaskRequest.getTaskId())
+        : Response.serverError().entity("Task runtime is down").build();
   }
 
   @Override
@@ -64,7 +69,9 @@ public class TaskApiServiceImpl extends TaskApiService {
       final StopTaskRequest stopTaskRequest, final SecurityContext securityContext) {
     TaskApiServiceRequestValidationHandler.validateStopRequest(stopTaskRequest);
 
-    return RuntimeService.task().stopTask(stopTaskRequest.getTaskId());
+    return RuntimeService.task().isPresent()
+        ? RuntimeService.task().get().stopTask(stopTaskRequest.getTaskId())
+        : Response.serverError().entity("Task runtime is down").build();
   }
 
   @Override
@@ -72,6 +79,8 @@ public class TaskApiServiceImpl extends TaskApiService {
       final DropTaskRequest dropTaskRequest, final SecurityContext securityContext) {
     TaskApiServiceRequestValidationHandler.validateDropRequest(dropTaskRequest);
 
-    return RuntimeService.task().dropTask(dropTaskRequest.getTaskId());
+    return RuntimeService.task().isPresent()
+        ? RuntimeService.task().get().dropTask(dropTaskRequest.getTaskId())
+        : Response.serverError().entity("Task runtime is down").build();
   }
 }

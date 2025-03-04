@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.collector.runtime.plugin;
 
-public class PluginRuntime {
+public class PluginRuntime implements AutoCloseable {
 
   public boolean createPlugin() {
     return true;
@@ -40,4 +40,7 @@ public class PluginRuntime {
   public boolean dropPlugin() {
     return true;
   }
+
+  @Override
+  public void close() throws Exception {}
 }
