@@ -19,22 +19,28 @@
 
 package org.apache.iotdb.collector.runtime.task.def;
 
-import org.apache.iotdb.collector.runtime.task.datastructure.TaskEventCollector;
-import org.apache.iotdb.collector.runtime.task.datastructure.TaskEventConsumer;
-import org.apache.iotdb.collector.runtime.task.datastructure.TaskEventConsumerController;
+import org.apache.iotdb.collector.runtime.task.execution.TaskEventCollector;
+import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumer;
+import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumerController;
 import org.apache.iotdb.pipe.api.PipePlugin;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Objects;
 import java.util.stream.Stream;
 
 public abstract class Task {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Task.class);
+
+  public abstract void create() throws Exception;
+
+  public abstract void start() throws Exception;
+
+  public abstract void stop() throws Exception;
+
+  public abstract void drop() throws Exception;
 
   protected TaskEventConsumer[] getConsumer(
       final PipePlugin plugin, final int consumerNum, final TaskEventCollector collector) {
@@ -48,22 +54,5 @@ public abstract class Task {
     return Objects.nonNull(collector)
         ? new TaskEventConsumer(plugin, collector, new TaskEventConsumerController())
         : new TaskEventConsumer(plugin, new TaskEventConsumerController());
-  }
-
-  protected <T> T createInstance(final Class<T> clazz) {
-    try {
-      final Constructor<T> constructor = clazz.getDeclaredConstructor();
-      constructor.setAccessible(true);
-      return constructor.newInstance();
-    } catch (final NoSuchMethodException e) {
-      LOGGER.warn("class {} is abstract class.", clazz, e);
-    } catch (final IllegalAccessException e) {
-      LOGGER.warn("failed to visit class {} constructor method.", clazz, e);
-    } catch (final InstantiationException e) {
-      LOGGER.warn("failed to instantiate class {}.", clazz, e);
-    } catch (final InvocationTargetException e) {
-      LOGGER.warn("the constructor threw an exception.", e);
-    }
-    throw new RuntimeException();
   }
 }

@@ -17,29 +17,27 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.datastructure;
+package org.apache.iotdb.collector.runtime.task.execution;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
+import org.apache.iotdb.pipe.api.collector.EventCollector;
+import org.apache.iotdb.pipe.api.event.Event;
 
-public class TaskEventConsumerController {
+import com.lmax.disruptor.RingBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-  private final AtomicBoolean running = new AtomicBoolean(true);
+public class TaskEventCollector implements EventCollector {
 
-  private static final long PARK_NANOS = 100_000_000L;
+  private static final Logger LOGGER = LoggerFactory.getLogger(TaskEventCollector.class);
+  private final RingBuffer<TaskEventContainer> ringBuffer;
 
-  public void pause() {
-    running.set(false);
+  public TaskEventCollector(final RingBuffer<TaskEventContainer> ringBuffer) {
+    this.ringBuffer = ringBuffer;
   }
 
-  public void resume() {
-    running.set(true);
-  }
-
-  public boolean shouldRun() {
-    while (!running.get()) {
-      LockSupport.parkNanos(PARK_NANOS);
-    }
-    return running.get();
+  @Override
+  public void collect(final Event event) {
+    ringBuffer.publishEvent((container, sequence, o) -> container.setEvent(event), event);
+    LOGGER.info("successfully publish event {}", event);
   }
 }

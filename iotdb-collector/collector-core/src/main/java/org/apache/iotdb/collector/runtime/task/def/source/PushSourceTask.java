@@ -17,27 +17,34 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def;
+package org.apache.iotdb.collector.runtime.task.def.source;
 
-import org.apache.iotdb.collector.plugin.source.HttpPullSource;
-import org.apache.iotdb.pipe.api.event.Event;
+import org.apache.iotdb.collector.plugin.source.HttpPushSource;
+import org.apache.iotdb.collector.runtime.task.def.processor.ProcessorTask;
+import org.apache.iotdb.collector.runtime.task.execution.TaskEventCollector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
-public class PullSourceTask extends SourceTask {
+public class PushSourceTask extends SourceTask {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PullSourceTask.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PushSourceTask.class);
 
-  public PullSourceTask(
+  private final TaskEventCollector collector;
+
+  public PushSourceTask(
       final String taskId,
       final Map<String, String> sourceParams,
       final ProcessorTask processorTask) {
     super(taskId, sourceParams, processorTask);
+
+    this.collector =
+        new TaskEventCollector(
+            processorTask.getProcessorRingBuffer().isPresent()
+                ? processorTask.getProcessorRingBuffer().get()
+                : null);
   }
 
   @Override
@@ -45,7 +52,7 @@ public class PullSourceTask extends SourceTask {
     createSourceTask();
     for (int i = 0; i < sourceParallelismNum; i++) {
       // use sourceAttribute later
-      try (final HttpPullSource source = createInstance(HttpPullSource.class)) {
+      try (final HttpPushSource source = new HttpPushSource(collector)) {
         addSourceTask(source);
         SOURCE_EXECUTOR_SERVICE
             .get(taskId)
@@ -53,27 +60,13 @@ public class PullSourceTask extends SourceTask {
                 () -> {
                   try {
                     source.start();
-                    while (SOURCE_TASK_STATUS.containsKey(taskId)) {
-                      if (SOURCE_TASK_STATUS.get(taskId) == TaskState.Stopped) {
-                        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
-                        continue;
-                      }
-
-                      final Event event = source.supply();
-                      processorTask
-                          .getProcessorRingBuffer()
-                          .ifPresent(
-                              ringBuffer ->
-                                  ringBuffer.publishEvent(
-                                      ((container, sequence, o) -> container.setEvent(event)),
-                                      event));
-                    }
-                  } catch (Exception e) {
+                  } catch (final Exception e) {
+                    LOGGER.warn("Failed to start push source", e);
                     throw new RuntimeException(e);
                   }
                 });
-      } catch (final Exception e) {
-        LOGGER.warn("Pull source task failed", e);
+      } catch (Exception e) {
+        LOGGER.warn("failed to create instance of HttpSource", e);
       }
     }
   }

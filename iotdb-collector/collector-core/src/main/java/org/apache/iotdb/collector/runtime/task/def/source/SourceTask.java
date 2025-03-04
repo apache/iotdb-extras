@@ -17,9 +17,11 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def;
+package org.apache.iotdb.collector.runtime.task.def.source;
 
 import org.apache.iotdb.collector.config.TaskRuntimeOptions;
+import org.apache.iotdb.collector.runtime.task.def.Task;
+import org.apache.iotdb.collector.runtime.task.def.processor.ProcessorTask;
 import org.apache.iotdb.commons.concurrent.IoTThreadFactory;
 import org.apache.iotdb.commons.concurrent.threadpool.WrappedThreadPoolExecutor;
 import org.apache.iotdb.pipe.api.PipeSource;
@@ -36,7 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-public abstract class SourceTask extends Task implements TaskComponent {
+public abstract class SourceTask extends Task {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SourceTask.class);
 

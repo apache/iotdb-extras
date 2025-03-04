@@ -17,27 +17,20 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.exception;
+package org.apache.iotdb.collector.runtime.task.execution;
 
-import com.lmax.disruptor.ExceptionHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.iotdb.pipe.api.event.Event;
 
-public class DisruptorTaskExceptionHandler implements ExceptionHandler<Object> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DisruptorTaskExceptionHandler.class);
+public class TaskEventContainer implements Event {
+  private Event event;
 
-  @Override
-  public void handleEventException(Throwable ex, long sequence, Object event) {
-    LOGGER.error("Event processing failed [seq={}, event={}]", sequence, event, ex);
+  public TaskEventContainer() {}
+
+  public Event getEvent() {
+    return event;
   }
 
-  @Override
-  public void handleOnStartException(Throwable ex) {
-    LOGGER.error("Failed to start disruptor", ex);
-  }
-
-  @Override
-  public void handleOnShutdownException(Throwable ex) {
-    LOGGER.error("Failed to shutdown disruptor", ex);
+  public void setEvent(final Event event) {
+    this.event = event;
   }
 }

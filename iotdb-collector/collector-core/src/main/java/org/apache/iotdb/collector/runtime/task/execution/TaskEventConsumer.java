@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.datastructure;
+package org.apache.iotdb.collector.runtime.task.execution;
 
 import org.apache.iotdb.pipe.api.PipePlugin;
 import org.apache.iotdb.pipe.api.PipeProcessor;

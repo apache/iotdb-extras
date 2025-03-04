@@ -19,11 +19,11 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
-import org.apache.iotdb.collector.runtime.task.def.ProcessorTask;
-import org.apache.iotdb.collector.runtime.task.def.PushSourceTask;
-import org.apache.iotdb.collector.runtime.task.def.SinkTask;
-import org.apache.iotdb.collector.runtime.task.def.SourceTask;
-import org.apache.iotdb.collector.runtime.task.def.TaskRepository;
+import org.apache.iotdb.collector.runtime.task.def.TaskCombiner;
+import org.apache.iotdb.collector.runtime.task.def.processor.ProcessorTask;
+import org.apache.iotdb.collector.runtime.task.def.sink.SinkTask;
+import org.apache.iotdb.collector.runtime.task.def.source.PushSourceTask;
+import org.apache.iotdb.collector.runtime.task.def.source.SourceTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ public class TaskRuntime implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskRuntime.class);
 
-  private final Map<String, TaskRepository> tasks = new ConcurrentHashMap<>();
+  private final Map<String, TaskCombiner> tasks = new ConcurrentHashMap<>();
 
   public Response createTask(
       final String taskId,
@@ -54,7 +54,7 @@ public class TaskRuntime implements AutoCloseable {
       final SinkTask sinkTask = new SinkTask(sinkAttribute);
       final ProcessorTask processorTask = new ProcessorTask(processorAttribute, sinkTask);
       final SourceTask sourceTask = new PushSourceTask(taskId, sourceAttribute, processorTask);
-      final TaskRepository taskRepository = new TaskRepository(sourceTask, processorTask, sinkTask);
+      final TaskCombiner taskRepository = new TaskCombiner(sourceTask, processorTask, sinkTask);
 
       tasks.put(taskId, taskRepository);
       taskRepository.create();
@@ -97,7 +97,7 @@ public class TaskRuntime implements AutoCloseable {
     }
 
     try {
-      final TaskRepository taskRepository = tasks.get(taskId);
+      final TaskCombiner taskRepository = tasks.get(taskId);
       if (taskRepository != null) {
         taskRepository.stop();
       }

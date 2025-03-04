@@ -22,29 +22,26 @@ package org.apache.iotdb.collector.runtime.task.def;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TaskRepository {
+public class TaskCombiner {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TaskRepository.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TaskCombiner.class);
 
-  private final TaskComponent sourceComponent;
-  private final TaskComponent processorComponent;
-  private final TaskComponent sinkComponent;
+  private final Task source;
+  private final Task processor;
+  private final Task sink;
 
-  public TaskRepository(
-      final TaskComponent sourceComponent,
-      final TaskComponent processorComponent,
-      final TaskComponent sinkComponent) {
-    this.sourceComponent = sourceComponent;
-    this.processorComponent = processorComponent;
-    this.sinkComponent = sinkComponent;
+  public TaskCombiner(final Task source, final Task processor, final Task sink) {
+    this.source = source;
+    this.processor = processor;
+    this.sink = sink;
   }
 
   // Disruptor consumers must be started before producers
   public void create() {
     try {
-      sinkComponent.create();
-      processorComponent.create();
-      sourceComponent.create();
+      sink.create();
+      processor.create();
+      source.create();
     } catch (final Exception e) {
       LOGGER.warn("Failed to create task", e);
     }
@@ -53,9 +50,9 @@ public class TaskRepository {
   // Disruptor consumers must be started before producers
   public void start() {
     try {
-      sinkComponent.start();
-      processorComponent.start();
-      sourceComponent.start();
+      sink.start();
+      processor.start();
+      source.start();
     } catch (final Exception e) {
       LOGGER.warn("Failed to start task", e);
     }
@@ -63,9 +60,9 @@ public class TaskRepository {
 
   public void stop() {
     try {
-      sourceComponent.stop();
-      processorComponent.stop();
-      sinkComponent.stop();
+      source.stop();
+      processor.stop();
+      sink.stop();
     } catch (final Exception e) {
       LOGGER.warn("Failed to stop task", e);
     }
@@ -73,9 +70,9 @@ public class TaskRepository {
 
   public void drop() {
     try {
-      sourceComponent.drop();
-      processorComponent.drop();
-      sinkComponent.drop();
+      source.drop();
+      processor.drop();
+      sink.drop();
     } catch (final Exception e) {
       LOGGER.warn("Failed to drop task", e);
     }

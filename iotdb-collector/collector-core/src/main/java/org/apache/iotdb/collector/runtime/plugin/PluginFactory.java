@@ -28,11 +28,14 @@ import org.apache.iotdb.pipe.api.PipePlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
 public class PluginFactory {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginFactory.class);
 
   protected final Map<String, Supplier<PipePlugin>> pluginConstructors = new HashMap<>();
@@ -49,5 +52,22 @@ public class PluginFactory {
     pluginConstructors.put(
         BuiltinPlugin.IOTDB_SESSION_SINK.getCollectorPluginName(), SessionSink::new);
     LOGGER.info("builtin plugin has been initialized");
+  }
+
+  public static <T> T createInstance(final Class<T> clazz) {
+    try {
+      final Constructor<T> constructor = clazz.getDeclaredConstructor();
+      constructor.setAccessible(true);
+      return constructor.newInstance();
+    } catch (final NoSuchMethodException e) {
+      LOGGER.warn("class {} is abstract class.", clazz, e);
+    } catch (final IllegalAccessException e) {
+      LOGGER.warn("failed to visit class {} constructor method.", clazz, e);
+    } catch (final InstantiationException e) {
+      LOGGER.warn("failed to instantiate class {}.", clazz, e);
+    } catch (final InvocationTargetException e) {
+      LOGGER.warn("the constructor threw an exception.", e);
+    }
+    throw new RuntimeException();
   }
 }

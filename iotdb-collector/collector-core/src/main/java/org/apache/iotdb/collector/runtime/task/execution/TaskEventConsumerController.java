@@ -16,14 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.iotdb.collector.runtime.task.def;
 
-public interface TaskComponent {
-  void create() throws Exception;
+package org.apache.iotdb.collector.runtime.task.execution;
 
-  void start() throws Exception;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 
-  void stop();
+public class TaskEventConsumerController {
 
-  void drop();
+  private final AtomicBoolean running = new AtomicBoolean(true);
+
+  private static final long PARK_NANOS = 100_000_000L;
+
+  public void pause() {
+    running.set(false);
+  }
+
+  public void resume() {
+    running.set(true);
+  }
+
+  public boolean shouldRun() {
+    while (!running.get()) {
+      LockSupport.parkNanos(PARK_NANOS);
+    }
+    return running.get();
+  }
 }

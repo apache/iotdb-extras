@@ -17,14 +17,15 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def;
+package org.apache.iotdb.collector.runtime.task.def.sink;
 
 import org.apache.iotdb.collector.config.TaskRuntimeOptions;
-import org.apache.iotdb.collector.plugin.processor.DoNothingProcessor;
-import org.apache.iotdb.collector.runtime.task.datastructure.TaskEventCollector;
-import org.apache.iotdb.collector.runtime.task.datastructure.TaskEventConsumer;
-import org.apache.iotdb.collector.runtime.task.datastructure.TaskEventContainer;
-import org.apache.iotdb.collector.runtime.task.exception.DisruptorTaskExceptionHandler;
+import org.apache.iotdb.collector.plugin.sink.SessionSink;
+import org.apache.iotdb.collector.runtime.plugin.PluginFactory;
+import org.apache.iotdb.collector.runtime.task.def.Task;
+import org.apache.iotdb.collector.runtime.task.execution.DisruptorTaskExceptionHandler;
+import org.apache.iotdb.collector.runtime.task.execution.TaskEventConsumer;
+import org.apache.iotdb.collector.runtime.task.execution.TaskEventContainer;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -34,50 +35,45 @@ import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 
 import java.util.Map;
-import java.util.Optional;
 
-public class ProcessorTask extends Task implements TaskComponent {
+public class SinkTask extends Task {
 
-  private Disruptor<TaskEventContainer> processorDisruptor;
+  private Disruptor<TaskEventContainer> sinkDisruptor;
   private TaskEventConsumer[] eventConsumers;
-
   private final PipeParameters parameters;
-  private final int processParallelismNum;
-  private final TaskEventCollector collector;
+  private final int sinkParallelismNum;
 
-  public ProcessorTask(final Map<String, String> processorAttributes, final SinkTask sinkTask) {
+  public SinkTask(final Map<String, String> processorAttributes) {
     this.parameters = new PipeParameters(processorAttributes);
-    this.processParallelismNum =
+    this.sinkParallelismNum =
         this.parameters.getIntOrDefault(
-            TaskRuntimeOptions.TASK_PROCESS_PARALLELISM_NUM.key(),
-            TaskRuntimeOptions.TASK_PROCESS_PARALLELISM_NUM.value());
-    this.collector = new TaskEventCollector(sinkTask.getSinkRingBuffer());
+            TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.key(),
+            TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.value());
 
-    this.initProcessorDisruptor();
+    this.initSinkDisruptor();
   }
 
   @Override
   public void create() {
-    if (this.processorDisruptor == null) {
-      this.initProcessorDisruptor();
+    if (this.sinkDisruptor == null) {
+      this.initSinkDisruptor();
     }
 
     this.eventConsumers =
-        this.getConsumer(
-            this.createInstance(DoNothingProcessor.class), processParallelismNum, collector);
+        this.getConsumer(PluginFactory.createInstance(SessionSink.class), sinkParallelismNum, null);
 
-    this.processorDisruptor.setDefaultExceptionHandler(new DisruptorTaskExceptionHandler());
-    this.processorDisruptor.handleEventsWithWorkerPool(this.eventConsumers);
-    this.processorDisruptor.start();
+    this.sinkDisruptor.setDefaultExceptionHandler(new DisruptorTaskExceptionHandler());
+    this.sinkDisruptor.handleEventsWithWorkerPool(this.eventConsumers);
+    this.sinkDisruptor.start();
   }
 
-  private void initProcessorDisruptor() {
-    this.processorDisruptor =
+  private void initSinkDisruptor() {
+    this.sinkDisruptor =
         new Disruptor<>(
             TaskEventContainer::new,
             this.parameters.getIntOrDefault(
-                TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE.key(),
-                TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE.value()),
+                TaskRuntimeOptions.TASK_SINK_RING_BUFFER_SIZE.key(),
+                TaskRuntimeOptions.TASK_SINK_RING_BUFFER_SIZE.value()),
             DaemonThreadFactory.INSTANCE,
             ProducerType.MULTI,
             new BlockingWaitStrategy());
@@ -99,16 +95,13 @@ public class ProcessorTask extends Task implements TaskComponent {
 
   @Override
   public void drop() {
-    if (this.processorDisruptor != null) {
-      this.processorDisruptor.shutdown();
-      this.processorDisruptor = null;
+    if (this.sinkDisruptor != null) {
+      this.sinkDisruptor.shutdown();
+      this.sinkDisruptor = null;
     }
   }
 
-  public Optional<RingBuffer<TaskEventContainer>> getProcessorRingBuffer() {
-    if (this.processorDisruptor != null) {
-      return Optional.of(this.processorDisruptor.getRingBuffer());
-    }
-    return Optional.empty();
+  public RingBuffer<TaskEventContainer> getSinkRingBuffer() {
+    return this.sinkDisruptor.getRingBuffer();
   }
 }
