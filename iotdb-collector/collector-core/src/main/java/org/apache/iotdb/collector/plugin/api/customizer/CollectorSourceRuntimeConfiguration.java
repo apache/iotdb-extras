@@ -17,7 +17,26 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def.sink;
+package org.apache.iotdb.collector.plugin.api.customizer;
 
-public class SinkConsumer {
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeRuntimeEnvironment;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
+
+public class CollectorSourceRuntimeConfiguration implements PipeSourceRuntimeConfiguration {
+
+  private final CollectorRuntimeEnvironment runtimeEnvironment;
+
+  public CollectorSourceRuntimeConfiguration(
+      final String pipeName,
+      final long creationTime,
+      final int parallelism,
+      final int instanceIndex) {
+    runtimeEnvironment =
+        new CollectorRuntimeEnvironment(pipeName, creationTime, parallelism, instanceIndex);
+  }
+
+  @Override
+  public PipeRuntimeEnvironment getRuntimeEnvironment() {
+    return runtimeEnvironment;
+  }
 }

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def;
+package org.apache.iotdb.collector.runtime.task;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

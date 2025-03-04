@@ -17,27 +17,30 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.execution;
+package org.apache.iotdb.collector.runtime.task.source;
 
-import com.lmax.disruptor.ExceptionHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.iotdb.collector.runtime.task.Task;
+import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
+import org.apache.iotdb.collector.runtime.task.source.pull.PullSourceTask;
 
-public class EventConsumerExceptionHandler implements ExceptionHandler<Object> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(EventConsumerExceptionHandler.class);
+import java.util.Map;
 
-  @Override
-  public void handleEventException(Throwable ex, long sequence, Object event) {
-    LOGGER.error("Event processing failed [seq={}, event={}]", sequence, event, ex);
+public abstract class SourceTask extends Task {
+
+  protected final ProcessorTask processorTask;
+
+  protected SourceTask(
+      final String taskId,
+      final Map<String, String> attributes,
+      final ProcessorTask processorTask) {
+    super(taskId, attributes);
+    this.processorTask = processorTask;
   }
 
-  @Override
-  public void handleOnStartException(Throwable ex) {
-    LOGGER.error("Failed to start disruptor", ex);
-  }
-
-  @Override
-  public void handleOnShutdownException(Throwable ex) {
-    LOGGER.error("Failed to shutdown disruptor", ex);
+  public static SourceTask construct(
+      final String taskId,
+      final Map<String, String> attributes,
+      final ProcessorTask processorTask) {
+    return new PullSourceTask(taskId, attributes, processorTask);
   }
 }

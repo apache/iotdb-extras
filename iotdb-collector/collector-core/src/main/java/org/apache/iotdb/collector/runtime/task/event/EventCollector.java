@@ -17,19 +17,22 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.execution;
+package org.apache.iotdb.collector.runtime.task.event;
 
 import org.apache.iotdb.pipe.api.event.Event;
 
-public class EventContainer implements Event {
+import com.lmax.disruptor.RingBuffer;
 
-  private Event event;
+public class EventCollector implements org.apache.iotdb.pipe.api.collector.EventCollector {
 
-  public Event getEvent() {
-    return event;
+  private final RingBuffer<EventContainer> ringBuffer;
+
+  public EventCollector(final RingBuffer<EventContainer> ringBuffer) {
+    this.ringBuffer = ringBuffer;
   }
 
-  public void setEvent(final Event event) {
-    this.event = event;
+  @Override
+  public void collect(final Event event) {
+    ringBuffer.publishEvent((container, sequence, o) -> container.setEvent(event), event);
   }
 }

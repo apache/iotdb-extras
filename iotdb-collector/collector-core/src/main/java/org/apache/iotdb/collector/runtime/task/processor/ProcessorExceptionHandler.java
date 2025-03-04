@@ -17,27 +17,31 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.execution;
+package org.apache.iotdb.collector.runtime.task.processor;
 
-import org.apache.iotdb.pipe.api.event.Event;
+import org.apache.iotdb.collector.runtime.task.event.EventContainer;
 
-import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.ExceptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class EventCollector implements org.apache.iotdb.pipe.api.collector.EventCollector {
+class ProcessorExceptionHandler implements ExceptionHandler<EventContainer> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(EventCollector.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProcessorExceptionHandler.class);
 
-  private final RingBuffer<EventContainer> ringBuffer;
-
-  public EventCollector(final RingBuffer<EventContainer> ringBuffer) {
-    this.ringBuffer = ringBuffer;
+  @Override
+  public void handleEventException(Throwable ex, long sequence, EventContainer event) {
+    // TODO: retry strategy
+    LOGGER.warn("Failed to handle event", ex);
   }
 
   @Override
-  public void collect(final Event event) {
-    ringBuffer.publishEvent((container, sequence, o) -> container.setEvent(event), event);
-    LOGGER.info("successfully publish event {}", event);
+  public void handleOnStartException(Throwable ex) {
+    LOGGER.warn("Failed to start processor disruptor", ex);
+  }
+
+  @Override
+  public void handleOnShutdownException(Throwable ex) {
+    LOGGER.warn("Failed to shutdown processor disruptor", ex);
   }
 }

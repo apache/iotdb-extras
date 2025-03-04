@@ -17,26 +17,40 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def;
+package org.apache.iotdb.collector.runtime.task;
 
-import org.apache.iotdb.collector.runtime.task.execution.EventCollector;
-import org.apache.iotdb.collector.runtime.task.execution.EventConsumer;
-import org.apache.iotdb.pipe.api.PipePlugin;
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Objects;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
-import java.util.stream.Stream;
 
 public abstract class Task {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Task.class);
 
+  protected final String taskId;
+  protected final PipeParameters parameters;
+
+  protected final int parallelism;
+
   private static final long CHECK_RUNNING_INTERVAL_NANOS = 100_000_000L;
-  private final AtomicBoolean isRunning = new AtomicBoolean(false);
+  protected final AtomicBoolean isRunning = new AtomicBoolean(false);
+  protected final AtomicBoolean isDropped = new AtomicBoolean(false);
+
+  protected Task(final String taskId, final Map<String, String> attributes) {
+    this.taskId = taskId;
+    this.parameters = new PipeParameters(attributes);
+
+    this.parallelism =
+        parameters.getIntOrDefault(
+            TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.key(),
+            TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.value());
+  }
 
   public void resume() {
     isRunning.set(true);
@@ -46,13 +60,13 @@ public abstract class Task {
     isRunning.set(false);
   }
 
-  public void waitUntilRunning() {
-    while (!isRunning.get()) {
+  protected void waitUntilRunningOrDropped() {
+    while (!isRunning.get() && !isDropped.get()) {
       LockSupport.parkNanos(CHECK_RUNNING_INTERVAL_NANOS);
     }
   }
 
-  public final void create() {
+  public final synchronized void create() {
     try {
       resume();
       createInternal();
@@ -63,7 +77,7 @@ public abstract class Task {
 
   public abstract void createInternal() throws Exception;
 
-  public final void start() {
+  public final synchronized void start() {
     try {
       resume();
       startInternal();
@@ -74,7 +88,7 @@ public abstract class Task {
 
   public abstract void startInternal() throws Exception;
 
-  public final void stop() {
+  public final synchronized void stop() {
     try {
       pause();
       stopInternal();
@@ -85,9 +99,10 @@ public abstract class Task {
 
   public abstract void stopInternal() throws Exception;
 
-  public final void drop() {
+  public final synchronized void drop() {
     try {
       pause();
+      isDropped.set(true);
       dropInternal();
     } catch (final Exception e) {
       LOGGER.warn("Failed to drop task", e);

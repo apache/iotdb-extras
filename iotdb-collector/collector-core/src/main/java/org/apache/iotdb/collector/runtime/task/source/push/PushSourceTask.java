@@ -17,11 +17,12 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.task.def.source;
+package org.apache.iotdb.collector.runtime.task.source.push;
 
 import org.apache.iotdb.collector.plugin.source.HttpPushSource;
-import org.apache.iotdb.collector.runtime.task.def.processor.ProcessorTask;
-import org.apache.iotdb.collector.runtime.task.execution.EventCollector;
+import org.apache.iotdb.collector.runtime.task.event.EventCollector;
+import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
+import org.apache.iotdb.collector.runtime.task.source.SourceTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,11 +41,7 @@ public class PushSourceTask extends SourceTask {
       final ProcessorTask processorTask) {
     super(taskId, sourceParams, processorTask);
 
-    this.collector =
-        new EventCollector(
-            processorTask.getProcessorRingBuffer().isPresent()
-                ? processorTask.getProcessorRingBuffer().get()
-                : null);
+    this.collector = processorTask.makeProducer();
   }
 
   @Override

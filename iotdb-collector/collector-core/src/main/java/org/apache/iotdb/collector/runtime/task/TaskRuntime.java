@@ -19,11 +19,9 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
-import org.apache.iotdb.collector.runtime.task.def.TaskCombiner;
-import org.apache.iotdb.collector.runtime.task.def.processor.ProcessorTask;
-import org.apache.iotdb.collector.runtime.task.def.sink.SinkTask;
-import org.apache.iotdb.collector.runtime.task.def.source.PushSourceTask;
-import org.apache.iotdb.collector.runtime.task.def.source.SourceTask;
+import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
+import org.apache.iotdb.collector.runtime.task.sink.SinkTask;
+import org.apache.iotdb.collector.runtime.task.source.SourceTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,9 +49,10 @@ public class TaskRuntime implements AutoCloseable {
             .build();
       }
 
-      final SinkTask sinkTask = new SinkTask(sinkAttribute);
-      final ProcessorTask processorTask = new ProcessorTask(processorAttribute, sinkTask);
-      final SourceTask sourceTask = new PushSourceTask(taskId, sourceAttribute, processorTask);
+      final SinkTask sinkTask = new SinkTask(taskId, sinkAttribute);
+      final ProcessorTask processorTask =
+          new ProcessorTask(taskId, processorAttribute, sinkTask.makeProducer());
+      final SourceTask sourceTask = SourceTask.construct(taskId, sourceAttribute, processorTask);
       final TaskCombiner taskRepository = new TaskCombiner(sourceTask, processorTask, sinkTask);
 
       tasks.put(taskId, taskRepository);
