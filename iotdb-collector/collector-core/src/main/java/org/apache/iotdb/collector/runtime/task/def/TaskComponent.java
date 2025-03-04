@@ -16,16 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.iotdb.collector.runtime.task.def;
 
-package org.apache.iotdb.collector.config;
+public interface TaskComponent {
+  void create() throws Exception;
 
-public class ApiServiceOptions extends Options {
+  void start() throws Exception;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  void stop();
+
+  void drop();
 }

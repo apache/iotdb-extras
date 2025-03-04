@@ -32,6 +32,15 @@ public class Options {
 
   private static final Map<String, Option<?>> OPTIONS = new ConcurrentHashMap<>();
 
+  static {
+    try {
+      Class.forName("org.apache.iotdb.collector.config.ApiServiceOptions");
+      Class.forName("org.apache.iotdb.collector.config.TaskRuntimeOptions");
+    } catch (final ClassNotFoundException e) {
+      throw new RuntimeException("Failed to load ApiServiceOptions", e);
+    }
+  }
+
   public abstract static class Option<T> {
 
     private final String key;

@@ -17,15 +17,29 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.runtime.task.datastructure;
 
-public class ApiServiceOptions extends Options {
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+public class TaskEventConsumerController {
+
+  private final AtomicBoolean running = new AtomicBoolean(true);
+
+  private static final long PARK_NANOS = 100_000_000L;
+
+  public void pause() {
+    running.set(false);
+  }
+
+  public void resume() {
+    running.set(true);
+  }
+
+  public boolean shouldRun() {
+    while (!running.get()) {
+      LockSupport.parkNanos(PARK_NANOS);
+    }
+    return running.get();
+  }
 }

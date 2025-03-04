@@ -17,15 +17,27 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.runtime.task.datastructure;
 
-public class ApiServiceOptions extends Options {
+import org.apache.iotdb.pipe.api.collector.EventCollector;
+import org.apache.iotdb.pipe.api.event.Event;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+import com.lmax.disruptor.RingBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class TaskEventCollector implements EventCollector {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TaskEventCollector.class);
+  private final RingBuffer<TaskEventContainer> ringBuffer;
+
+  public TaskEventCollector(final RingBuffer<TaskEventContainer> ringBuffer) {
+    this.ringBuffer = ringBuffer;
+  }
+
+  @Override
+  public void collect(final Event event) {
+    ringBuffer.publishEvent((container, sequence, o) -> container.setEvent(event), event);
+    LOGGER.info("successfully publish event {}", event);
+  }
 }

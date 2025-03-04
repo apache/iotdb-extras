@@ -17,15 +17,20 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.runtime.task.datastructure;
 
-public class ApiServiceOptions extends Options {
+import org.apache.iotdb.pipe.api.event.Event;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+public class TaskEventContainer implements Event {
+  private Event event;
+
+  public TaskEventContainer() {}
+
+  public Event getEvent() {
+    return event;
+  }
+
+  public void setEvent(final Event event) {
+    this.event = event;
+  }
 }

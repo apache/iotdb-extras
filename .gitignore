@@ -5,3 +5,6 @@ target/
 # IntelliJ relaged
 .idea/
 *.iml
+
+# log
+logs/

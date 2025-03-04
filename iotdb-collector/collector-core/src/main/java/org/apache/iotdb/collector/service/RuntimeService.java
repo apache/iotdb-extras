@@ -17,15 +17,38 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.service;
 
-public class ApiServiceOptions extends Options {
+import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
+import org.apache.iotdb.collector.runtime.task.TaskRuntime;
 
-  public static final Option<Integer> PORT =
-      new Option<Integer>("api_service_port", 17070) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+public class RuntimeService implements IService {
+
+  private static TaskRuntime task;
+  private static PluginRuntime plugin;
+
+  @Override
+  public void start() {
+    plugin = new PluginRuntime();
+    task = new TaskRuntime();
+  }
+
+  public static TaskRuntime task() {
+    return task;
+  }
+
+  public static PluginRuntime plugin() {
+    return plugin;
+  }
+
+  @Override
+  public void stop() {
+    task = null;
+    plugin = null;
+  }
+
+  @Override
+  public String name() {
+    return "RuntimeService";
+  }
 }
