@@ -29,6 +29,8 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import java.util.Map;
 
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SOURCE_PARALLELISM_NUM;
+
 public abstract class SourceTask extends Task {
 
   protected final EventCollector processorProducer;
@@ -37,7 +39,8 @@ public abstract class SourceTask extends Task {
       final String taskId,
       final Map<String, String> attributes,
       final EventCollector processorProducer) {
-    super(taskId, attributes);
+    super(
+        taskId, attributes, TASK_SOURCE_PARALLELISM_NUM.key(), TASK_SOURCE_PARALLELISM_NUM.value());
     this.processorProducer = processorProducer;
   }
 

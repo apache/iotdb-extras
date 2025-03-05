@@ -19,19 +19,13 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
-import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
 public abstract class Task {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(Task.class);
 
   protected final String taskId;
   protected final PipeParameters parameters;
@@ -42,14 +36,15 @@ public abstract class Task {
   protected final AtomicBoolean isRunning = new AtomicBoolean(false);
   protected final AtomicBoolean isDropped = new AtomicBoolean(false);
 
-  protected Task(final String taskId, final Map<String, String> attributes) {
+  protected Task(
+      final String taskId,
+      final Map<String, String> attributes,
+      final String parallelismKey,
+      final int parallelismValue) {
     this.taskId = taskId;
     this.parameters = new PipeParameters(attributes);
 
-    this.parallelism =
-        parameters.getIntOrDefault(
-            TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.key(),
-            TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM.value());
+    this.parallelism = parameters.getIntOrDefault(parallelismKey, parallelismValue);
   }
 
   public void resume() {

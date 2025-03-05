@@ -25,20 +25,31 @@ import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.commons.concurrent.IoTThreadFactory;
+import org.apache.iotdb.commons.concurrent.threadpool.WrappedThreadPoolExecutor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESS_PARALLELISM_NUM;
 
 public class ProcessorTask extends Task {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ProcessorTask.class);
+
+  private static final Map<String, ExecutorService> REGISTERED_EXECUTOR_SERVICES =
+      new ConcurrentHashMap<>();
 
   private final Disruptor<EventContainer> disruptor;
   private final EventCollector sinkProducer;
@@ -48,13 +59,28 @@ public class ProcessorTask extends Task {
       final String taskId,
       final Map<String, String> attributes,
       final EventCollector sinkProducer) {
-    super(taskId, attributes);
+    super(
+        taskId,
+        attributes,
+        TASK_PROCESS_PARALLELISM_NUM.key(),
+        TASK_PROCESS_PARALLELISM_NUM.value());
+
+    REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
+        taskId,
+        new WrappedThreadPoolExecutor(
+            parallelism,
+            parallelism,
+            0L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(parallelism),
+            new IoTThreadFactory(taskId), // TODO: thread name
+            taskId));
 
     disruptor =
         new Disruptor<>(
             EventContainer::new,
-            parallelism, // fault usage
-            DaemonThreadFactory.INSTANCE, // fault usage
+            TASK_PROCESSOR_RING_BUFFER_SIZE.value(),
+            REGISTERED_EXECUTOR_SERVICES.get(taskId),
             ProducerType.MULTI,
             new BlockingWaitStrategy());
     this.sinkProducer = sinkProducer;
@@ -117,6 +143,11 @@ public class ProcessorTask extends Task {
     }
 
     disruptor.shutdown();
+
+    final ExecutorService executorService = REGISTERED_EXECUTOR_SERVICES.remove(taskId);
+    if (executorService != null) {
+      executorService.shutdown();
+    }
   }
 
   public EventCollector makeProducer() {
