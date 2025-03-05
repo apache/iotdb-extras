@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.source;
 
-import org.apache.iotdb.collector.plugin.api.CollectorPullSource;
+import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.event.SourceEvent;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
@@ -34,7 +34,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
-public class HttpPullSource extends CollectorPullSource {
+public class HttpPullSource extends PullSource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpPullSource.class);
 
@@ -61,9 +61,6 @@ public class HttpPullSource extends CollectorPullSource {
     LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(2));
     return event;
   }
-
-  @Override
-  public void stop() throws Exception {}
 
   @Override
   public void close() {}

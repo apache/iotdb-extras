@@ -20,11 +20,11 @@
 package org.apache.iotdb.collector.runtime.task.sink;
 
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSinkRuntimeConfiguration;
-import org.apache.iotdb.collector.plugin.sink.SessionSink;
-import org.apache.iotdb.collector.runtime.plugin.PluginFactory;
+import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
+import org.apache.iotdb.collector.service.RuntimeService;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -57,18 +57,32 @@ public class SinkTask extends Task {
 
   @Override
   public void createInternal() throws Exception {
+    final PluginRuntime pluginRuntime =
+        RuntimeService.plugin().isPresent() ? RuntimeService.plugin().get() : null;
+    if (pluginRuntime == null) {
+      throw new IllegalStateException("Plugin runtime is down");
+    }
+
     final long creationTime = System.currentTimeMillis();
     consumers = new SinkConsumer[parallelism];
     for (int i = 0; i < parallelism; i++) {
-      // TODO: PluginFactory
-      consumers[i] = new SinkConsumer(PluginFactory.createInstance(SessionSink.class));
-      consumers[i].consumer().validate(new PipeParameterValidator(parameters));
-      consumers[i]
-          .consumer()
-          .customize(
-              parameters,
-              new CollectorSinkRuntimeConfiguration(taskId, creationTime, parallelism, i));
-      consumers[i].consumer().handshake();
+      consumers[i] = new SinkConsumer(pluginRuntime.constructSink(parameters));
+      try {
+        consumers[i].consumer().validate(new PipeParameterValidator(parameters));
+        consumers[i]
+            .consumer()
+            .customize(
+                parameters,
+                new CollectorSinkRuntimeConfiguration(taskId, creationTime, parallelism, i));
+        consumers[i].consumer().handshake();
+      } catch (final Exception e) {
+        try {
+          consumers[i].consumer().close();
+        } catch (final Exception ex) {
+          LOGGER.warn("Failed to close sink on creation failure", ex);
+        }
+        throw e;
+      }
     }
     disruptor.handleEventsWithWorkerPool(consumers);
 

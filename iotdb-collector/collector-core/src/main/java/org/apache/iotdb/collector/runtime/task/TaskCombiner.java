@@ -36,45 +36,29 @@ public class TaskCombiner {
     this.sink = sink;
   }
 
-  // Disruptor consumers must be started before producers
-  public void create() {
-    try {
-      sink.create();
-      processor.create();
-      source.create();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to create task", e);
-    }
+  public void create() throws Exception {
+    sink.create();
+    processor.create();
+    source.create();
   }
 
-  // Disruptor consumers must be started before producers
-  public void start() {
-    try {
-      sink.start();
-      processor.start();
-      source.start();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to start task", e);
-    }
+  public void start() throws Exception {
+    sink.start();
+    processor.start();
+    source.start();
   }
 
-  public void stop() {
-    try {
-      source.stop();
-      processor.stop();
-      sink.stop();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to stop task", e);
-    }
+  public void stop() throws Exception {
+    source.stop();
+    processor.stop();
+    sink.stop();
   }
 
-  public void drop() {
-    try {
-      source.drop();
-      processor.drop();
-      sink.drop();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to drop task", e);
-    }
+  public void drop() throws Exception {
+    stop();
+
+    source.drop();
+    processor.drop();
+    sink.drop();
   }
 }

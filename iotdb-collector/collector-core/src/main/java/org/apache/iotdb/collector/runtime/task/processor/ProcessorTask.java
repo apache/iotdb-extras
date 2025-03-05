@@ -20,13 +20,12 @@
 package org.apache.iotdb.collector.runtime.task.processor;
 
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorProcessorRuntimeConfiguration;
-import org.apache.iotdb.collector.plugin.processor.DoNothingProcessor;
-import org.apache.iotdb.collector.runtime.plugin.PluginFactory;
+import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
+import org.apache.iotdb.collector.service.RuntimeService;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
-import org.apache.iotdb.pipe.api.event.Event;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
@@ -63,19 +62,32 @@ public class ProcessorTask extends Task {
 
   @Override
   public void createInternal() throws Exception {
+    final PluginRuntime pluginRuntime =
+        RuntimeService.plugin().isPresent() ? RuntimeService.plugin().get() : null;
+    if (pluginRuntime == null) {
+      throw new IllegalStateException("Plugin runtime is down");
+    }
+
     final long creationTime = System.currentTimeMillis();
     processorConsumers = new ProcessorConsumer[parallelism];
     for (int i = 0; i < parallelism; i++) {
-      // TODO: PluginFactory
       processorConsumers[i] =
-          new ProcessorConsumer(
-              PluginFactory.createInstance(DoNothingProcessor.class), sinkProducer);
-      processorConsumers[i].consumer().validate(new PipeParameterValidator(parameters));
-      processorConsumers[i]
-          .consumer()
-          .customize(
-              parameters,
-              new CollectorProcessorRuntimeConfiguration(taskId, creationTime, parallelism, i));
+          new ProcessorConsumer(pluginRuntime.constructProcessor(parameters), sinkProducer);
+      try {
+        processorConsumers[i].consumer().validate(new PipeParameterValidator(parameters));
+        processorConsumers[i]
+            .consumer()
+            .customize(
+                parameters,
+                new CollectorProcessorRuntimeConfiguration(taskId, creationTime, parallelism, i));
+      } catch (final Exception e) {
+        try {
+          processorConsumers[i].consumer().close();
+        } catch (final Exception ex) {
+          LOGGER.warn("Failed to close sink on creation failure", ex);
+        }
+        throw e;
+      }
     }
     disruptor.handleEventsWithWorkerPool(processorConsumers);
 
@@ -109,11 +121,5 @@ public class ProcessorTask extends Task {
 
   public EventCollector makeProducer() {
     return new EventCollector(disruptor.getRingBuffer());
-  }
-
-  public void publishEvent(final Event event) {
-    disruptor
-        .getRingBuffer()
-        .publishEvent((container, sequence, o) -> container.setEvent(event), event);
   }
 }

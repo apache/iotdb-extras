@@ -19,4 +19,6 @@
 
 package org.apache.iotdb.collector.plugin.api;
 
-public abstract class CollectorPullSource implements CollectorSource {}
+import org.apache.iotdb.pipe.api.PipeSource;
+
+public abstract class PullSource implements PipeSource {}

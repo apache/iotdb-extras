@@ -19,12 +19,12 @@
 
 package org.apache.iotdb.collector.runtime.task.source.pull;
 
+import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSourceRuntimeConfiguration;
-import org.apache.iotdb.collector.plugin.source.HttpPullSource;
-import org.apache.iotdb.collector.runtime.plugin.PluginFactory;
+import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
-import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
+import org.apache.iotdb.collector.service.RuntimeService;
 import org.apache.iotdb.commons.concurrent.IoTThreadFactory;
 import org.apache.iotdb.commons.concurrent.threadpool.WrappedThreadPoolExecutor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
@@ -45,19 +45,23 @@ public class PullSourceTask extends SourceTask {
   private static final Map<String, ExecutorService> REGISTERED_EXECUTOR_SERVICES =
       new ConcurrentHashMap<>();
 
-  private final EventCollector processorProducer;
   private PullSourceConsumer[] consumers;
 
   public PullSourceTask(
       final String taskId,
-      final Map<String, String> sourceParams,
-      final ProcessorTask processorTask) {
-    super(taskId, sourceParams, processorTask);
-    processorProducer = processorTask.makeProducer();
+      final Map<String, String> attributes,
+      final EventCollector processorProducer) {
+    super(taskId, attributes, processorProducer);
   }
 
   @Override
   public void createInternal() throws Exception {
+    final PluginRuntime pluginRuntime =
+        RuntimeService.plugin().isPresent() ? RuntimeService.plugin().get() : null;
+    if (pluginRuntime == null) {
+      throw new IllegalStateException("Plugin runtime is down");
+    }
+
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
         new WrappedThreadPoolExecutor(
@@ -74,14 +78,23 @@ public class PullSourceTask extends SourceTask {
     for (int i = 0; i < parallelism; i++) {
       consumers[i] =
           new PullSourceConsumer(
-              PluginFactory.createInstance(HttpPullSource.class), processorProducer);
-      consumers[i].consumer().validate(new PipeParameterValidator(parameters));
-      consumers[i]
-          .consumer()
-          .customize(
-              parameters,
-              new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
-      consumers[i].consumer().start();
+              (PullSource) pluginRuntime.constructSource(parameters), processorProducer);
+      try {
+        consumers[i].consumer().validate(new PipeParameterValidator(parameters));
+        consumers[i]
+            .consumer()
+            .customize(
+                parameters,
+                new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
+        consumers[i].consumer().start();
+      } catch (final Exception e) {
+        try {
+          consumers[i].consumer().close();
+        } catch (final Exception ex) {
+          LOGGER.warn("Failed to close source on creation failure", ex);
+          throw e;
+        }
+      }
 
       int finalI = i;
       REGISTERED_EXECUTOR_SERVICES
@@ -102,17 +115,27 @@ public class PullSourceTask extends SourceTask {
   }
 
   @Override
-  public void startInternal() throws Exception {
+  public void startInternal() {
     // do nothing
   }
 
   @Override
-  public void stopInternal() throws Exception {
+  public void stopInternal() {
     // do nothing
   }
 
   @Override
-  public void dropInternal() throws Exception {
+  public void dropInternal() {
+    if (consumers != null) {
+      for (int i = 0; i < parallelism; i++) {
+        try {
+          consumers[i].consumer().close();
+        } catch (final Exception e) {
+          LOGGER.warn("Failed to close source", e);
+        }
+      }
+    }
+
     final ExecutorService executorService = REGISTERED_EXECUTOR_SERVICES.remove(taskId);
     if (executorService != null) {
       executorService.shutdown();

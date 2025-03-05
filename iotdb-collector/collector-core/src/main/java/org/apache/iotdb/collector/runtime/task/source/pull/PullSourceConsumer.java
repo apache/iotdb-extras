@@ -19,20 +19,20 @@
 
 package org.apache.iotdb.collector.runtime.task.source.pull;
 
-import org.apache.iotdb.collector.plugin.api.CollectorPullSource;
+import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 
 class PullSourceConsumer {
 
-  private final CollectorPullSource pullSource;
+  private final PullSource pullSource;
   private final EventCollector eventCollector;
 
-  PullSourceConsumer(final CollectorPullSource pullSource, final EventCollector eventCollector) {
+  PullSourceConsumer(final PullSource pullSource, final EventCollector eventCollector) {
     this.pullSource = pullSource;
     this.eventCollector = eventCollector;
   }
 
-  CollectorPullSource consumer() {
+  PullSource consumer() {
     return pullSource;
   }
 

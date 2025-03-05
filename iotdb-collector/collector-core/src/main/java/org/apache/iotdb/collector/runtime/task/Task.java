@@ -66,47 +66,31 @@ public abstract class Task {
     }
   }
 
-  public final synchronized void create() {
-    try {
-      resume();
-      createInternal();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to create task", e);
-    }
+  public final synchronized void create() throws Exception {
+    resume();
+    createInternal();
   }
 
   public abstract void createInternal() throws Exception;
 
-  public final synchronized void start() {
-    try {
-      resume();
-      startInternal();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to start task", e);
-    }
+  public final synchronized void start() throws Exception {
+    resume();
+    startInternal();
   }
 
   public abstract void startInternal() throws Exception;
 
-  public final synchronized void stop() {
-    try {
-      pause();
-      stopInternal();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to stop task", e);
-    }
+  public final synchronized void stop() throws Exception {
+    pause();
+    stopInternal();
   }
 
   public abstract void stopInternal() throws Exception;
 
-  public final synchronized void drop() {
-    try {
-      pause();
-      isDropped.set(true);
-      dropInternal();
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to drop task", e);
-    }
+  public final synchronized void drop() throws Exception {
+    pause();
+    isDropped.set(true);
+    dropInternal();
   }
 
   public abstract void dropInternal() throws Exception;

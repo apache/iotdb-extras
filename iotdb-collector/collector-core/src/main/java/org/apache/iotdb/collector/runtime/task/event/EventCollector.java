@@ -23,6 +23,9 @@ import org.apache.iotdb.pipe.api.event.Event;
 
 import com.lmax.disruptor.RingBuffer;
 
+import javax.annotation.concurrent.ThreadSafe;
+
+@ThreadSafe
 public class EventCollector implements org.apache.iotdb.pipe.api.collector.EventCollector {
 
   private final RingBuffer<EventContainer> ringBuffer;

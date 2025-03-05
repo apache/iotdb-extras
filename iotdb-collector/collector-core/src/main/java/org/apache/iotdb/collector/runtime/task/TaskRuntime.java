@@ -37,13 +37,13 @@ public class TaskRuntime implements AutoCloseable {
 
   private final Map<String, TaskCombiner> tasks = new ConcurrentHashMap<>();
 
-  public Response createTask(
+  public synchronized Response createTask(
       final String taskId,
       final Map<String, String> sourceAttribute,
       final Map<String, String> processorAttribute,
       final Map<String, String> sinkAttribute) {
     try {
-      if (validateTaskIsExist(taskId)) {
+      if (tasks.containsKey(taskId)) {
         return Response.status(Response.Status.CONFLICT)
             .entity(String.format("task %s has existed", taskId))
             .build();
@@ -52,89 +52,98 @@ public class TaskRuntime implements AutoCloseable {
       final SinkTask sinkTask = new SinkTask(taskId, sinkAttribute);
       final ProcessorTask processorTask =
           new ProcessorTask(taskId, processorAttribute, sinkTask.makeProducer());
-      final SourceTask sourceTask = SourceTask.construct(taskId, sourceAttribute, processorTask);
-      final TaskCombiner taskRepository = new TaskCombiner(sourceTask, processorTask, sinkTask);
+      final SourceTask sourceTask =
+          SourceTask.construct(taskId, sourceAttribute, processorTask.makeProducer());
 
-      tasks.put(taskId, taskRepository);
-      taskRepository.create();
+      final TaskCombiner taskCombiner = new TaskCombiner(sourceTask, processorTask, sinkTask);
+      tasks.put(taskId, taskCombiner);
+      taskCombiner.create();
 
       LOGGER.info("Successfully created task {}", taskId);
       return Response.status(Response.Status.CREATED)
           .entity(String.format("Successfully created task %s", taskId))
           .build();
     } catch (final Exception e) {
-      LOGGER.warn("Failed to create task", e);
+      LOGGER.warn("Failed to create task {} because {}", taskId, e.getMessage(), e);
       return Response.serverError()
           .entity(String.format("Failed to create task %s, because %s", taskId, e.getMessage()))
           .build();
     }
   }
 
-  public boolean alterTask() {
-    return true;
-  }
-
-  public Response startTask(final String taskId) {
-    if (!validateTaskIsExist(taskId)) {
-      return Response.status(Response.Status.NOT_FOUND)
-          .entity(String.format("task %s not found", taskId))
-          .build();
-    }
-
-    tasks.get(taskId).start();
-    LOGGER.info("Task {} started successfully", taskId);
-    return Response.status(Response.Status.OK)
-        .entity(String.format("task %s start successfully", taskId))
-        .build();
-  }
-
-  public Response stopTask(final String taskId) {
-    if (!validateTaskIsExist(taskId)) {
+  public synchronized Response startTask(final String taskId) {
+    if (!tasks.containsKey(taskId)) {
       return Response.status(Response.Status.NOT_FOUND)
           .entity(String.format("task %s not found", taskId))
           .build();
     }
 
     try {
-      final TaskCombiner taskRepository = tasks.get(taskId);
-      if (taskRepository != null) {
-        taskRepository.stop();
-      }
-    } catch (final Exception e) {
-      LOGGER.warn("Failed to stop task", e);
+      tasks.get(taskId).start();
+
+      LOGGER.info("Task {} start successfully", taskId);
+      return Response.status(Response.Status.OK)
+          .entity(String.format("task %s start successfully", taskId))
+          .build();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to start task {} because {}", taskId, e.getMessage(), e);
       return Response.serverError()
-          .entity(String.format("Failed to stop task %s, because %s", taskId, e.getMessage()))
+          .entity(String.format("Failed to start task %s, because %s", taskId, e.getMessage()))
           .build();
     }
-
-    LOGGER.info("Task {} stopped successfully", taskId);
-    return Response.status(Response.Status.OK)
-        .entity(String.format("task %s stop successfully", taskId))
-        .build();
   }
 
-  public Response dropTask(final String taskId) {
-    if (!validateTaskIsExist(taskId)) {
+  public synchronized Response stopTask(final String taskId) {
+    if (!tasks.containsKey(taskId)) {
       return Response.status(Response.Status.NOT_FOUND)
           .entity(String.format("task %s not found", taskId))
           .build();
     }
 
-    tasks.remove(taskId).drop();
-    LOGGER.info("Task {} dropped successfully", taskId);
-    return Response.status(Response.Status.OK)
-        .entity(String.format("task %s drop successfully", taskId))
-        .build();
+    try {
+      tasks.get(taskId).stop();
+
+      LOGGER.info("Task {} stop successfully", taskId);
+      return Response.status(Response.Status.OK)
+          .entity(String.format("task %s stop successfully", taskId))
+          .build();
+    } catch (final Exception e) {
+      LOGGER.warn("Failed to stop task {} because {}", taskId, e.getMessage(), e);
+      return Response.serverError()
+          .entity(String.format("Failed to stop task %s, because %s", taskId, e.getMessage()))
+          .build();
+    }
   }
 
-  private boolean validateTaskIsExist(final String taskId) {
-    if (tasks.containsKey(taskId)) {
-      return true;
+  public synchronized Response dropTask(final String taskId) {
+    if (!tasks.containsKey(taskId)) {
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity(String.format("task %s not found", taskId))
+          .build();
     }
-    LOGGER.warn("Task {} not found", taskId);
-    return false;
+
+    try {
+      tasks.remove(taskId).drop();
+
+      LOGGER.info("Task {} drop successfully", taskId);
+      return Response.status(Response.Status.OK)
+          .entity(String.format("task %s drop successfully", taskId))
+          .build();
+    } catch (final Exception e) {
+      LOGGER.warn("Failed to drop task {} because {}", taskId, e.getMessage(), e);
+      return Response.serverError()
+          .entity(String.format("Failed to drop task %s, because %s", taskId, e.getMessage()))
+          .build();
+    }
   }
 
   @Override
-  public void close() throws Exception {}
+  public synchronized void close() throws Exception {
+    final long currentTime = System.currentTimeMillis();
+    for (final TaskCombiner taskCombiner : tasks.values()) {
+      taskCombiner.drop();
+    }
+    tasks.clear();
+    LOGGER.info("Task runtime closed in {}ms", System.currentTimeMillis() - currentTime);
+  }
 }

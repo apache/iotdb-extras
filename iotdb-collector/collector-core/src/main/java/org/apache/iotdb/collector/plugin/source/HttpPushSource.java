@@ -19,9 +19,8 @@
 
 package org.apache.iotdb.collector.plugin.source;
 
-import org.apache.iotdb.collector.plugin.api.CollectorPushSource;
+import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.event.SourceEvent;
-import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
@@ -34,16 +33,12 @@ import org.slf4j.LoggerFactory;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-public class HttpPushSource extends CollectorPushSource {
+public class HttpPushSource extends PushSource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpPushSource.class);
 
   private volatile boolean isStarted = true;
   private Thread workerThread;
-
-  public HttpPushSource(final EventCollector collector) {
-    super(collector);
-  }
 
   @Override
   public void validate(final PipeParameterValidator validator) {}
@@ -78,11 +73,6 @@ public class HttpPushSource extends CollectorPushSource {
     } catch (Exception e) {
       LOGGER.error("Error in push source", e);
     }
-  }
-
-  @Override
-  public void stop() throws Exception {
-    this.isStarted = false;
   }
 
   @Override

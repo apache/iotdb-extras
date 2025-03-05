@@ -19,10 +19,13 @@
 
 package org.apache.iotdb.collector.runtime.task.source.push;
 
-import org.apache.iotdb.collector.plugin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.api.PushSource;
+import org.apache.iotdb.collector.plugin.api.customizer.CollectorSourceRuntimeConfiguration;
+import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
-import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
+import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,37 +36,65 @@ public class PushSourceTask extends SourceTask {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PushSourceTask.class);
 
-  private final EventCollector collector;
+  private PushSource[] pushSources;
 
   public PushSourceTask(
       final String taskId,
       final Map<String, String> sourceParams,
-      final ProcessorTask processorTask) {
-    super(taskId, sourceParams, processorTask);
-
-    this.collector = processorTask.makeProducer();
+      final EventCollector processorProducer) {
+    super(taskId, sourceParams, processorProducer);
   }
 
   @Override
-  public void createInternal() {
-    createSourceTask();
-    for (int i = 0; i < sourceParallelismNum; i++) {
-      // use sourceAttribute later
-      try (final HttpPushSource source = new HttpPushSource(collector)) {
-        addSourceTask(source);
-        SOURCE_EXECUTOR_SERVICE
-            .get(taskId)
-            .submit(
-                () -> {
-                  try {
-                    source.start();
-                  } catch (final Exception e) {
-                    LOGGER.warn("Failed to start push source", e);
-                    throw new RuntimeException(e);
-                  }
-                });
-      } catch (Exception e) {
-        LOGGER.warn("failed to create instance of HttpSource", e);
+  public void createInternal() throws Exception {
+    final PluginRuntime pluginRuntime =
+        RuntimeService.plugin().isPresent() ? RuntimeService.plugin().get() : null;
+    if (pluginRuntime == null) {
+      throw new IllegalStateException("Plugin runtime is down");
+    }
+
+    final long creationTime = System.currentTimeMillis();
+    pushSources = new PushSource[parallelism];
+    for (int i = 0; i < parallelism; i++) {
+      pushSources[i] = (PushSource) pluginRuntime.constructSource(parameters);
+      pushSources[i].setCollector(processorProducer);
+
+      try {
+        pushSources[i].validate(new PipeParameterValidator(parameters));
+        pushSources[i].customize(
+            parameters,
+            new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
+        pushSources[i].start();
+      } catch (final Exception e) {
+        try {
+          pushSources[i].close();
+        } catch (final Exception ex) {
+          LOGGER.warn("Failed to close source on creation failure", ex);
+          throw e;
+        }
+      }
+    }
+  }
+
+  @Override
+  public void startInternal() {
+    // do nothing
+  }
+
+  @Override
+  public void stopInternal() {
+    // do nothing
+  }
+
+  @Override
+  public void dropInternal() {
+    if (pushSources != null) {
+      for (int i = 0; i < parallelism; i++) {
+        try {
+          pushSources[i].close();
+        } catch (final Exception e) {
+          LOGGER.warn("Failed to close source", e);
+        }
       }
     }
   }

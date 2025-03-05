@@ -19,45 +19,28 @@
 
 package org.apache.iotdb.collector.plugin.api;
 
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeRuntimeEnvironment;
+import org.apache.iotdb.pipe.api.PipeSource;
+import org.apache.iotdb.pipe.api.collector.EventCollector;
+import org.apache.iotdb.pipe.api.event.Event;
 
-public class RuntimeConfig implements PipeExtractorRuntimeConfiguration {
+public abstract class PushSource implements PipeSource {
 
-  public static class RuntimeEnvironment implements PipeRuntimeEnvironment {
+  protected EventCollector collector;
 
-    public int getParallelism() {
-      return 0;
-    }
+  public PushSource() {
+    this.collector = null;
+  }
 
-    public int getParallelismIndex() {
-      return 0;
-    }
-
-    @Override
-    public String getPipeName() {
-      return "";
-    }
-
-    @Override
-    public long getCreationTime() {
-      return 0;
-    }
+  public final void setCollector(final EventCollector collector) {
+    this.collector = collector;
   }
 
   @Override
-  public PipeRuntimeEnvironment getRuntimeEnvironment() {
-    return new PipeRuntimeEnvironment() {
+  public final Event supply() {
+    throw new UnsupportedOperationException();
+  }
 
-      @Override
-      public String getPipeName() {
-        return "";
-      }
-
-      @Override
-      public long getCreationTime() {
-        return 0;
-      }
-    };
+  public final void supply(final Event event) throws Exception {
+    collector.collect(event);
   }
 }

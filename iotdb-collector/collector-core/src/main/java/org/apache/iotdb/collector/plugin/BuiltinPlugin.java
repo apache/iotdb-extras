@@ -24,24 +24,19 @@ import org.apache.iotdb.collector.plugin.sink.SessionSink;
 import org.apache.iotdb.collector.plugin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.source.HttpPushSource;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-
 public enum BuiltinPlugin {
 
-  // PushSources
+  // Push Sources
   HTTP_PUSH_SOURCE("http-push-source", HttpPushSource.class),
 
-  // PullSources
+  // Pull Sources
   HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),
 
   // Processors
   DO_NOTHING_PROCESSOR("do-nothing-processor", DoNothingProcessor.class),
 
   // Sinks
-  IOTDB_SESSION_SINK("iotdb-session-sink", SessionSink.class);
+  IOTDB_THRIFT_SINK("iotdb-thrift-sink", SessionSink.class);
 
   private final String collectorPluginName;
   private final Class<?> collectorPluginClass;
@@ -53,28 +48,15 @@ public enum BuiltinPlugin {
     this.className = collectorPluginClass.getName();
   }
 
-  public String getCollectorPluginName() {
+  public String getPluginName() {
     return collectorPluginName;
   }
 
-  public Class<?> getCollectorPluginClass() {
+  public Class<?> getPluginClass() {
     return collectorPluginClass;
   }
 
   public String getClassName() {
     return className;
   }
-
-  public static final Set<String> SHOW_COLLECTOR_PLUGINS_BLACKLIST =
-      Collections.unmodifiableSet(
-          new HashSet<>(
-              Arrays.asList(
-                  // PushSources
-                  HTTP_PUSH_SOURCE.getCollectorPluginName().toUpperCase(),
-                  // PullSources
-                  HTTP_PULL_SOURCE.getCollectorPluginName().toUpperCase(),
-                  // Processors
-                  DO_NOTHING_PROCESSOR.getCollectorPluginName().toUpperCase(),
-                  // Sinks
-                  IOTDB_SESSION_SINK.getCollectorPluginName().toUpperCase())));
 }
