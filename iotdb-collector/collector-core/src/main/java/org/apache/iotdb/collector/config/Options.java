@@ -34,10 +34,10 @@ public class Options {
 
   static {
     try {
-      Class.forName("org.apache.iotdb.collector.config.ApiServiceOptions");
-      Class.forName("org.apache.iotdb.collector.config.TaskRuntimeOptions");
+      Class.forName(ApiServiceOptions.class.getName());
+      Class.forName(TaskRuntimeOptions.class.getName());
     } catch (final ClassNotFoundException e) {
-      throw new RuntimeException("Failed to load ApiServiceOptions", e);
+      throw new RuntimeException("Failed to load options", e);
     }
   }
 

@@ -19,7 +19,52 @@
 
 package org.apache.iotdb.collector.runtime.plugin;
 
-public class PluginRuntime {
+import org.apache.iotdb.collector.runtime.plugin.constructor.ProcessorConstructor;
+import org.apache.iotdb.collector.runtime.plugin.constructor.SinkConstructor;
+import org.apache.iotdb.collector.runtime.plugin.constructor.SourceConstructor;
+import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
+import org.apache.iotdb.pipe.api.PipeProcessor;
+import org.apache.iotdb.pipe.api.PipeSink;
+import org.apache.iotdb.pipe.api.PipeSource;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+
+public class PluginRuntime implements AutoCloseable {
+
+  private final PluginMetaKeeper metaKeeper;
+  private final SourceConstructor sourceConstructor;
+  private final ProcessorConstructor processorConstructor;
+  private final SinkConstructor sinkConstructor;
+
+  public PluginRuntime() {
+    this.metaKeeper = new PluginMetaKeeper();
+    this.sourceConstructor = new SourceConstructor(metaKeeper);
+    this.processorConstructor = new ProcessorConstructor(metaKeeper);
+    this.sinkConstructor = new SinkConstructor(metaKeeper);
+  }
+
+  public PipeSource constructSource(final PipeParameters sourceParameters) {
+    return sourceConstructor.reflectPlugin(sourceParameters);
+  }
+
+  public boolean isPullSource(final PipeParameters sourceParameters) throws Exception {
+    try (final PipeSource source = constructSource(sourceParameters)) {
+      return sourceConstructor.isPullSource(source);
+    }
+  }
+
+  public boolean isPushSource(final PipeParameters sourceParameters) throws Exception {
+    try (final PipeSource source = constructSource(sourceParameters)) {
+      return sourceConstructor.isPushSource(source);
+    }
+  }
+
+  public PipeProcessor constructProcessor(final PipeParameters processorParameters) {
+    return processorConstructor.reflectPlugin(processorParameters);
+  }
+
+  public PipeSink constructSink(final PipeParameters sinkParameters) {
+    return sinkConstructor.reflectPlugin(sinkParameters);
+  }
 
   public boolean createPlugin() {
     return true;
@@ -40,4 +85,7 @@ public class PluginRuntime {
   public boolean dropPlugin() {
     return true;
   }
+
+  @Override
+  public void close() throws Exception {}
 }

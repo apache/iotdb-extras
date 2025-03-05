@@ -22,29 +22,57 @@ package org.apache.iotdb.collector.service;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.TaskRuntime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
 public class RuntimeService implements IService {
 
-  private static TaskRuntime task;
-  private static PluginRuntime plugin;
+  private static final Logger LOGGER = LoggerFactory.getLogger(RuntimeService.class);
+
+  private static final AtomicReference<TaskRuntime> TASK = new AtomicReference<>();
+  private static final AtomicReference<PluginRuntime> PLUGIN = new AtomicReference<>();
 
   @Override
-  public void start() {
-    plugin = new PluginRuntime();
-    task = new TaskRuntime();
+  public synchronized void start() {
+    TASK.set(new TaskRuntime());
+    PLUGIN.set(new PluginRuntime());
   }
 
-  public static TaskRuntime task() {
-    return task;
+  public static Optional<TaskRuntime> task() {
+    return Optional.of(TASK.get());
   }
 
-  public static PluginRuntime plugin() {
-    return plugin;
+  public static Optional<PluginRuntime> plugin() {
+    return Optional.of(PLUGIN.get());
   }
 
   @Override
-  public void stop() {
-    task = null;
-    plugin = null;
+  public synchronized void stop() {
+    task()
+        .ifPresent(
+            taskRuntime -> {
+              try {
+                taskRuntime.close();
+              } catch (final Exception e) {
+                LOGGER.warn("[RuntimeService] Failed to close task runtime: {}", e.getMessage(), e);
+              }
+            });
+    TASK.set(null);
+
+    plugin()
+        .ifPresent(
+            pluginRuntime -> {
+              try {
+                pluginRuntime.close();
+              } catch (final Exception e) {
+                LOGGER.warn(
+                    "[RuntimeService] Failed to close plugin runtime: {}", e.getMessage(), e);
+              }
+            });
+    PLUGIN.set(null);
   }
 
   @Override
