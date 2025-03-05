@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.processor;
+package org.apache.iotdb.collector.plugin.builtin.processor;
 
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
@@ -26,42 +26,42 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
 
 public class DoNothingProcessor implements PipeProcessor {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DoNothingProcessor.class);
-
   @Override
-  public void validate(final PipeParameterValidator validator) throws Exception {
-    // Do Nothing
+  public void validate(PipeParameterValidator validator) {
+    // do nothing
   }
 
   @Override
   public void customize(
-      final PipeParameters parameters, final PipeProcessorRuntimeConfiguration configuration)
-      throws Exception {
-    // Do Nothing
+      PipeParameters parameters, PipeProcessorRuntimeConfiguration configuration) {
+    // do nothing
   }
 
   @Override
-  public void process(
-      final TabletInsertionEvent tabletInsertionEvent, final EventCollector eventCollector)
-      throws Exception {
-    LOGGER.info("DoNothingProcessor process tabletInsertionEvent: {}", tabletInsertionEvent);
+  public void process(TabletInsertionEvent tabletInsertionEvent, EventCollector eventCollector)
+      throws IOException {
     eventCollector.collect(tabletInsertionEvent);
   }
 
   @Override
-  public void process(final Event event, final EventCollector eventCollector) throws Exception {
-    LOGGER.info("DoNothingProcessor process event: {}", event);
+  public void process(TsFileInsertionEvent tsFileInsertionEvent, EventCollector eventCollector)
+      throws IOException {
+    eventCollector.collect(tsFileInsertionEvent);
+  }
+
+  @Override
+  public void process(Event event, EventCollector eventCollector) throws IOException {
     eventCollector.collect(event);
   }
 
   @Override
-  public void close() throws Exception {
-    // Do Nothing
+  public void close() {
+    // do nothing
   }
 }

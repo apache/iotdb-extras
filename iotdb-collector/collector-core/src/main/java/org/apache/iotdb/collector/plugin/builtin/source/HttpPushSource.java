@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.source;
+package org.apache.iotdb.collector.plugin.builtin.source;
 
 import org.apache.iotdb.collector.plugin.api.PushSource;
-import org.apache.iotdb.collector.plugin.event.SourceEvent;
+import org.apache.iotdb.collector.plugin.api.event.DemoEvent;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
@@ -63,10 +63,10 @@ public class HttpPushSource extends PushSource {
   private void doWork() {
     try {
       while (isStarted && !Thread.currentThread().isInterrupted()) {
-        final Event event = new SourceEvent(String.valueOf(new Random().nextInt(1000)));
-        LOGGER.info("event: {} created success", event);
+        final Event event = new DemoEvent(String.valueOf(new Random().nextInt(1000)));
+        LOGGER.info("{} created successfully ...", event);
         supply(event);
-        TimeUnit.SECONDS.sleep(2);
+        TimeUnit.SECONDS.sleep(100);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

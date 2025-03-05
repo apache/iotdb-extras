@@ -31,6 +31,7 @@ class SinkExceptionHandler implements ExceptionHandler<EventContainer> {
 
   @Override
   public void handleEventException(Throwable ex, long sequence, EventContainer event) {
+    // TODO: heartbeat
     // TODO: retry strategy
     LOGGER.warn("Failed to handle event", ex);
   }

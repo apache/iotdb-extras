@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin;
+package org.apache.iotdb.collector.plugin.builtin;
 
-import org.apache.iotdb.collector.plugin.processor.DoNothingProcessor;
-import org.apache.iotdb.collector.plugin.sink.SessionSink;
-import org.apache.iotdb.collector.plugin.source.HttpPullSource;
-import org.apache.iotdb.collector.plugin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
+import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
+import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
+import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
 
 public enum BuiltinPlugin {
 
@@ -36,7 +36,7 @@ public enum BuiltinPlugin {
   DO_NOTHING_PROCESSOR("do-nothing-processor", DoNothingProcessor.class),
 
   // Sinks
-  IOTDB_THRIFT_SINK("iotdb-thrift-sink", SessionSink.class);
+  IOTDB_THRIFT_SINK("iotdb-thrift-sink", DemoSink.class);
 
   private final String collectorPluginName;
   private final Class<?> collectorPluginClass;

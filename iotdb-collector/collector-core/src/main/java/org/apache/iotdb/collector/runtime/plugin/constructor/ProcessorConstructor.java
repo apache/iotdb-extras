@@ -19,8 +19,8 @@
 
 package org.apache.iotdb.collector.runtime.plugin.constructor;
 
-import org.apache.iotdb.collector.plugin.BuiltinPlugin;
-import org.apache.iotdb.collector.plugin.processor.DoNothingProcessor;
+import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
+import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;

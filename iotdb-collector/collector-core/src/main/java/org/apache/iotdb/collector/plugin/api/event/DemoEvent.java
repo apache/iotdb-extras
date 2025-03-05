@@ -17,29 +17,24 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.event;
+package org.apache.iotdb.collector.plugin.api.event;
 
 import org.apache.iotdb.pipe.api.event.Event;
 
-public class SourceEvent implements Event {
-  private String name;
+public class DemoEvent implements Event {
 
-  public SourceEvent() {}
+  private final String value;
 
-  public SourceEvent(final String name) {
-    this.name = name;
+  public DemoEvent(final String value) {
+    this.value = value;
   }
 
-  public String getName() {
-    return name;
-  }
-
-  public void setName(final String name) {
-    this.name = name;
+  public String getValue() {
+    return value;
   }
 
   @Override
   public String toString() {
-    return "SourceEvent [name=" + name + "]";
+    return "DemoEvent [value = " + value + "]";
   }
 }

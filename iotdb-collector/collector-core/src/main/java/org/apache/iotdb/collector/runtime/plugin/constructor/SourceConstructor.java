@@ -19,11 +19,11 @@
 
 package org.apache.iotdb.collector.runtime.plugin.constructor;
 
-import org.apache.iotdb.collector.plugin.BuiltinPlugin;
 import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.PushSource;
-import org.apache.iotdb.collector.plugin.source.HttpPullSource;
-import org.apache.iotdb.collector.plugin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
+import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
+import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
