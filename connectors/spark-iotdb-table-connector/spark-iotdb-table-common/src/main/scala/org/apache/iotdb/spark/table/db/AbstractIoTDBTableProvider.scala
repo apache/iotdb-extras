@@ -21,7 +21,6 @@ package org.apache.iotdb.spark.table.db
 
 import org.apache.spark.sql.connector.catalog.{Identifier, Table, TableProvider}
 import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
@@ -32,7 +31,7 @@ import scala.collection.JavaConverters.mapAsScalaMapConverter
  * IoTDBTableProvider is a Spark DataSource V2 provider for IoTDB.
  * It supports schema inference and table access.
  */
-class IoTDBTableProvider extends TableProvider with DataSourceRegister {
+abstract class AbstractIoTDBTableProvider extends TableProvider {
 
   override def inferSchema(caseInsensitiveStringMap: CaseInsensitiveStringMap): StructType = {
     IoTDBUtils.getSchema(IoTDBOptions.fromMap(caseInsensitiveStringMap.asCaseSensitiveMap().asScala.toMap))
@@ -43,6 +42,4 @@ class IoTDBTableProvider extends TableProvider with DataSourceRegister {
     val table = map.get(IoTDBOptions.IOTDB_TABLE)
     new IoTDBTable(Identifier.of(Array[String](db), table), structType, IoTDBOptions.fromMap(map.asScala.toMap))
   }
-
-  override def shortName(): String = "iotdb"
 }
