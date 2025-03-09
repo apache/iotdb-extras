@@ -56,7 +56,7 @@ public class HttpPullSource extends PullSource {
 
   @Override
   public Event supply() {
-    LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(100));
+    LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(2));
     final Event event = new DemoEvent(String.valueOf(new Random().nextInt(1000)));
     LOGGER.info("{} created successfully ...", event);
     return event;

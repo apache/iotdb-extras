@@ -31,12 +31,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PushSourceTask extends SourceTask {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PushSourceTask.class);
 
   private PushSource[] pushSources;
+
+  private static final Map<String, Boolean> PUSH_SOURCE_TASKS_STATUS = new ConcurrentHashMap<>();
 
   public PushSourceTask(
       final String taskId,
@@ -74,16 +77,44 @@ public class PushSourceTask extends SourceTask {
         }
       }
     }
+
+    PUSH_SOURCE_TASKS_STATUS.put(taskId, true);
   }
 
   @Override
   public void startInternal() {
-    // do nothing
+    if (PUSH_SOURCE_TASKS_STATUS.containsKey(taskId) && PUSH_SOURCE_TASKS_STATUS.get(taskId)) {
+      return;
+    }
+
+    if (pushSources != null) {
+      for (int i = 0; i < parallelism; i++) {
+        try {
+          pushSources[i].start();
+        } catch (final Exception e) {
+          LOGGER.warn("Failed to restart push source", e);
+          return;
+        }
+      }
+    }
+
+    PUSH_SOURCE_TASKS_STATUS.put(taskId, true);
   }
 
   @Override
   public void stopInternal() {
-    // do nothing
+    if (pushSources != null) {
+      for (int i = 0; i < parallelism; i++) {
+        try {
+          pushSources[i].close();
+        } catch (final Exception e) {
+          LOGGER.warn("Failed to stop source", e);
+          return;
+        }
+      }
+
+      PUSH_SOURCE_TASKS_STATUS.put(taskId, false);
+    }
   }
 
   @Override
@@ -96,6 +127,8 @@ public class PushSourceTask extends SourceTask {
           LOGGER.warn("Failed to close source", e);
         }
       }
+
+      PUSH_SOURCE_TASKS_STATUS.remove(taskId);
     }
   }
 }

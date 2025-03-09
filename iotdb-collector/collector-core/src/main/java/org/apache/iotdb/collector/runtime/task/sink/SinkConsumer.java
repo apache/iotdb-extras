@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.runtime.task.sink;
 
+import org.apache.iotdb.collector.runtime.task.TaskDispatch;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
 import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.event.Event;
@@ -31,6 +32,8 @@ class SinkConsumer implements WorkHandler<EventContainer> {
 
   private final PipeSink sink;
 
+  private TaskDispatch dispatch;
+
   SinkConsumer(final PipeSink sink) {
     this.sink = sink;
   }
@@ -41,6 +44,8 @@ class SinkConsumer implements WorkHandler<EventContainer> {
 
   @Override
   public void onEvent(EventContainer eventContainer) throws Exception {
+    dispatch.waitUntilRunningOrDropped();
+
     // TODO: retry strategy
     final Event event = eventContainer.getEvent();
     if (event instanceof TabletInsertionEvent) {
@@ -50,5 +55,9 @@ class SinkConsumer implements WorkHandler<EventContainer> {
     } else if (event != null) {
       sink.transfer(event);
     }
+  }
+
+  public void setDispatch(final TaskDispatch dispatch) {
+    this.dispatch = dispatch;
   }
 }

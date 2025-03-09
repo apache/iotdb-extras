@@ -22,8 +22,6 @@ package org.apache.iotdb.collector.runtime.task;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
 
 public abstract class Task {
 
@@ -32,9 +30,7 @@ public abstract class Task {
 
   protected final int parallelism;
 
-  private static final long CHECK_RUNNING_INTERVAL_NANOS = 100_000_000L;
-  protected final AtomicBoolean isRunning = new AtomicBoolean(false);
-  protected final AtomicBoolean isDropped = new AtomicBoolean(false);
+  protected final TaskDispatch dispatch;
 
   protected Task(
       final String taskId,
@@ -45,46 +41,33 @@ public abstract class Task {
     this.parameters = new PipeParameters(attributes);
 
     this.parallelism = parameters.getIntOrDefault(parallelismKey, parallelismValue);
-  }
 
-  public void resume() {
-    isRunning.set(true);
-  }
-
-  public void pause() {
-    isRunning.set(false);
-  }
-
-  protected void waitUntilRunningOrDropped() {
-    while (!isRunning.get() && !isDropped.get()) {
-      LockSupport.parkNanos(CHECK_RUNNING_INTERVAL_NANOS);
-    }
+    this.dispatch = new TaskDispatch();
   }
 
   public final synchronized void create() throws Exception {
-    resume();
+    dispatch.resume();
     createInternal();
   }
 
   public abstract void createInternal() throws Exception;
 
   public final synchronized void start() throws Exception {
-    resume();
+    dispatch.resume();
     startInternal();
   }
 
   public abstract void startInternal() throws Exception;
 
   public final synchronized void stop() throws Exception {
-    pause();
+    dispatch.pause();
     stopInternal();
   }
 
   public abstract void stopInternal() throws Exception;
 
   public final synchronized void drop() throws Exception {
-    pause();
-    isDropped.set(true);
+    dispatch.remove();
     dropInternal();
   }
 
