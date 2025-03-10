@@ -21,6 +21,7 @@ package org.apache.iotdb.spark.table.db.write
 
 import org.apache.iotdb.session.TableSessionBuilder
 import org.apache.iotdb.spark.table.db.{IoTDBOptions, IoTDBUtils}
+import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
@@ -92,7 +93,7 @@ class IoTDBDataWriter(options: IoTDBOptions, writeSchema: StructType, tableSchem
       }
     } catch {
       case e: Exception =>
-        throw new RuntimeException("Error writing data to Tablet", e)
+        throw SparkException.internalError("Error writing data to Tablet", e)
     }
   }
 
@@ -109,7 +110,7 @@ class IoTDBDataWriter(options: IoTDBOptions, writeSchema: StructType, tableSchem
       tablet.reset()
     } catch {
       case e: Exception =>
-        throw new RuntimeException("Error writing tablet to IoTDB", e)
+        throw SparkException.internalError("Error writing tablet to IoTDB", e)
     }
   }
 

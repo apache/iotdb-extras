@@ -20,6 +20,7 @@
 package org.apache.iotdb.spark.table.db.read
 
 import org.apache.iotdb.spark.table.db.IoTDBOptions
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read._
 import org.apache.spark.sql.types.StructType
@@ -37,7 +38,8 @@ class IoTDBScanBuilder(options: IoTDBOptions, schema: StructType) extends ScanBu
     with SupportsPushDownRequiredColumns
     with SupportsPushDownV2Filters
     with SupportsPushDownOffset
-    with SupportsPushDownLimit {
+    with SupportsPushDownLimit
+    with Logging {
 
   private var supportedFilters: Array[Predicate] = Array.empty
   private var pushDownFilterStrings: Array[String] = Array.empty
@@ -54,9 +56,6 @@ class IoTDBScanBuilder(options: IoTDBOptions, schema: StructType) extends ScanBu
       val fields = schema.fields.filter(
         field => requiredSchema.fieldNames.contains(field.name)
       )
-      if (fields.isEmpty) {
-        throw new IllegalArgumentException("No required columns found")
-      }
       requiredColumns = StructType(fields)
     } else {
       requiredColumns = schema
@@ -83,7 +82,7 @@ class IoTDBScanBuilder(options: IoTDBOptions, schema: StructType) extends ScanBu
         true
       } catch {
         case e: Exception => {
-          System.err.println(s"Predicate push-down failed for: $predicate, reason: ${e.getMessage}")
+          logDebug(s"Predicate push-down failed for: $predicate, reason: ${e.getMessage}")
           false
         }
       }

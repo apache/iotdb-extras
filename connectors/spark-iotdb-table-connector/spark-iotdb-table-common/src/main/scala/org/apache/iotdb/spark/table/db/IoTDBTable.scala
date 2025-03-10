@@ -21,7 +21,7 @@ package org.apache.iotdb.spark.table.db
 
 import org.apache.iotdb.spark.table.db.read.IoTDBScanBuilder
 import org.apache.iotdb.spark.table.db.write.IoTDBWriteBuilder
-import org.apache.spark.internal.Logging
+import org.apache.spark.SparkException
 import org.apache.spark.sql.connector.catalog.{Identifier, SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.read.ScanBuilder
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}

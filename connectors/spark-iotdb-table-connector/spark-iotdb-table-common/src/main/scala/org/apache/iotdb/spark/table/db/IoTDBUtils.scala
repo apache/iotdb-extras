@@ -21,6 +21,7 @@ package org.apache.iotdb.spark.table.db
 
 import org.apache.iotdb.isession.SessionDataSet
 import org.apache.iotdb.session.TableSessionBuilder
+import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -63,6 +64,8 @@ object IoTDBUtils {
         val columnType = row.getField(2).getStringValue
         structFields.add(StructField(columnName, getSparkDataType(dataType), metadata = new MetadataBuilder().putString(COLUMN_CATEGORY, columnType).build()))
       }
+    } catch {
+      case e: Exception => throw SparkException.internalError(s"Failed to get schema of table ${options.table}.", e)
     } finally {
       if (dataSet != null) {
         dataSet.close()
@@ -108,6 +111,10 @@ object IoTDBUtils {
     }
     require(value.length % 2 == 0, "The length of the hex string must be even.")
     value.substring(2).sliding(2, 2).map(Integer.parseInt(_, 16).toByte).toArray
+  }
+
+  def getIoTDBHexStringFromByteArray(value: Array[Byte]): String = {
+    s"X'${value.map(b => f"$b%02X").mkString("")}'"
   }
 
   def getIoTDBDataType(sparkDataType: DataType): TSDataType = {

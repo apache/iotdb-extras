@@ -20,9 +20,10 @@
 package org.apache.iotdb.spark.table.db.read
 
 import org.apache.iotdb.spark.table.db.IoTDBUtils
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.connector.expressions.filter.{AlwaysFalse, AlwaysTrue, And, Not, Or, Predicate}
 import org.apache.spark.sql.connector.expressions.{Expression, GeneralScalarExpression, Literal, NamedReference}
-import org.apache.spark.sql.types.{ArrayType, CalendarIntervalType, MapType, NullType, ObjectType, StringType, StructType, UserDefinedType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CalendarIntervalType, DateType, DoubleType, FloatType, IntegerType, LongType, MapType, NullType, ObjectType, ShortType, StringType, StructType, UserDefinedType}
 
 class IoTDBExpressionSQLBuilder {
 
@@ -40,14 +41,17 @@ class IoTDBExpressionSQLBuilder {
       case and: And => visitAnd(and)
       case not: Not => visitNot(not)
       case expr: GeneralScalarExpression => visitGeneralScalarExpression(expr)
-      case _ => throw new UnsupportedOperationException("Unexpected V2 expression: " + expression)
+      case _ => throw new UnsupportedOperationException("Unsupported push down expression: " + expression)
     }
   }
 
   private def visitLiteral(literal: Literal[_]): String = {
     literal.dataType() match {
       case StringType => s"'${literal.value().toString}'"
-      case _ => literal.value().toString
+      case BinaryType => IoTDBUtils.getIoTDBHexStringFromByteArray(literal.value().asInstanceOf[Array[Byte]])
+      case DateType => s"CAST('${DateTimeUtils.toJavaDate(Integer.parseInt(literal.value().toString))}' as DATE)"
+      case ShortType | IntegerType | ByteType | LongType | BooleanType | FloatType | DoubleType => literal.value().toString
+      case _ => throw new UnsupportedOperationException("Unsupported push down literal type: " + literal.dataType())
     }
   }
 
@@ -105,16 +109,19 @@ class IoTDBExpressionSQLBuilder {
   private def visitStartsWith(expr: Expression): String = {
     val leftExpr = buildIoTDBExpressionSQL(expr.children()(0))
     val rightExpr = buildIoTDBExpressionSQL(expr.children()(1))
-    s"$leftExpr LIKE '${rightExpr.substring(1, rightExpr.length - 1)}%'"
+    s"starts_with(${leftExpr}, ${rightExpr})"
   }
 
   private def visitEndsWith(expr: Expression): String = {
     val leftExpr = buildIoTDBExpressionSQL(expr.children()(0))
     val rightExpr = buildIoTDBExpressionSQL(expr.children()(1))
-    s"$leftExpr LIKE '%${rightExpr.substring(1, rightExpr.length - 1)}'"
+    s"ends_with(${leftExpr}, ${rightExpr})"
   }
 
   private def visitContains(expr: Expression): String = {
+    if (expr.children()(1).isInstanceOf[NamedReference]) {
+      throw new UnsupportedOperationException("Unsupported push down expression: contains non constant string")
+    }
     val leftExpr = buildIoTDBExpressionSQL(expr.children()(0))
     val rightExpr = buildIoTDBExpressionSQL(expr.children()(1))
     s"$leftExpr LIKE '%${rightExpr.substring(1, rightExpr.length - 1)}%'"
