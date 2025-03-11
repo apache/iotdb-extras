@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.iotdb</groupId>
         <artifactId>iotdb-collector</artifactId>
-        <version>1.3.2</version>
+        <version>2.0.2-SNAPSHOT</version>
     </parent>
     <artifactId>collector-openapi</artifactId>
     <name>IoTDB: Collector: OpenAPI</name>
@@ -88,13 +88,13 @@
                         </goals>
                         <phase>generate-sources</phase>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/openapi3/ping.yaml</inputSpec>
+                            <inputSpec>${project.basedir}/src/main/openapi3/ping/ping.yaml</inputSpec>
                             <output>${project.build.directory}/generated-sources/java</output>
-                            <apiPackage>org.apache.iotdb.collector.api</apiPackage>
-                            <modelPackage>org.apache.iotdb.collector.api.model</modelPackage>
-                            <invokerPackage>org.apache.iotdb.collector.api.invoker</invokerPackage>
+                            <apiPackage>org.apache.iotdb.collector.api.ping</apiPackage>
+                            <modelPackage>org.apache.iotdb.collector.api.ping.model</modelPackage>
+                            <invokerPackage>org.apache.iotdb.collector.api.ping.invoker</invokerPackage>
                             <generatorName>jaxrs-jersey</generatorName>
-                            <groupId>org.apache.iotdb.</groupId>
+                            <groupId>org.apache.iotdb</groupId>
                             <artifactId>iotdb-collector-rest-service</artifactId>
                             <artifactVersion>${project.version}</artifactVersion>
                             <addCompileSourceRoot>true</addCompileSourceRoot>
@@ -109,17 +109,44 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>generate-java-rest-codes-v1</id>
+                        <id>generate-java-rest-codes-v1-task</id>
                         <goals>
                             <goal>generate</goal>
                         </goals>
                         <phase>generate-sources</phase>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/openapi3/iotdb_collector_rest_v1.yaml</inputSpec>
+                            <inputSpec>${project.basedir}/src/main/openapi3/v1/task.yaml</inputSpec>
                             <output>${project.build.directory}/generated-sources/java</output>
-                            <apiPackage>org.apache.iotdb.collector.api.v1</apiPackage>
-                            <modelPackage>org.apache.iotdb.collector.api.v1.model</modelPackage>
-                            <invokerPackage>org.apache.iotdb.collector.api.v1.invoker</invokerPackage>
+                            <apiPackage>org.apache.iotdb.collector.api.v1.task</apiPackage>
+                            <modelPackage>org.apache.iotdb.collector.api.v1.task.model</modelPackage>
+                            <invokerPackage>org.apache.iotdb.collector.api.v1.task.invoker</invokerPackage>
+                            <generatorName>jaxrs-jersey</generatorName>
+                            <groupId>org.apache.iotdb</groupId>
+                            <artifactId>iotdb-collector-rest-service</artifactId>
+                            <artifactVersion>${project.version}</artifactVersion>
+                            <addCompileSourceRoot>true</addCompileSourceRoot>
+                            <configOptions>
+                                <licenseName>Apache License 2.0</licenseName>
+                                <groupId>org.apache.iotdb</groupId>
+                                <artifactId>iotdb-collector-rest-service</artifactId>
+                                <artifactVersion>${project.version}</artifactVersion>
+                                <dateLibrary>java8</dateLibrary>
+                                <useGzipFeature>true</useGzipFeature>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-java-rest-codes-v1-plugin</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/openapi3/v1/plugin.yaml</inputSpec>
+                            <output>${project.build.directory}/generated-sources/java</output>
+                            <apiPackage>org.apache.iotdb.collector.api.v1.plugin</apiPackage>
+                            <modelPackage>org.apache.iotdb.collector.api.v1.plugin.model</modelPackage>
+                            <invokerPackage>org.apache.iotdb.collector.api.v1.plugin.invoker</invokerPackage>
                             <generatorName>jaxrs-jersey</generatorName>
                             <groupId>org.apache.iotdb</groupId>
                             <artifactId>iotdb-collector-rest-service</artifactId>
@@ -158,11 +185,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <configuration>
+                <!--<configuration>
                     <excludes>
                         <exclude>**/impl/**</exclude>
                     </excludes>
-                </configuration>
+                </configuration>-->
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -24,7 +24,7 @@ public class ApiServiceOptions extends Options {
   public static final Option<Integer> PORT =
       new Option<Integer>("api_service_port", 17070) {
         @Override
-        public void setValue(String valueString) {
+        public void setValue(final String valueString) {
           value = Integer.parseInt(valueString);
         }
       };

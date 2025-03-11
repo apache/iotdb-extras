@@ -63,7 +63,12 @@ public class ApiService implements IService {
     holder.setInitOrder(1);
     holder.setInitParameter(
         "jersey.config.server.provider.packages",
-        "io.swagger.jaxrs.listing, io.swagger.sample.resource, org.apache.iotdb.collector.api");
+        String.join(
+            ",",
+            "io.swagger.jaxrs.listing, io.swagger.sample.resource",
+            "org.apache.iotdb.collector.api.ping",
+            "org.apache.iotdb.collector.api.v1.plugin",
+            "org.apache.iotdb.collector.api.v1.task"));
     holder.setInitParameter(
         "jersey.config.server.provider.classnames",
         "org.glassfish.jersey.media.multipart.MultiPartFeature");

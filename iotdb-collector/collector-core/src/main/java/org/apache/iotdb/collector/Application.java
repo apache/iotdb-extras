@@ -22,6 +22,7 @@ package org.apache.iotdb.collector;
 import org.apache.iotdb.collector.config.Configuration;
 import org.apache.iotdb.collector.service.ApiService;
 import org.apache.iotdb.collector.service.IService;
+import org.apache.iotdb.collector.service.RuntimeService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +37,7 @@ public class Application {
   private final LinkedList<IService> services = new LinkedList<>();
 
   private Application() {
+    services.add(new RuntimeService());
     services.add(new ApiService());
   }
 

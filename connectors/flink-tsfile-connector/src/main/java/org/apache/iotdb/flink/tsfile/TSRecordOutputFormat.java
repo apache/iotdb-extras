@@ -19,15 +19,15 @@
 
 package org.apache.iotdb.flink.tsfile;
 
-import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
-import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
-import org.apache.iotdb.tsfile.write.record.TSRecord;
-import org.apache.iotdb.tsfile.write.schema.Schema;
-
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.tsfile.common.conf.TSFileConfig;
+import org.apache.tsfile.exception.write.WriteProcessException;
+import org.apache.tsfile.write.record.TSRecord;
+import org.apache.tsfile.write.schema.Schema;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Output format that writes TsFiles by {@link TSRecord}. Users need to provide a {@link
@@ -83,7 +83,13 @@ public class TSRecordOutputFormat<T> extends TsFileOutputFormat<T> {
     @Override
     public void collect(TSRecord tsRecord) {
       try {
-        writer.write(tsRecord);
+        if (schema.getSchemaTemplates().size() == 1
+            && !schema.getRegisteredTimeseriesMap().containsKey(tsRecord.deviceId)) {
+          writer.registerDevice(
+              tsRecord.deviceId.toString(),
+              new ArrayList<>(schema.getSchemaTemplates().keySet()).get(0));
+        }
+        writer.writeRecord(tsRecord);
       } catch (IOException | WriteProcessException e) {
         throw new FlinkRuntimeException(e);
       }
