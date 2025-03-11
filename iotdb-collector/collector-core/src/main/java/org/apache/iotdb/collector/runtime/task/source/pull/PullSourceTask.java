@@ -25,8 +25,6 @@ import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
 import org.apache.iotdb.collector.service.RuntimeService;
-import org.apache.iotdb.commons.concurrent.IoTThreadFactory;
-import org.apache.iotdb.commons.concurrent.threadpool.WrappedThreadPoolExecutor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import org.slf4j.Logger;
@@ -36,6 +34,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class PullSourceTask extends SourceTask {
@@ -64,14 +63,9 @@ public class PullSourceTask extends SourceTask {
 
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
-        new WrappedThreadPoolExecutor(
-            parallelism,
-            parallelism,
-            0L,
-            TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(parallelism),
-            new IoTThreadFactory(taskId), // TODO: thread name
-            taskId));
+        new ThreadPoolExecutor(
+                parallelism,parallelism,0L,TimeUnit.SECONDS,new LinkedBlockingQueue<>(parallelism)
+        ));
 
     final long creationTime = System.currentTimeMillis();
     consumers = new PullSourceConsumer[parallelism];
