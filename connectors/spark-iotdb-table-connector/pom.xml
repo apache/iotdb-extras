@@ -35,7 +35,9 @@
     <name>IoTDB: Table Connector: Apache Spark</name>
     <modules>
         <module>spark-iotdb-table-common</module>
-        <module>scala_2.12</module>
+        <module>iotdb-table-connector-3.5</module>
+        <module>iotdb-table-connector-3.4</module>
+        <module>iotdb-table-connector-3.3</module>
     </modules>
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
@@ -44,7 +46,34 @@
         <iotdb.version>2.0.1-beta</iotdb.version>
         <spark.version>3.5.0</spark.version>
     </properties>
-    <dependencies/>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-sql-api_${scala.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-catalyst_${scala.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-sql-api_${scala.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-common-utils_${scala.version}</artifactId>
+                <version>3.5.0</version>
+                <scope>provided</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <build>
         <!--
             Defining the settings in pluginManagement as we don't actually want to run the plugins in this module

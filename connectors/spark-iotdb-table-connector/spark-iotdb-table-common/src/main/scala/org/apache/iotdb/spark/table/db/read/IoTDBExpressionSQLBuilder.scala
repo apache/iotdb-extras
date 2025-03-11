@@ -23,7 +23,7 @@ import org.apache.iotdb.spark.table.db.IoTDBUtils
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.connector.expressions.filter.{AlwaysFalse, AlwaysTrue, And, Not, Or, Predicate}
 import org.apache.spark.sql.connector.expressions.{Expression, GeneralScalarExpression, Literal, NamedReference}
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CalendarIntervalType, DateType, DoubleType, FloatType, IntegerType, LongType, MapType, NullType, ObjectType, ShortType, StringType, StructType, UserDefinedType}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType}
 
 class IoTDBExpressionSQLBuilder {
 

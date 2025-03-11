@@ -25,14 +25,11 @@ import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.tsfile.common.conf.TSFileConfig
 import org.apache.tsfile.enums.TSDataType
 import org.apache.tsfile.read.common.RowRecord
 import org.apache.tsfile.utils.{Binary, DateUtils}
 import org.apache.tsfile.write.record.Tablet.ColumnCategory
 
-import java.nio.charset.Charset
-import java.sql.{Date, Timestamp}
 import java.util
 
 object IoTDBUtils {
