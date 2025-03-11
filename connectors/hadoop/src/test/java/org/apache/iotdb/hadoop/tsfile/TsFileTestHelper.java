@@ -18,15 +18,15 @@
  */
 package org.apache.iotdb.hadoop.tsfile;
 
-import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
-import org.apache.iotdb.tsfile.file.metadata.enums.TSEncoding;
-import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
-import org.apache.iotdb.tsfile.read.common.Path;
-import org.apache.iotdb.tsfile.write.TsFileWriter;
-import org.apache.iotdb.tsfile.write.record.Tablet;
-import org.apache.iotdb.tsfile.write.schema.MeasurementSchema;
-import org.apache.iotdb.tsfile.write.schema.Schema;
-
+import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.file.metadata.enums.TSEncoding;
+import org.apache.tsfile.read.TsFileSequenceReader;
+import org.apache.tsfile.read.common.Path;
+import org.apache.tsfile.write.TsFileWriter;
+import org.apache.tsfile.write.record.Tablet;
+import org.apache.tsfile.write.schema.IMeasurementSchema;
+import org.apache.tsfile.write.schema.MeasurementSchema;
+import org.apache.tsfile.write.schema.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,7 @@ public class TsFileTestHelper {
       }
 
       Schema schema = new Schema();
-      List<MeasurementSchema> schemaList = new ArrayList<>();
+      List<IMeasurementSchema> schemaList = new ArrayList<>();
 
       // the number of rows to include in the tablet
       int rowNum = 1000000;
@@ -75,28 +75,24 @@ public class TsFileTestHelper {
       // construct the tablet
       Tablet tablet = new Tablet("device_1", schemaList);
 
-      long[] timestamps = tablet.timestamps;
-      Object[] values = tablet.values;
-
       long timestamp = 1;
       long value = 1000000L;
 
       for (int r = 0; r < rowNum; r++, value++) {
-        int row = tablet.rowSize++;
-        timestamps[row] = timestamp++;
+        int row = tablet.getRowSize();
+        tablet.addTimestamp(row, timestamp++);
         for (int i = 0; i < sensorNum; i++) {
-          long[] sensor = (long[]) values[i];
-          sensor[row] = value;
+          tablet.addValue(row, i, value);
         }
         // write Tablet to TsFile
-        if (tablet.rowSize == tablet.getMaxRowNumber()) {
-          tsFileWriter.write(tablet);
+        if (tablet.getRowSize() == tablet.getMaxRowNumber()) {
+          tsFileWriter.writeTree(tablet);
           tablet.reset();
         }
       }
       // write Tablet to TsFile
-      if (tablet.rowSize != 0) {
-        tsFileWriter.write(tablet);
+      if (tablet.getRowSize() != 0) {
+        tsFileWriter.writeTree(tablet);
         tablet.reset();
       }
 

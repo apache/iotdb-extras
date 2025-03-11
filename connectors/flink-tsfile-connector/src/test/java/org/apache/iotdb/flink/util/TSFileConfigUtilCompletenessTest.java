@@ -19,8 +19,7 @@
 
 package org.apache.iotdb.flink.util;
 
-import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
-
+import org.apache.tsfile.common.conf.TSFileConfig;
 import org.junit.Test;
 
 import java.lang.reflect.Method;
@@ -82,7 +81,17 @@ public class TSFileConfigUtilCompletenessTest {
       "setHdfsFile",
       "setHdfsTsFileInput",
       "setHdfsTsFileOutput",
-      "setObjectStorageFile"
+      "setObjectStorageFile",
+      "setEncryptType",
+      "setDoubleEncoding",
+      "setEncryptKey",
+      "setFloatEncoding",
+      "setEncryptFlag",
+      "setEncryptKeyFromPath",
+      "setInt64Encoding",
+      "setBooleanEncoding",
+      "setInt32Encoding",
+      "setTextEncoding",
     };
     Set<String> addedSetters = new HashSet<>();
     Collections.addAll(addedSetters, setters);
