@@ -20,14 +20,14 @@ package org.apache.iotdb.hadoop.tsfile;
 
 import org.apache.iotdb.hadoop.fileSystem.HDFSOutput;
 import org.apache.iotdb.hadoop.tsfile.record.HDFSTSRecord;
-import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
-import org.apache.iotdb.tsfile.write.TsFileWriter;
-import org.apache.iotdb.tsfile.write.schema.Schema;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.tsfile.exception.write.WriteProcessException;
+import org.apache.tsfile.write.TsFileWriter;
+import org.apache.tsfile.write.schema.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +48,7 @@ public class TSFRecordWriter extends RecordWriter<NullWritable, HDFSTSRecord> {
   public synchronized void write(NullWritable key, HDFSTSRecord value)
       throws IOException, InterruptedException {
     try {
-      writer.write(value.convertToTSRecord());
+      writer.writeRecord(value.convertToTSRecord());
     } catch (WriteProcessException e) {
       throw new InterruptedException(String.format("Write tsfile record error %s", e));
     }

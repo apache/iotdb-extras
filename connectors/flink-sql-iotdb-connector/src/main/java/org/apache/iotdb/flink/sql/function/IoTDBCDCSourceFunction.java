@@ -28,12 +28,6 @@ import org.apache.iotdb.flink.sql.wrapper.SchemaWrapper;
 import org.apache.iotdb.flink.sql.wrapper.TabletWrapper;
 import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.session.Session;
-import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
-import org.apache.iotdb.tsfile.read.common.RowRecord;
-import org.apache.iotdb.tsfile.utils.BitMap;
-import org.apache.iotdb.tsfile.utils.Pair;
-import org.apache.iotdb.tsfile.write.record.Tablet;
-import org.apache.iotdb.tsfile.write.schema.MeasurementSchema;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
@@ -42,6 +36,12 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
+import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.read.common.RowRecord;
+import org.apache.tsfile.utils.BitMap;
+import org.apache.tsfile.utils.Pair;
+import org.apache.tsfile.write.record.Tablet;
+import org.apache.tsfile.write.schema.IMeasurementSchema;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.enums.ReadyState;
 import org.slf4j.Logger;
@@ -232,11 +232,11 @@ public class IoTDBCDCSourceFunction extends RichSourceFunction<RowData> {
   }
 
   public void collectTablet(Tablet tablet, SourceContext<RowData> ctx) {
-    List<MeasurementSchema> schemas = tablet.getSchemas();
-    int rowSize = tablet.rowSize;
+    List<IMeasurementSchema> schemas = tablet.getSchemas();
+    int rowSize = tablet.getRowSize();
     HashMap<String, Pair<BitMap, List<Object>>> values = new HashMap<>();
-    for (MeasurementSchema schema : schemas) {
-      String timeseries = String.format("%s.%s", tablet.deviceId, schema.getMeasurementId());
+    for (IMeasurementSchema schema : schemas) {
+      String timeseries = String.format("%s.%s", tablet.getDeviceId(), schema.getMeasurementName());
       TSDataType iotdbType = schema.getType();
       int index = timeseriesList.indexOf(timeseries);
       if (index == -1) {
@@ -251,12 +251,12 @@ public class IoTDBCDCSourceFunction extends RichSourceFunction<RowData> {
       values.put(
           timeseries,
           new Pair<>(
-              tablet.bitMaps[schemas.indexOf(schema)],
-              Utils.object2List(tablet.values[schemas.indexOf(schema)], iotdbType)));
+              tablet.getBitMaps()[schemas.indexOf(schema)],
+              Utils.object2List(tablet.getValues()[schemas.indexOf(schema)], iotdbType)));
     }
     for (int i = 0; i < rowSize; i++) {
       ArrayList<Object> row = new ArrayList<>();
-      row.add(tablet.timestamps[i]);
+      row.add(tablet.getTimestamps()[i]);
       for (String timeseries : timeseriesList) {
         if (values.containsKey(timeseries)
             && (values.get(timeseries).getLeft() == null

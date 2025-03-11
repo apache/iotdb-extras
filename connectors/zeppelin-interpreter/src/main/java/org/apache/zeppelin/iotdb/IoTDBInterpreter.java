@@ -46,7 +46,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
-import static org.apache.iotdb.rpc.IoTDBRpcDataSet.TIMESTAMP_STR;
 import static org.apache.iotdb.rpc.RpcUtils.setTimeFormat;
 
 public class IoTDBInterpreter extends AbstractInterpreter {
@@ -69,6 +68,7 @@ public class IoTDBInterpreter extends AbstractInterpreter {
   static final String DEFAULT_TIME_DISPLAY_TYPE = "long";
   static final String DEFAULT_ZONE_ID = "UTC";
   static final String NULL_ITEM = "null";
+  static final String TIMESTAMP_STR = "Time";
 
   private static final char TAB = '\t';
   private static final char NEWLINE = '\n';
