@@ -25,7 +25,7 @@ class IoTDBOptions(
                     @transient private val properties: Map[String, String])
   extends Serializable {
 
-    val urls = properties.getOrElse(IoTDBOptions.IOTDB_URL, sys.error(s"Option '${IoTDBOptions.IOTDB_URL}' not specified")).split(",").toList.asJava
+    val urls = properties.getOrElse(IoTDBOptions.IOTDB_URLS, sys.error(s"Option '${IoTDBOptions.IOTDB_URLS}' not specified")).split(",").toList.asJava
 
     val username = properties.getOrElse(IoTDBOptions.IOTDB_USERNAME, "root")
 
@@ -40,7 +40,7 @@ class IoTDBOptions(
 object IoTDBOptions {
   val IOTDB_USERNAME = "iotdb.username"
   val IOTDB_PASSWORD = "iotdb.password"
-  val IOTDB_URL = "iotdb.url"
+  val IOTDB_URLS = "iotdb.urls"
   val IOTDB_DATABASE = "iotdb.database"
   val IOTDB_TABLE = "iotdb.table"
 

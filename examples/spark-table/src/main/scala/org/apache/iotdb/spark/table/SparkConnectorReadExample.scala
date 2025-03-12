@@ -34,7 +34,7 @@ object SparkConnectorReadExample {
       .option("iotdb.table", "table1")
       .option("iotdb.username", "root")
       .option("iotdb.password", "root")
-      .option("iotdb.url", "127.0.0.1:6667")
+      .option("iotdb.urls", "127.0.0.1:6667")
       .load()
     df.createTempView("iotdb_table1")
     df.printSchema()

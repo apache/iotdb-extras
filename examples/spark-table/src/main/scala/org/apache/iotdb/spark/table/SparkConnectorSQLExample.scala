@@ -48,7 +48,7 @@ object SparkConnectorSQLExample {
                  "iotdb.table"="table2",
                  "iotdb.username"="root",
                  "iotdb.password"="root",
-                 "iotdb.url"="127.0.0.1:6667");
+                 "iotdb.urls"="127.0.0.1:6667");
         """)
     spark.sql("select * from spark_iotdb1").show
     spark.sql("insert into spark_iotdb2 select time,tag1, s0, s1 from spark_iotdb1")

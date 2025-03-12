@@ -43,7 +43,7 @@ object SparkConnectorWriteExample {
       .option("iotdb.table", "spark_table1")
       .option("iotdb.username", "root")
       .option("iotdb.password", "root")
-      .option("iotdb.url", "127.0.0.1:6667")
+      .option("iotdb.urls", "127.0.0.1:6667")
       .mode("append")
       .save()
     spark.close()

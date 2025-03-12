@@ -100,7 +100,7 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
                     <configuration>
-                        <finalName>spark-iotdb-table-connector_${scala.version}-${project.version}</finalName>
+                        <finalName>spark-iotdb-table-connector_${spark.version}_${scala.version}-${project.version}</finalName>
                     </configuration>
                 </plugin>
                 <plugin>

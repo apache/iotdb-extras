@@ -43,21 +43,6 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_2.12</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.scalactic</groupId>
-            <artifactId>scalactic_2.12</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.version}</artifactId>
             <version>${spark.version}</version>
