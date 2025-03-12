@@ -29,14 +29,13 @@ Import the IoTDB-Table-Spark-Connector dependency in your project.
 ```
 <dependency>
     <groupId>org.apache.iotdb</groupId>
-    <artifactId>spark-iotdb-table-connector_2.12</artifactId>
-    <version>1.3.2</version>
+    <artifactId>spark-iotdb-table-connector-3.5</artifactId>
 </dependency>
 ```
 ## Read
 ### DataFrame
 ```scala
-val df = spark.read.format("iotdb")
+val df = spark.read.format("org.apache.iotdb.spark.table.db.IoTDBTableProvider")
   .option("iotdb.database", "$YOUR_IOTDB_DATABASE_NAME")
   .option("iotdb.table", "$YOUR_IOTDB_TABLE_NAME")
   .option("iotdb.username", "$YOUR_IOTDB_USERNAME")
@@ -47,13 +46,13 @@ val df = spark.read.format("iotdb")
 ### Spark SQL
 ```
 CREATE TEMPORARY VIEW spark_iotdb
-   USING iotdb
+   USING org.apache.iotdb.spark.table.db.IoTDBTableProvider
    OPTIONS(
    "iotdb.database"="$YOUR_IOTDB_DATABASE_NAME",
    "iotdb.table"="$YOUR_IOTDB_TABLE_NAME",
    "iotdb.username"="$YOUR_IOTDB_USERNAME",
    "iotdb.password"="$YOUR_IOTDB_PASSWORD",
-   "iotdb.url"="$YOUR_IOTDB_URL"
+   "iotdb.urls"="$YOUR_IOTDB_URL"
 );
 
 SELECT * FROM spark_iotdb;
@@ -69,24 +68,24 @@ val df = spark.createDataFrame(List(
 
 df
   .write
-  .format("iotdb")
+  .format("org.apache.iotdb.spark.table.db.IoTDBTableProvider")
   .option("iotdb.database", "$YOUR_IOTDB_DATABASE_NAME")
   .option("iotdb.table", "$YOUR_IOTDB_TABLE_NAME")
   .option("iotdb.username", "$YOUR_IOTDB_USERNAME")
   .option("iotdb.password", "$YOUR_IOTDB_PASSWORD")
-  .option("iotdb.url", "$YOUR_IOTDB_URL")
+  .option("iotdb.urls", "$YOUR_IOTDB_URL")
   .save()
 ```
 ### Spark SQL
 ```
 CREATE TEMPORARY VIEW spark_iotdb
-   USING iotdb
+   USING org.apache.iotdb.spark.table.db.IoTDBTableProvider
    OPTIONS(
    "iotdb.database"="$YOUR_IOTDB_DATABASE_NAME",
    "iotdb.table"="$YOUR_IOTDB_TABLE_NAME",
    "iotdb.username"="$YOUR_IOTDB_USERNAME",
    "iotdb.password"="$YOUR_IOTDB_PASSWORD",
-   "iotdb.url"="$YOUR_IOTDB_URL"
+   "iotdb.urls"="$YOUR_IOTDB_URL"
 );
 
 INSERT INTO spark_iotdb VALUES ("VALUE1", "VALUE2", ...);
