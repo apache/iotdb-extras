@@ -20,6 +20,7 @@
 package org.apache.iotdb.collector.plugin.builtin.sink.compressor;
 
 import com.github.luben.zstd.Zstd;
+
 import java.io.IOException;
 
 public class PipeZSTDCompressor extends PipeCompressor {

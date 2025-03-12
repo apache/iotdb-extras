@@ -19,10 +19,11 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.compressor;
 
-import java.io.IOException;
 import org.apache.tsfile.compress.ICompressor;
 import org.apache.tsfile.compress.IUnCompressor;
 import org.apache.tsfile.file.metadata.enums.CompressionType;
+
+import java.io.IOException;
 
 public class PipeGZIPCompressor extends PipeCompressor {
 

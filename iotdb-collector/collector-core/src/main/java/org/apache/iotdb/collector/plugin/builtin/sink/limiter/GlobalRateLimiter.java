@@ -19,11 +19,12 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.limiter;
 
+import org.apache.iotdb.collector.config.PipeOptions;
+
 import com.google.common.util.concurrent.AtomicDouble;
 import com.google.common.util.concurrent.RateLimiter;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.iotdb.collector.config.PipeOptions;
+import java.util.concurrent.TimeUnit;
 
 /** This is a global rate limiter for all connectors. */
 public class GlobalRateLimiter {

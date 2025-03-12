@@ -26,6 +26,7 @@ import org.apache.iotdb.pipe.api.collector.RowCollector;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.iotdb.pipe.api.exception.PipeException;
 import org.apache.iotdb.pipe.api.type.Binary;
+
 import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.write.record.Tablet;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
@@ -56,9 +57,7 @@ public class PipeRowCollector implements RowCollector {
   }
 
   public PipeRowCollector(
-      PipeRawTabletInsertionEvent sourceEvent,
-      String sourceEventDataBase,
-      Boolean isTableModel) {
+      PipeRawTabletInsertionEvent sourceEvent, String sourceEventDataBase, Boolean isTableModel) {
     this.sourceEvent = sourceEvent;
     this.sourceEventDataBaseName = sourceEventDataBase;
     this.isTableModel = isTableModel;

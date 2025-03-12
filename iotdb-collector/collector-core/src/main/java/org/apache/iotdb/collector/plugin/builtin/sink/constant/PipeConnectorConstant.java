@@ -19,8 +19,9 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.constant;
 
-import com.github.luben.zstd.Zstd;
 import org.apache.iotdb.collector.config.PipeOptions;
+
+import com.github.luben.zstd.Zstd;
 
 import java.io.File;
 import java.util.Arrays;

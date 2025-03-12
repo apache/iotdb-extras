@@ -19,13 +19,13 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.compressor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_COMPRESSOR_GZIP;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_COMPRESSOR_LZ4;

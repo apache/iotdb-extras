@@ -28,6 +28,7 @@ import org.apache.iotdb.collector.plugin.builtin.sink.resource.ref.PipePhantomRe
 import org.apache.iotdb.pipe.api.access.Row;
 import org.apache.iotdb.pipe.api.collector.RowCollector;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+
 import org.apache.tsfile.utils.RamUsageEstimator;
 import org.apache.tsfile.write.record.Tablet;
 

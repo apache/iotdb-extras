@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.constant;
 
-
 public class ColumnHeaderConstant {
 
   private ColumnHeaderConstant() {
@@ -272,7 +271,7 @@ public class ColumnHeaderConstant {
   public static final String CURRENT_DATABASE = "CurrentDatabase";
 
   public static final String CURRENT_SQL_DIALECT = "CurrentSqlDialect";
-/*
+  /*
   public static final List<ColumnHeader> lastQueryColumnHeaders =
       ImmutableList.of(
           new ColumnHeader(TIMESERIES, TSDataType.TEXT),

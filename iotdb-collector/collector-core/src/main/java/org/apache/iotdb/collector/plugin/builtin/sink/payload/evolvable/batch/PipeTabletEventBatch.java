@@ -19,17 +19,17 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
+import org.apache.iotdb.pipe.api.event.Event;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.async.IoTDBDataRegionAsyncConnector;
-import org.apache.iotdb.pipe.api.event.Event;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class PipeTabletEventBatch implements AutoCloseable {
 
@@ -62,7 +62,8 @@ public abstract class PipeTabletEventBatch implements AutoCloseable {
     //         .setExpandCallback(
     //             (oldMemory, newMemory) ->
     //                 LOGGER.info(
-    //                     "The batch size limit has expanded from {} to {}.", oldMemory, newMemory));
+    //                     "The batch size limit has expanded from {} to {}.", oldMemory,
+    // newMemory));
 
     if (getMaxBatchSizeInBytes() != requestMaxBatchSizeInBytes) {
       LOGGER.info(
@@ -79,8 +80,7 @@ public abstract class PipeTabletEventBatch implements AutoCloseable {
    * @param event the given {@link Event}
    * @return {@code true} if the batch can be transferred
    */
-  public synchronized boolean onEvent(final TabletInsertionEvent event)
-      throws IOException {
+  public synchronized boolean onEvent(final TabletInsertionEvent event) throws IOException {
     if (isClosed || !(event instanceof PipeRawTabletInsertionEvent)) {
       return false;
     }
@@ -108,8 +108,7 @@ public abstract class PipeTabletEventBatch implements AutoCloseable {
    *     cached and not emitted in this batch. If there are failure encountered, just throw
    *     exceptions and do not return {@code false} here.
    */
-  protected abstract boolean constructBatch(final TabletInsertionEvent event)
-      throws IOException;
+  protected abstract boolean constructBatch(final TabletInsertionEvent event) throws IOException;
 
   public boolean shouldEmit() {
     return totalBufferSize >= getMaxBatchSizeInBytes()

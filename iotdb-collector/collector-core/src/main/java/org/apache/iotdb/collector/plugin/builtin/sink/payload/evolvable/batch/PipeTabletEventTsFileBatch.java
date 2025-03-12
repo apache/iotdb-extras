@@ -19,6 +19,21 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.utils.PipeMemoryWeightUtil;
+import org.apache.iotdb.collector.plugin.builtin.sink.utils.builder.PipeTableModeTsFileBuilder;
+import org.apache.iotdb.collector.plugin.builtin.sink.utils.builder.PipeTreeModelTsFileBuilder;
+import org.apache.iotdb.collector.plugin.builtin.sink.utils.builder.PipeTsFileBuilder;
+import org.apache.iotdb.collector.plugin.builtin.sink.utils.sorter.PipeTableModelTabletEventSorter;
+import org.apache.iotdb.collector.plugin.builtin.sink.utils.sorter.PipeTreeModelTabletEventSorter;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+
+import org.apache.tsfile.exception.write.WriteProcessException;
+import org.apache.tsfile.utils.Pair;
+import org.apache.tsfile.write.record.Tablet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,20 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.PipeMemoryWeightUtil;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.builder.PipeTableModeTsFileBuilder;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.builder.PipeTreeModelTsFileBuilder;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.builder.PipeTsFileBuilder;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.sorter.PipeTableModelTabletEventSorter;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.sorter.PipeTreeModelTabletEventSorter;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
-import org.apache.tsfile.exception.write.WriteProcessException;
-import org.apache.tsfile.utils.Pair;
-import org.apache.tsfile.write.record.Tablet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PipeTabletEventTsFileBatch extends PipeTabletEventBatch {
 
@@ -92,7 +93,7 @@ public class PipeTabletEventTsFileBatch extends PipeTabletEventBatch {
     //     }
     //   }
     // } else
-      if (event instanceof PipeRawTabletInsertionEvent) {
+    if (event instanceof PipeRawTabletInsertionEvent) {
       final PipeRawTabletInsertionEvent rawTabletInsertionEvent =
           (PipeRawTabletInsertionEvent) event;
       final Tablet tablet = rawTabletInsertionEvent.convertToTablet();

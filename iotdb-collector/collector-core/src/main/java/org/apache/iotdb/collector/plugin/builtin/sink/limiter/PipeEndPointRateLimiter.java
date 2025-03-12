@@ -19,13 +19,14 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.limiter;
 
+import org.apache.iotdb.collector.config.PipeOptions;
+import org.apache.iotdb.common.rpc.thrift.TEndPoint;
+
 import com.google.common.util.concurrent.RateLimiter;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-
-import org.apache.iotdb.collector.config.PipeOptions;
-import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 
 public class PipeEndPointRateLimiter {
 
@@ -72,8 +73,7 @@ public class PipeEndPointRateLimiter {
     while (!rateLimiter.tryAcquire(
         bytes,
         PipeOptions.RATE_LIMITER_HOT_RELOAD_CHECK_INTERVAL_MS.value(),
-        TimeUnit.MILLISECONDS)) {
-    }
+        TimeUnit.MILLISECONDS)) {}
     return true;
   }
 }

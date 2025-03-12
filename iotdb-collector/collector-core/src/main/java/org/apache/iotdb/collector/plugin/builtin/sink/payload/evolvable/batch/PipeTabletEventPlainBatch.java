@@ -19,6 +19,16 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request.PipeTransferTabletBatchReqV2;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+
+import org.apache.tsfile.utils.Pair;
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,15 +36,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request.PipeTransferTabletBatchReqV2;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
-import org.apache.tsfile.utils.Pair;
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PipeTabletEventPlainBatch extends PipeTabletEventBatch {
 
@@ -57,13 +58,13 @@ public class PipeTabletEventPlainBatch extends PipeTabletEventBatch {
   }
 
   @Override
-  protected boolean constructBatch(final TabletInsertionEvent event)
-      throws IOException {
+  protected boolean constructBatch(final TabletInsertionEvent event) throws IOException {
     final int bufferSize = buildTabletInsertionBuffer(event);
     totalBufferSize += bufferSize;
     pipe2BytesAccumulated.compute(
         new Pair<>(
-            ((PipeRawTabletInsertionEvent) event).getPipeName(), ((PipeRawTabletInsertionEvent) event).getCreationTime()),
+            ((PipeRawTabletInsertionEvent) event).getPipeName(),
+            ((PipeRawTabletInsertionEvent) event).getCreationTime()),
         (pipeName, bytesAccumulated) ->
             bytesAccumulated == null ? bufferSize : bytesAccumulated + bufferSize);
     return true;
@@ -102,8 +103,7 @@ public class PipeTabletEventPlainBatch extends PipeTabletEventBatch {
     return pipe2BytesAccumulated;
   }
 
-  private int buildTabletInsertionBuffer(final TabletInsertionEvent event)
-      throws IOException {
+  private int buildTabletInsertionBuffer(final TabletInsertionEvent event) throws IOException {
     int databaseEstimateSize = 0;
     final ByteBuffer buffer;
     // if (event instanceof PipeInsertNodeTabletInsertionEvent) {
@@ -130,7 +130,8 @@ public class PipeTabletEventPlainBatch extends PipeTabletEventBatch {
     //     if (pipeInsertNodeTabletInsertionEvent.isTableModelEvent()) {
     //       databaseEstimateSize =
     //           pipeInsertNodeTabletInsertionEvent.getTableModelDatabaseName().length();
-    //       insertNodeDataBases.add(pipeInsertNodeTabletInsertionEvent.getTableModelDatabaseName());
+    //
+    // insertNodeDataBases.add(pipeInsertNodeTabletInsertionEvent.getTableModelDatabaseName());
     //     } else {
     //       databaseEstimateSize = 4;
     //       insertNodeDataBases.add(TREE_MODEL_DATABASE_PLACEHOLDER);

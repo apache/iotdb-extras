@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.exception.pipe;
 
-
 public class PipeRuntimeConnectorRetryTimesConfigurableException
     extends PipeRuntimeConnectorCriticalException {
 

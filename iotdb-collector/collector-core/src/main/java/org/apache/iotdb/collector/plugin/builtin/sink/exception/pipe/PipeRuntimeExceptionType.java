@@ -22,7 +22,6 @@ package org.apache.iotdb.collector.plugin.builtin.sink.exception.pipe;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 

@@ -19,6 +19,4 @@
 
 package org.apache.iotdb.collector.config;
 
-public class IoTDBCommonOptions extends Options{
-
-}
+public class IoTDBCommonOptions extends Options {}

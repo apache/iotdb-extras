@@ -19,8 +19,21 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile;
 
-import static org.apache.tsfile.common.constant.TsFileConstant.PATH_ROOT;
-import static org.apache.tsfile.common.constant.TsFileConstant.PATH_SEPARATOR;
+import org.apache.iotdb.collector.plugin.builtin.sink.datastructure.pattern.TablePattern;
+import org.apache.iotdb.collector.plugin.builtin.sink.datastructure.pattern.TreePattern;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.aggregator.TsFileInsertionPointCounter;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.parser.TsFileInsertionEventParser;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.parser.TsFileInsertionEventParserProvider;
+import org.apache.iotdb.collector.plugin.builtin.sink.resource.ref.PipePhantomReferenceManager.PipeEventResource;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
+import org.apache.iotdb.pipe.api.exception.PipeException;
+
+import org.apache.tsfile.file.metadata.IDeviceID;
+import org.apache.tsfile.file.metadata.PlainDeviceID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,20 +45,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.datastructure.pattern.TablePattern;
-import org.apache.iotdb.collector.plugin.builtin.sink.datastructure.pattern.TreePattern;
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.aggregator.TsFileInsertionPointCounter;
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.parser.TsFileInsertionEventParser;
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.parser.TsFileInsertionEventParserProvider;
-import org.apache.iotdb.collector.plugin.builtin.sink.resource.ref.PipePhantomReferenceManager.PipeEventResource;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
-import org.apache.iotdb.pipe.api.exception.PipeException;
-import org.apache.tsfile.file.metadata.IDeviceID;
-import org.apache.tsfile.file.metadata.PlainDeviceID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.tsfile.common.constant.TsFileConstant.PATH_ROOT;
+import static org.apache.tsfile.common.constant.TsFileConstant.PATH_SEPARATOR;
 
 public class PipeTsFileInsertionEvent extends PipeInsertionEvent
     implements TsFileInsertionEvent, ReferenceTrackableEvent {
@@ -260,9 +261,11 @@ public class PipeTsFileInsertionEvent extends PipeInsertionEvent
   @Override
   public boolean internallyIncreaseResourceReferenceCount(final String holderMessage) {
     try {
-      // tsFile = PipeDataNodeResourceManager.tsfile().increaseFileReference(tsFile, true, resource);
+      // tsFile = PipeDataNodeResourceManager.tsfile().increaseFileReference(tsFile, true,
+      // resource);
       // if (isWithMod) {
-      //   modFile = PipeDataNodeResourceManager.tsfile().increaseFileReference(modFile, false, null);
+      //   modFile = PipeDataNodeResourceManager.tsfile().increaseFileReference(modFile, false,
+      // null);
       // }
       return true;
     } catch (final Exception e) {

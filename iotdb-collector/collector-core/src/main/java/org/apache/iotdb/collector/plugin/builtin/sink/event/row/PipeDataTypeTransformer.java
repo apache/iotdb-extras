@@ -20,6 +20,7 @@
 package org.apache.iotdb.collector.plugin.builtin.sink.event.row;
 
 import org.apache.iotdb.pipe.api.type.Type;
+
 import org.apache.tsfile.enums.TSDataType;
 
 import java.util.List;
