@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.property;
+package org.apache.iotdb.collector.plugin.builtin.sink.client;
 
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TCompactProtocol;

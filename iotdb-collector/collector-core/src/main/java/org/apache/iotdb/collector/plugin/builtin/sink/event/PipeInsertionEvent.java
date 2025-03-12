@@ -17,21 +17,24 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.event.row;
+package org.apache.iotdb.collector.plugin.builtin.sink.event;
 
-public class PipeBinaryTransformer {
+public abstract class PipeInsertionEvent {
 
-  public static org.apache.tsfile.utils.Binary transformToBinary(
-      org.apache.iotdb.pipe.api.type.Binary binary) {
-    return binary == null ? null : new org.apache.tsfile.utils.Binary(binary.getValues());
+  protected Boolean isTableModelEvent;
+
+  protected String treeModelDatabaseName;
+  protected String tableModelDatabaseName;
+
+  public boolean isTableModelEvent() {
+    return isTableModelEvent;
   }
 
-  public static org.apache.iotdb.pipe.api.type.Binary transformToPipeBinary(
-      org.apache.tsfile.utils.Binary binary) {
-    return binary == null ? null : new org.apache.iotdb.pipe.api.type.Binary(binary.getValues());
+  public String getTreeModelDatabaseName() {
+    return treeModelDatabaseName;
   }
 
-  private PipeBinaryTransformer() {
-    // util class
+  public String getTableModelDatabaseName() {
+    return tableModelDatabaseName;
   }
 }

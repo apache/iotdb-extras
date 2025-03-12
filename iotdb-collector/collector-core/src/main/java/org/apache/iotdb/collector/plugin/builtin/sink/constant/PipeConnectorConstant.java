@@ -23,7 +23,6 @@ import org.apache.iotdb.collector.config.PipeOptions;
 
 import com.github.luben.zstd.Zstd;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -153,13 +152,6 @@ public class PipeConnectorConstant {
   public static final String SINK_OPC_UA_HTTPS_BIND_PORT_KEY = "sink.opcua.https.port";
   public static final int CONNECTOR_OPC_UA_HTTPS_BIND_PORT_DEFAULT_VALUE = 8443;
 
-  public static final String CONNECTOR_OPC_UA_SECURITY_DIR_KEY = "connector.opcua.security.dir";
-  public static final String SINK_OPC_UA_SECURITY_DIR_KEY = "sink.opcua.security.dir";
-  public static final String CONNECTOR_OPC_UA_SECURITY_DIR_DEFAULT_VALUE =
-      getConfDir() != null
-          ? getConfDir() + File.separatorChar + "opc_security"
-          : System.getProperty("user.home") + File.separatorChar + "iotdb_opc_security";
-
   public static final String CONNECTOR_OPC_UA_ENABLE_ANONYMOUS_ACCESS_KEY =
       "connector.opcua.enable-anonymous-access";
   public static final String SINK_OPC_UA_ENABLE_ANONYMOUS_ACCESS_KEY =
@@ -255,19 +247,6 @@ public class PipeConnectorConstant {
 
   public static final String CONNECTOR_OPC_DA_PROGID_KEY = "connector.opcda.progid";
   public static final String SINK_OPC_DA_PROGID_KEY = "sink.opcda.progid";
-
-  public static String getConfDir() {
-    // Check if a config-directory was specified first.
-    String confString = System.getProperty(IoTDBConstant.IOTDB_CONF, null);
-    // If it wasn't, check if a home directory was provided (This usually contains a config)
-    if (confString == null) {
-      confString = System.getProperty(IoTDBConstant.IOTDB_HOME, null);
-      if (confString != null) {
-        confString = confString + File.separatorChar + "conf";
-      }
-    }
-    return confString;
-  }
 
   private PipeConnectorConstant() {
     throw new IllegalStateException("Utility class");

@@ -17,10 +17,11 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tsfile.PipeTsFileInsertionEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClient;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeTsFileInsertionEvent;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch.PipeTabletEventBatch;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch.PipeTabletEventPlainBatch;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch.PipeTabletEventTsFileBatch;
@@ -30,7 +31,6 @@ import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request.
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request.PipeTransferTsFilePieceWithModReq;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request.PipeTransferTsFileSealWithModReq;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferFilePieceReq;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.RetryUtils;
 import org.apache.iotdb.collector.plugin.builtin.sink.utils.cacher.LeaderCacheUtils;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
@@ -282,27 +282,16 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
 
   private void doTransferWrapper(final PipeTsFileInsertionEvent pipeTsFileInsertionEvent)
       throws PipeException, IOException {
-    // We increase the reference count for this event to determine if the event may be released.
-    if (!pipeTsFileInsertionEvent.increaseReferenceCount(
-        IoTDBDataRegionSyncConnector.class.getName())) {
-      return;
-    }
-    try {
-      doTransfer(
-          Collections.singletonMap(
-              new Pair<>(
-                  pipeTsFileInsertionEvent.getPipeName(),
-                  pipeTsFileInsertionEvent.getCreationTime()),
-              1.0),
-          pipeTsFileInsertionEvent.getTsFile(),
-          pipeTsFileInsertionEvent.isWithMod() ? pipeTsFileInsertionEvent.getModFile() : null,
-          pipeTsFileInsertionEvent.isTableModelEvent()
-              ? pipeTsFileInsertionEvent.getTableModelDatabaseName()
-              : null);
-    } finally {
-      pipeTsFileInsertionEvent.decreaseReferenceCount(
-          IoTDBDataRegionSyncConnector.class.getName(), false);
-    }
+    doTransfer(
+        Collections.singletonMap(
+            new Pair<>(
+                pipeTsFileInsertionEvent.getPipeName(), pipeTsFileInsertionEvent.getCreationTime()),
+            1.0),
+        pipeTsFileInsertionEvent.getTsFile(),
+        pipeTsFileInsertionEvent.isWithMod() ? pipeTsFileInsertionEvent.getModFile() : null,
+        pipeTsFileInsertionEvent.isTableModelEvent()
+            ? pipeTsFileInsertionEvent.getTableModelDatabaseName()
+            : null);
   }
 
   private void doTransfer(

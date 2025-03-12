@@ -17,13 +17,11 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
+package org.apache.iotdb.collector.plugin.builtin.sink.client;
 
 import org.apache.iotdb.collector.config.PipeOptions;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferSliceReq;
-import org.apache.iotdb.collector.plugin.builtin.sink.property.ThriftClient;
-import org.apache.iotdb.collector.plugin.builtin.sink.property.ThriftClientProperty;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.pipe.api.exception.PipeConnectionException;
 import org.apache.iotdb.rpc.DeepCopyRpcTransportFactory;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol;
 
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.pipe.api.event.Event;

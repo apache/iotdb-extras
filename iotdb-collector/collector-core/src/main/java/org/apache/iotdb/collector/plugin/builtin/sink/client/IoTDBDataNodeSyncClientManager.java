@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
+package org.apache.iotdb.collector.plugin.builtin.sink.client;
 
 import org.apache.iotdb.collector.config.PipeOptions;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request.PipeTransferDataNodeHandshakeV1Req;

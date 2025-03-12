@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.collector.config;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.constant.IoTDBConstant;
 import org.apache.iotdb.rpc.RpcUtils;
 
 import java.io.File;
