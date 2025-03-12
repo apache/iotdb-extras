@@ -59,7 +59,7 @@ object IoTDBUtils {
         val columnName = row.getField(0).getStringValue
         val dataType = row.getField(1).getStringValue
         val columnType = row.getField(2).getStringValue
-        structFields.add(StructField(columnName, getSparkDataType(dataType), metadata = new MetadataBuilder().putString(COLUMN_CATEGORY, columnType).build()))
+        structFields.add(StructField(columnName, getSparkDataType(dataType), nullable = !TIME.equals(columnName), metadata = new MetadataBuilder().putString(COLUMN_CATEGORY, columnType).build()))
       }
     } catch {
       case e: Exception => throw SparkException.internalError(s"Failed to get schema of table ${options.table}.", e)
