@@ -47,7 +47,7 @@ class IoTDBExpressionSQLBuilder {
 
   private def visitLiteral(literal: Literal[_]): String = {
     literal.dataType() match {
-      case StringType => s"'${literal.value().toString}'"
+      case StringType => s"'${literal.value().toString.replace("'", "''")}'"
       case BinaryType => IoTDBUtils.getIoTDBHexStringFromByteArray(literal.value().asInstanceOf[Array[Byte]])
       case DateType => s"CAST('${DateTimeUtils.toJavaDate(Integer.parseInt(literal.value().toString))}' as DATE)"
       case ShortType | IntegerType | ByteType | LongType | BooleanType | FloatType | DoubleType => literal.value().toString
