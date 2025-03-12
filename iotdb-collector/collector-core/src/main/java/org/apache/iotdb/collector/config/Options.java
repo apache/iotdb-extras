@@ -32,6 +32,15 @@ public class Options {
 
   private static final Map<String, Option<?>> OPTIONS = new ConcurrentHashMap<>();
 
+  static {
+    try {
+      Class.forName(ApiServiceOptions.class.getName());
+      Class.forName(TaskRuntimeOptions.class.getName());
+    } catch (final ClassNotFoundException e) {
+      throw new RuntimeException("Failed to load options", e);
+    }
+  }
+
   public abstract static class Option<T> {
 
     private final String key;

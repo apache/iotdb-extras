@@ -19,19 +19,18 @@
 
 package org.apache.iotdb.hadoop.tsfile;
 
-import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
-import org.apache.iotdb.tsfile.common.conf.TSFileDescriptor;
-import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
-import org.apache.iotdb.tsfile.file.metadata.enums.TSEncoding;
-import org.apache.iotdb.tsfile.fileSystem.FSFactoryProducer;
-import org.apache.iotdb.tsfile.fileSystem.FSType;
-import org.apache.iotdb.tsfile.read.common.Path;
-import org.apache.iotdb.tsfile.write.TsFileWriter;
-import org.apache.iotdb.tsfile.write.record.TSRecord;
-import org.apache.iotdb.tsfile.write.record.datapoint.DataPoint;
-import org.apache.iotdb.tsfile.write.record.datapoint.LongDataPoint;
-import org.apache.iotdb.tsfile.write.schema.MeasurementSchema;
-
+import org.apache.tsfile.common.conf.TSFileConfig;
+import org.apache.tsfile.common.conf.TSFileDescriptor;
+import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.file.metadata.enums.TSEncoding;
+import org.apache.tsfile.fileSystem.FSFactoryProducer;
+import org.apache.tsfile.fileSystem.FSType;
+import org.apache.tsfile.read.common.Path;
+import org.apache.tsfile.write.TsFileWriter;
+import org.apache.tsfile.write.record.TSRecord;
+import org.apache.tsfile.write.record.datapoint.DataPoint;
+import org.apache.tsfile.write.record.datapoint.LongDataPoint;
+import org.apache.tsfile.write.schema.MeasurementSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +59,7 @@ public class TsFileWriteToHDFS {
 
       // construct TSRecord
       for (int i = 0; i < 100; i++) {
-        TSRecord tsRecord = new TSRecord(i, Constant.DEVICE_1);
+        TSRecord tsRecord = new TSRecord(Constant.DEVICE_1, i);
         DataPoint dPoint1 = new LongDataPoint(Constant.SENSOR_1, i);
         DataPoint dPoint2 = new LongDataPoint(Constant.SENSOR_2, i);
         DataPoint dPoint3 = new LongDataPoint(Constant.SENSOR_3, i);
@@ -69,7 +68,7 @@ public class TsFileWriteToHDFS {
         tsRecord.addTuple(dPoint3);
 
         // write TSRecord
-        tsFileWriter.write(tsRecord);
+        tsFileWriter.writeRecord(tsRecord);
       }
     } catch (Exception e) {
       LOGGER.error("Failed to write TsFile on HDFS. {}", e.getMessage());

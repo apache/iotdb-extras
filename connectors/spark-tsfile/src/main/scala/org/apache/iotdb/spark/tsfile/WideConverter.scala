@@ -24,19 +24,20 @@ import java.util
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
 import org.apache.iotdb.hadoop.fileSystem.HDFSInput
-import org.apache.iotdb.tsfile.common.constant.QueryConstant
-import org.apache.iotdb.tsfile.file.metadata.TsFileMetadata
-import org.apache.iotdb.tsfile.file.metadata.enums.{TSDataType, TSEncoding}
-import org.apache.iotdb.tsfile.common.conf.TSFileConfig
-import org.apache.iotdb.tsfile.read.TsFileSequenceReader
-import org.apache.iotdb.tsfile.read.common.Path
-import org.apache.iotdb.tsfile.read.expression.impl.{BinaryExpression, GlobalTimeExpression, SingleSeriesExpression}
-import org.apache.iotdb.tsfile.read.expression.{IExpression, QueryExpression}
-import org.apache.iotdb.tsfile.read.filter.factory.{TimeFilterApi, ValueFilterApi}
-import org.apache.iotdb.tsfile.utils.Binary
-import org.apache.iotdb.tsfile.write.record.TSRecord
-import org.apache.iotdb.tsfile.write.record.datapoint.DataPoint
-import org.apache.iotdb.tsfile.write.schema.{IMeasurementSchema, MeasurementSchema, Schema}
+import org.apache.tsfile.common.constant.QueryConstant
+import org.apache.tsfile.file.metadata.TsFileMetadata
+import org.apache.tsfile.enums.TSDataType
+import org.apache.tsfile.file.metadata.enums.TSEncoding
+import org.apache.tsfile.common.conf.TSFileConfig
+import org.apache.tsfile.read.TsFileSequenceReader
+import org.apache.tsfile.read.common.Path
+import org.apache.tsfile.read.expression.impl.{BinaryExpression, GlobalTimeExpression, SingleSeriesExpression}
+import org.apache.tsfile.read.expression.{IExpression, QueryExpression}
+import org.apache.tsfile.read.filter.factory.{TimeFilterApi, ValueFilterApi}
+import org.apache.tsfile.utils.Binary
+import org.apache.tsfile.write.record.TSRecord
+import org.apache.tsfile.write.record.datapoint.DataPoint
+import org.apache.tsfile.write.schema.{IMeasurementSchema, MeasurementSchema, Schema}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
@@ -138,8 +139,8 @@ object WideConverter extends Converter {
       val measurementIds = reader.getAllMeasurements.keySet()
       requiredSchema.foreach(f => {
         if (!QueryConstant.RESERVED_TIME.equals(f.name)) {
-          val path = new org.apache.iotdb.tsfile.read.common.Path(f.name, true)
-          if (devices.contains(path.getDevice) && measurementIds.contains(path.getMeasurement)) {
+          val path = new org.apache.tsfile.read.common.Path(f.name, true)
+          if (devices.contains(path.getDeviceString) && measurementIds.contains(path.getMeasurement)) {
             queriedSchema = queriedSchema.add(f)
           }
         }
@@ -160,10 +161,10 @@ object WideConverter extends Converter {
     */
   def toQueryExpression(schema: StructType, filters: Seq[Filter]): QueryExpression = {
     //get paths from schema
-    val paths = new util.ArrayList[org.apache.iotdb.tsfile.read.common.Path]
+    val paths = new util.ArrayList[org.apache.tsfile.read.common.Path]
     schema.foreach(f => {
       if (!QueryConstant.RESERVED_TIME.equals(f.name)) { // the time field is excluded
-        paths.add(new org.apache.iotdb.tsfile.read.common.Path(f.name, true))
+        paths.add(new org.apache.tsfile.read.common.Path(f.name, true))
       }
     })
 
@@ -308,27 +309,27 @@ object WideConverter extends Converter {
           dataType match {
             case BooleanType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.eq(nodeValue.asInstanceOf[java.lang.Boolean]))
+                ValueFilterApi.eq(index, nodeValue.asInstanceOf[java.lang.Boolean], TSDataType.BOOLEAN))
               filter
             case IntegerType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.eq(nodeValue.asInstanceOf[java.lang.Integer]))
+                ValueFilterApi.eq(index, nodeValue.asInstanceOf[java.lang.Integer], TSDataType.INT32))
               filter
             case LongType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.eq(nodeValue.asInstanceOf[java.lang.Long]))
+                ValueFilterApi.eq(index, nodeValue.asInstanceOf[java.lang.Long], TSDataType.INT64))
               filter
             case FloatType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.eq(nodeValue.asInstanceOf[java.lang.Float]))
+                ValueFilterApi.eq(index, nodeValue.asInstanceOf[java.lang.Float], TSDataType.FLOAT))
               filter
             case DoubleType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.eq(nodeValue.asInstanceOf[java.lang.Double]))
+                ValueFilterApi.eq(index, nodeValue.asInstanceOf[java.lang.Double], TSDataType.DOUBLE))
               filter
             case StringType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.eq(new Binary(nodeValue.toString, TSFileConfig.STRING_CHARSET)))
+                ValueFilterApi.eq(index, new Binary(nodeValue.toString, TSFileConfig.STRING_CHARSET), TSDataType.TEXT))
               filter
             case other => throw new UnsupportedOperationException(s"Unsupported type $other")
           }
@@ -336,19 +337,19 @@ object WideConverter extends Converter {
           dataType match {
             case IntegerType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gt(nodeValue.asInstanceOf[java.lang.Integer]))
+                ValueFilterApi.gt(index, nodeValue.asInstanceOf[java.lang.Integer], TSDataType.INT32))
               filter
             case LongType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gt(nodeValue.asInstanceOf[java.lang.Long]))
+                ValueFilterApi.gt(index, nodeValue.asInstanceOf[java.lang.Long], TSDataType.INT64))
               filter
             case FloatType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gt(nodeValue.asInstanceOf[java.lang.Float]))
+                ValueFilterApi.gt(index, nodeValue.asInstanceOf[java.lang.Float], TSDataType.FLOAT))
               filter
             case DoubleType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gt(nodeValue.asInstanceOf[java.lang.Double]))
+                ValueFilterApi.gt(index, nodeValue.asInstanceOf[java.lang.Double], TSDataType.DOUBLE))
               filter
             case other => throw new UnsupportedOperationException(s"Unsupported type $other")
           }
@@ -356,19 +357,19 @@ object WideConverter extends Converter {
           dataType match {
             case IntegerType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gtEq(nodeValue.asInstanceOf[java.lang.Integer]))
+                ValueFilterApi.gtEq(index, nodeValue.asInstanceOf[java.lang.Integer], TSDataType.INT32))
               filter
             case LongType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gtEq(nodeValue.asInstanceOf[java.lang.Long]))
+                ValueFilterApi.gtEq(index, nodeValue.asInstanceOf[java.lang.Long], TSDataType.INT64))
               filter
             case FloatType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gtEq(nodeValue.asInstanceOf[java.lang.Float]))
+                ValueFilterApi.gtEq(index, nodeValue.asInstanceOf[java.lang.Float], TSDataType.FLOAT))
               filter
             case DoubleType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.gtEq(nodeValue.asInstanceOf[java.lang.Double]))
+                ValueFilterApi.gtEq(index, nodeValue.asInstanceOf[java.lang.Double], TSDataType.DOUBLE))
               filter
             case other => throw new UnsupportedOperationException(s"Unsupported type $other")
           }
@@ -376,19 +377,19 @@ object WideConverter extends Converter {
           dataType match {
             case IntegerType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.lt(nodeValue.asInstanceOf[java.lang.Integer]))
+                ValueFilterApi.lt(index, nodeValue.asInstanceOf[java.lang.Integer], TSDataType.INT32))
               filter
             case LongType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.lt(nodeValue.asInstanceOf[java.lang.Long]))
+                ValueFilterApi.lt(index, nodeValue.asInstanceOf[java.lang.Long], TSDataType.INT64))
               filter
             case FloatType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.lt(nodeValue.asInstanceOf[java.lang.Float]))
+                ValueFilterApi.lt(index, nodeValue.asInstanceOf[java.lang.Float], TSDataType.FLOAT))
               filter
             case DoubleType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.lt(nodeValue.asInstanceOf[java.lang.Double]))
+                ValueFilterApi.lt(index, nodeValue.asInstanceOf[java.lang.Double], TSDataType.DOUBLE))
               filter
             case other => throw new UnsupportedOperationException(s"Unsupported type $other")
           }
@@ -396,19 +397,19 @@ object WideConverter extends Converter {
           dataType match {
             case IntegerType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.ltEq(nodeValue.asInstanceOf[java.lang.Integer]))
+                ValueFilterApi.ltEq(index, nodeValue.asInstanceOf[java.lang.Integer], TSDataType.INT32))
               filter
             case LongType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.ltEq(nodeValue.asInstanceOf[java.lang.Long]))
+                ValueFilterApi.ltEq(index, nodeValue.asInstanceOf[java.lang.Long], TSDataType.INT64))
               filter
             case FloatType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.ltEq(nodeValue.asInstanceOf[java.lang.Float]))
+                ValueFilterApi.ltEq(index, nodeValue.asInstanceOf[java.lang.Float], TSDataType.FLOAT))
               filter
             case DoubleType =>
               val filter = new SingleSeriesExpression(new Path(nodeName, true),
-                ValueFilterApi.ltEq(nodeValue.asInstanceOf[java.lang.Double]))
+                ValueFilterApi.ltEq(index, nodeValue.asInstanceOf[java.lang.Double], TSDataType.DOUBLE))
               filter
             case other => throw new UnsupportedOperationException(s"Unsupported type $other")
           }
@@ -474,13 +475,13 @@ object WideConverter extends Converter {
     }).foreach(f => {
       val name = f.name
       val fullPath = new Path(name, true)
-      val device = fullPath.getDevice
+      val device = fullPath.getDeviceString
       val measurement = fullPath.getMeasurement
 
       if (!deviceToRecord.contains(device)) {
-        deviceToRecord.put(device, new TSRecord(time, device))
+        deviceToRecord.put(device, new TSRecord(device, time))
       }
-      val tsRecord: TSRecord = deviceToRecord.getOrElse(device, new TSRecord(time, device))
+      val tsRecord: TSRecord = deviceToRecord.getOrElse(device, new TSRecord(device, time))
 
       val dataType = getTsDataType(f.dataType)
       if (!row.isNullAt(index)) {
