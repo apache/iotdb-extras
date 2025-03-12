@@ -20,7 +20,7 @@
 package org.apache.iotdb.spark.table.db.read
 
 import org.apache.spark.sql.connector.expressions.Expressions
-import org.apache.spark.sql.connector.expressions.filter.Predicate
+import org.apache.spark.sql.connector.expressions.filter.{AlwaysFalse, AlwaysTrue, And, Not, Or, Predicate}
 import org.apache.spark.sql.sources.EqualTo
 import org.junit.Assert
 import org.scalatest.FunSuite
@@ -65,5 +65,12 @@ class PushDownPredicateSQLBuilderTest extends FunSuite {
     Assert.assertEquals("(\"s1\" > 1)", builder.build(new Predicate(">", Array(Expressions.column("s1"), Expressions.literal(1)))))
     Assert.assertEquals("(\"s1\" >= 1)", builder.build(new Predicate(">=", Array(Expressions.column("s1"), Expressions.literal(1)))))
     Assert.assertThrows(classOf[UnsupportedOperationException], () => builder.build(new Predicate("<=>", Array(Expressions.column("s1"), Expressions.literal(1)))))
+
+    Assert.assertEquals("((\"time\" = 1) AND (\"s1\" = 1))", builder.build(new And(new Predicate("=", Array(Expressions.column("time"), Expressions.literal(1L))), new Predicate("=", Array(Expressions.column("s1"), Expressions.literal(1))))))
+    Assert.assertEquals("((\"time\" = 1) OR (\"s1\" = 1))", builder.build(new Or(new Predicate("=", Array(Expressions.column("time"), Expressions.literal(1L))), new Predicate("=", Array(Expressions.column("s1"), Expressions.literal(1))))))
+    Assert.assertEquals("(NOT (\"s1\" = 1))", builder.build(new Not(new Predicate("=", Array(Expressions.column("s1"), Expressions.literal(1))))))
+    Assert.assertEquals("(true)", builder.build(new AlwaysTrue))
+    Assert.assertEquals("(false)", builder.build(new AlwaysFalse))
   }
+
 }
