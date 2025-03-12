@@ -19,6 +19,13 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 
+import org.apache.iotdb.common.rpc.thrift.TConfigNodeLocation;
+import org.apache.iotdb.common.rpc.thrift.TEndPoint;
+import org.apache.iotdb.rpc.UrlUtils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -28,13 +35,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
-
-import org.apache.iotdb.common.rpc.thrift.TConfigNodeLocation;
-import org.apache.iotdb.common.rpc.thrift.TEndPoint;
-
-import org.apache.iotdb.rpc.UrlUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class NodeUrlUtils {
 

@@ -19,19 +19,20 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.compressor.PipeCompressor;
+import org.apache.iotdb.collector.plugin.builtin.sink.compressor.PipeCompressorFactory;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
+import org.apache.tsfile.utils.BytesUtils;
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.compressor.PipeCompressor;
-import org.apache.iotdb.collector.plugin.builtin.sink.compressor.PipeCompressorFactory;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
-import org.apache.tsfile.utils.BytesUtils;
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 public class PipeTransferCompressedReq extends TPipeTransferReq {
 

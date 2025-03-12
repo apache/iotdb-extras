@@ -19,14 +19,16 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.response;
 
+import org.apache.iotdb.common.rpc.thrift.TSStatus;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferResp;
+
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
-import org.apache.iotdb.common.rpc.thrift.TSStatus;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferResp;
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 public class PipeTransferFilePieceResp extends TPipeTransferResp {
 

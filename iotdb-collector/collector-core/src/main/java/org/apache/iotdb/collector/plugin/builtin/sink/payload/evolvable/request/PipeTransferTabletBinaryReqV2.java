@@ -19,15 +19,16 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
+
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 public class PipeTransferTabletBinaryReqV2 extends PipeTransferTabletBinaryReq {
 

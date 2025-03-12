@@ -19,10 +19,11 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.property;
 
-import java.util.concurrent.TimeUnit;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
+
+import java.util.concurrent.TimeUnit;
 
 /** This class defines the configurations commonly used by the Thrift Client. */
 public class ThriftClientProperty {

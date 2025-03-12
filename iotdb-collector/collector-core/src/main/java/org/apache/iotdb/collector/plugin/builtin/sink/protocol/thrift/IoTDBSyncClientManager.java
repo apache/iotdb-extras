@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.client;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
 
 import org.apache.iotdb.collector.config.PipeOptions;
 import org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeTransferHandshakeConstant;
@@ -28,6 +28,7 @@ import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.pipe.api.exception.PipeConnectionException;
 import org.apache.iotdb.rpc.TSStatusCode;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferResp;
+
 import org.apache.tsfile.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

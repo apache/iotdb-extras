@@ -19,10 +19,11 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.utils.sorter;
 
-import java.util.Arrays;
-import java.util.Comparator;
 import org.apache.tsfile.write.record.Tablet;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
+
+import java.util.Arrays;
+import java.util.Comparator;
 
 public class PipeTreeModelTabletEventSorter {
 

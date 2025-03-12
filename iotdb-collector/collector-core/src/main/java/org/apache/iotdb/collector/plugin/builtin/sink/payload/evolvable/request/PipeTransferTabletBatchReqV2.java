@@ -19,19 +19,19 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.TestOnly;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 public class PipeTransferTabletBatchReqV2 extends TPipeTransferReq {
 
@@ -43,87 +43,6 @@ public class PipeTransferTabletBatchReqV2 extends TPipeTransferReq {
   private PipeTransferTabletBatchReqV2() {
     // Empty constructor
   }
-
-  // public List<InsertBaseStatement> constructStatements() {
-  //   final List<InsertBaseStatement> statements = new ArrayList<>();
-  //
-  //   final InsertRowsStatement insertRowsStatement = new InsertRowsStatement();
-  //   final InsertMultiTabletsStatement insertMultiTabletsStatement =
-  //       new InsertMultiTabletsStatement();
-  //
-  //   final List<InsertRowStatement> insertRowStatementList = new ArrayList<>();
-  //   final List<InsertTabletStatement> insertTabletStatementList = new ArrayList<>();
-  //
-  //   for (final PipeTransferTabletBinaryReqV2 binaryReq : binaryReqs) {
-  //     final InsertBaseStatement statement = binaryReq.constructStatement();
-  //     if (statement.isEmpty()) {
-  //       continue;
-  //     }
-  //     if (statement.isWriteToTable()) {
-  //       statements.add(statement);
-  //       continue;
-  //     }
-  //     if (statement instanceof InsertRowStatement) {
-  //       insertRowStatementList.add((InsertRowStatement) statement);
-  //     } else if (statement instanceof InsertTabletStatement) {
-  //       insertTabletStatementList.add((InsertTabletStatement) statement);
-  //     } else if (statement instanceof InsertRowsStatement) {
-  //       insertRowStatementList.addAll(
-  //           ((InsertRowsStatement) statement).getInsertRowStatementList());
-  //     } else {
-  //       throw new UnsupportedOperationException(
-  //           String.format(
-  //               "unknown InsertBaseStatement %s constructed from PipeTransferTabletBinaryReqV2.",
-  //               binaryReq));
-  //     }
-  //   }
-  //
-  //   for (final PipeTransferTabletInsertNodeReqV2 insertNodeReq : insertNodeReqs) {
-  //     final InsertBaseStatement statement = insertNodeReq.constructStatement();
-  //     if (statement.isEmpty()) {
-  //       continue;
-  //     }
-  //     if (statement.isWriteToTable()) {
-  //       statements.add(statement);
-  //       continue;
-  //     }
-  //     if (statement instanceof InsertRowStatement) {
-  //       insertRowStatementList.add((InsertRowStatement) statement);
-  //     } else if (statement instanceof InsertTabletStatement) {
-  //       insertTabletStatementList.add((InsertTabletStatement) statement);
-  //     } else if (statement instanceof InsertRowsStatement) {
-  //       insertRowStatementList.addAll(
-  //           ((InsertRowsStatement) statement).getInsertRowStatementList());
-  //     } else {
-  //       throw new UnsupportedOperationException(
-  //           String.format(
-  //               "Unknown InsertBaseStatement %s constructed from PipeTransferTabletInsertNodeReqV2.",
-  //               statement));
-  //     }
-  //   }
-  //
-  //   for (final PipeTransferTabletRawReqV2 tabletReq : tabletReqs) {
-  //     final InsertTabletStatement statement = tabletReq.constructStatement();
-  //     if (statement.isEmpty()) {
-  //       continue;
-  //     }
-  //     if (statement.isWriteToTable()) {
-  //       statements.add(statement);
-  //       continue;
-  //     }
-  //     insertTabletStatementList.add(statement);
-  //   }
-  //
-  //   insertRowsStatement.setInsertRowStatementList(insertRowStatementList);
-  //   insertMultiTabletsStatement.setInsertTabletStatementList(insertTabletStatementList);
-  //   if (!insertRowsStatement.isEmpty()) {
-  //     statements.add(insertRowsStatement);
-  //   }
-  //   if (!insertMultiTabletsStatement.isEmpty()) {
-  //     statements.add(insertMultiTabletsStatement);
-  //   }
-  //   return statements;
-  // }
 
   /////////////////////////////// Thrift ///////////////////////////////
 
@@ -208,23 +127,6 @@ public class PipeTransferTabletBatchReqV2 extends TPipeTransferReq {
   //   return batchReq;
   // }
 
-  /////////////////////////////// TestOnly ///////////////////////////////
-
-  @TestOnly
-  public List<PipeTransferTabletBinaryReqV2> getBinaryReqs() {
-    return binaryReqs;
-  }
-
-  @TestOnly
-  public List<PipeTransferTabletInsertNodeReqV2> getInsertNodeReqs() {
-    return insertNodeReqs;
-  }
-
-  @TestOnly
-  public List<PipeTransferTabletRawReqV2> getTabletReqs() {
-    return tabletReqs;
-  }
-
   /////////////////////////////// Object ///////////////////////////////
 
   @Override
@@ -237,7 +139,6 @@ public class PipeTransferTabletBatchReqV2 extends TPipeTransferReq {
     }
     final PipeTransferTabletBatchReqV2 that = (PipeTransferTabletBatchReqV2) obj;
     return Objects.equals(binaryReqs, that.binaryReqs)
-        && Objects.equals(insertNodeReqs, that.insertNodeReqs)
         && Objects.equals(tabletReqs, that.tabletReqs)
         && version == that.version
         && type == that.type
@@ -246,6 +147,6 @@ public class PipeTransferTabletBatchReqV2 extends TPipeTransferReq {
 
   @Override
   public int hashCode() {
-    return Objects.hash(binaryReqs, insertNodeReqs, tabletReqs, version, type, body);
+    return Objects.hash(binaryReqs, tabletReqs, version, type, body);
   }
 }

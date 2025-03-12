@@ -19,9 +19,10 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.property;
 
+import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
+
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 
 public class ClientPoolProperty<V> {
 

@@ -18,7 +18,10 @@
  */
 package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 
-import static org.apache.iotdb.rpc.TSStatusCode.NUMERIC_VALUE_OUT_OF_RANGE;
+import org.apache.iotdb.collector.config.PipeOptions;
+
+import org.apache.tsfile.utils.DateUtils;
+import org.apache.tsfile.utils.TimeDuration;
 
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -37,9 +40,6 @@ import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import org.apache.iotdb.collector.config.PipeOptions;
-import org.apache.tsfile.utils.DateUtils;
-import org.apache.tsfile.utils.TimeDuration;
 
 public class DateTimeUtils {
 
@@ -64,12 +64,10 @@ public class DateTimeUtils {
           return millis;
       }
     } catch (ArithmeticException e) {
-      throw new IoTDBRuntimeException(
+      throw new RuntimeException(
           String.format(
               "Timestamp overflow, Millisecond: %s , Timestamp precision: %s",
-              millis, TIMESTAMP_PRECISION),
-          NUMERIC_VALUE_OUT_OF_RANGE.getStatusCode(),
-          true);
+              millis, TIMESTAMP_PRECISION));
     }
   }
 
@@ -629,12 +627,6 @@ public class DateTimeUtils {
       }
     }
     return total;
-  }
-
-  @TestOnly
-  public static long convertDurationStrToLongForTest(
-      long value, String unit, String timestampPrecision) {
-    return convertDurationStrToLong(-1, value, unit, timestampPrecision);
   }
 
   /** convert duration string to millisecond, microsecond or nanosecond. */

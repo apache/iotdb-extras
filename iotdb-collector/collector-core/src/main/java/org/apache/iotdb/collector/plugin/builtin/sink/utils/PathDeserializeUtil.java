@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 import org.apache.iotdb.collector.plugin.builtin.sink.path.AlignedPath;
 import org.apache.iotdb.collector.plugin.builtin.sink.path.MeasurementPath;
 import org.apache.iotdb.collector.plugin.builtin.sink.path.PartialPath;
+
 import org.apache.tsfile.read.common.Path;
 
 import java.nio.ByteBuffer;

@@ -17,16 +17,13 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.sync;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
 
 import org.apache.iotdb.collector.config.PipeOptions;
-import org.apache.iotdb.collector.plugin.builtin.annotation.TableModel;
-import org.apache.iotdb.collector.plugin.builtin.annotation.TreeModel;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.client.IoTDBDataNodeSyncClientManager;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.client.IoTDBSyncClientManager;
 import org.apache.iotdb.collector.plugin.builtin.sink.utils.NodeUrlUtils;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +33,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@TreeModel
-@TableModel
 public abstract class IoTDBDataNodeSyncConnector extends IoTDBSslSyncConnector {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IoTDBDataNodeSyncConnector.class);
@@ -91,7 +86,9 @@ public abstract class IoTDBDataNodeSyncConnector extends IoTDBSslSyncConnector {
         new IoTDBDataNodeSyncClientManager(
             nodeUrls,
             useSSL,
-            Objects.nonNull(trustStorePath) ? /*IoTDBConfig.addDataHomeDir(trustStorePath)*/ "" : null,
+            Objects.nonNull(trustStorePath)
+                ? /*IoTDBConfig.addDataHomeDir(trustStorePath)*/ ""
+                : null,
             trustStorePwd,
             useLeaderCache,
             loadBalanceStrategy,

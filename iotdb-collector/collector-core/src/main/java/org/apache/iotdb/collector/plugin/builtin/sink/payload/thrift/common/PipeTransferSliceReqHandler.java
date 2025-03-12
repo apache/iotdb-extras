@@ -19,16 +19,17 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.common;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferSliceReq;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferSliceReq;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PipeTransferSliceReqHandler {
 

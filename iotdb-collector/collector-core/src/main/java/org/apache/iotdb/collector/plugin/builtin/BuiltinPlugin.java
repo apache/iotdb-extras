@@ -20,7 +20,7 @@
 package org.apache.iotdb.collector.plugin.builtin;
 
 import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
-import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
+import org.apache.iotdb.collector.plugin.builtin.sink.protocol.demo.DemoSink;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
 

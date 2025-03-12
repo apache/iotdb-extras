@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol.demo;
 
 import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeConnectorRuntimeConfiguration;

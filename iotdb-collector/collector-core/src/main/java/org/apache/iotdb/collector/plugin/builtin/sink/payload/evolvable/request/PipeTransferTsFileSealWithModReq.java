@@ -19,14 +19,14 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferFileSealReqV2;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferFileSealReqV2;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
 
 public class PipeTransferTsFileSealWithModReq extends PipeTransferFileSealReqV2 {
 

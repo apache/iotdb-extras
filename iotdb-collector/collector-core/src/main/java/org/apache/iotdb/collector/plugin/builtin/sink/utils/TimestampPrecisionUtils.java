@@ -18,9 +18,9 @@
  */
 package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 
-import java.util.concurrent.TimeUnit;
-
 import org.apache.iotdb.collector.config.PipeOptions;
+
+import java.util.concurrent.TimeUnit;
 
 public class TimestampPrecisionUtils {
   public static String TIMESTAMP_PRECISION = PipeOptions.TIMESTAMP_PRECISION.value();
@@ -47,7 +47,7 @@ public class TimestampPrecisionUtils {
         convertToCurrPrecisionFunction = TimeUnit.NANOSECONDS::convert;
         currPrecision = TimeUnit.NANOSECONDS;
         break;
-      // this case will never reach
+        // this case will never reach
       default:
         throw new UnsupportedOperationException(
             "not supported time_precision: " + TIMESTAMP_PRECISION);
@@ -89,7 +89,7 @@ public class TimestampPrecisionUtils {
                   TIMESTAMP_PRECISION, time));
         }
         break;
-      // Long.MaxValue is 19 digits, therefore no problem when the precision is ns.
+        // Long.MaxValue is 19 digits, therefore no problem when the precision is ns.
       case "ns":
       default:
         break;

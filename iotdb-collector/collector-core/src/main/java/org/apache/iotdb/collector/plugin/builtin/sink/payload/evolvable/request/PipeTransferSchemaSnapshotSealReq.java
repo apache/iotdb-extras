@@ -19,6 +19,12 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.constant.ColumnHeaderConstant;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferFileSealReqV2;
+import org.apache.iotdb.collector.plugin.builtin.sink.protocol.session.IClientSession;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,12 +32,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
-import org.apache.iotdb.collector.plugin.builtin.sink.constant.ColumnHeaderConstant;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferFileSealReqV2;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.session.IClientSession;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
 
 public class PipeTransferSchemaSnapshotSealReq extends PipeTransferFileSealReqV2 {
 

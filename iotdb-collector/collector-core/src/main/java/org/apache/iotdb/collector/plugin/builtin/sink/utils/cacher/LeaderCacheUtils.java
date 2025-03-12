@@ -19,12 +19,14 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.utils.cacher;
 
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.rpc.TSStatusCode;
+
 import org.apache.tsfile.utils.Pair;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class LeaderCacheUtils {
 

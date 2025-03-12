@@ -17,17 +17,11 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.sync;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.iotdb.collector.config.PipeOptions;
-import org.apache.iotdb.collector.plugin.builtin.annotation.TableModel;
-import org.apache.iotdb.collector.plugin.builtin.annotation.TreeModel;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferFilePieceReq;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.response.PipeTransferFilePieceResp;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.airgap.IoTDBConnector;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.client.IoTDBSyncClient;
-import org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.client.IoTDBSyncClientManager;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeConnectorRuntimeConfiguration;
@@ -37,6 +31,8 @@ import org.apache.iotdb.pipe.api.exception.PipeConnectionException;
 import org.apache.iotdb.pipe.api.exception.PipeException;
 import org.apache.iotdb.rpc.TSStatusCode;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
+import com.google.common.collect.ImmutableList;
 import org.apache.tsfile.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +53,6 @@ import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnec
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.SINK_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.SINK_LEADER_CACHE_ENABLE_KEY;
 
-@TreeModel
-@TableModel
 public abstract class IoTDBSslSyncConnector extends IoTDBConnector {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IoTDBSslSyncConnector.class);
@@ -75,7 +69,7 @@ public abstract class IoTDBSslSyncConnector extends IoTDBConnector {
         parameters
             .getStringOrDefault(
                 ImmutableList.of(CONNECTOR_KEY, SINK_KEY), ""
-                /*IOTDB_THRIFT_CONNECTOR.getPipePluginName()*/)
+                /*IOTDB_THRIFT_CONNECTOR.getPipePluginName()*/ )
             .toLowerCase();
 
     validator.validate(
@@ -85,7 +79,7 @@ public abstract class IoTDBSslSyncConnector extends IoTDBConnector {
             SINK_IOTDB_SSL_TRUST_STORE_PATH_KEY, SINK_IOTDB_SSL_TRUST_STORE_PWD_KEY),
         // IOTDB_THRIFT_SSL_CONNECTOR.getPipePluginName().equals(userSpecifiedConnectorName)
         //     || IOTDB_THRIFT_SSL_SINK.getPipePluginName().equals(userSpecifiedConnectorName)
-            /*|| */parameters.getBooleanOrDefault(SINK_IOTDB_SSL_ENABLE_KEY, false),
+        /*|| */ parameters.getBooleanOrDefault(SINK_IOTDB_SSL_ENABLE_KEY, false),
         parameters.hasAttribute(SINK_IOTDB_SSL_TRUST_STORE_PATH_KEY),
         parameters.hasAttribute(SINK_IOTDB_SSL_TRUST_STORE_PWD_KEY));
   }
@@ -193,13 +187,7 @@ public abstract class IoTDBSslSyncConnector extends IoTDBConnector {
                   isMultiFile
                       ? getTransferMultiFilePieceReq(file.getName(), position, payLoad)
                       : getTransferSingleFilePieceReq(file.getName(), position, payLoad));
-          pipe2WeightMap.forEach(
-              (namePair, weight) ->
-                  rateLimitIfNeeded(
-                      namePair.getLeft(),
-                      namePair.getRight(),
-                      clientAndStatus.getLeft().getEndPoint(),
-                      (long) (req.getBody().length * weight)));
+
           resp =
               PipeTransferFilePieceResp.fromTPipeTransferResp(
                   clientAndStatus.getLeft().pipeTransfer(req));

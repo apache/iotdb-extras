@@ -19,7 +19,15 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
+import org.apache.iotdb.common.rpc.thrift.TEndPoint;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+import org.apache.iotdb.pipe.api.event.Event;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 
+import org.apache.tsfile.utils.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,22 +37,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.event.tablet.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.common.rpc.thrift.TEndPoint;
-// import org.apache.iotdb.db.pipe.connector.client.IoTDBDataNodeCacheLeaderClientManager;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
-import org.apache.iotdb.pipe.api.event.Event;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
-import org.apache.tsfile.exception.write.WriteProcessException;
-import org.apache.tsfile.utils.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_FORMAT_HYBRID_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_FORMAT_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_FORMAT_TS_FILE_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_BATCH_DELAY_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_BATCH_SIZE_KEY;
+import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_PLAIN_BATCH_DELAY_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_PLAIN_BATCH_SIZE_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_TS_FILE_BATCH_DELAY_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_TS_FILE_BATCH_SIZE_DEFAULT_VALUE;
@@ -54,7 +52,6 @@ import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnec
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.SINK_IOTDB_BATCH_DELAY_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.SINK_IOTDB_BATCH_SIZE_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.SINK_LEADER_CACHE_ENABLE_KEY;
-import static org.apache.iotdb.collector.plugin.builtin.sink.constant.PipeConnectorConstant.CONNECTOR_IOTDB_PLAIN_BATCH_DELAY_DEFAULT_VALUE;
 
 public class PipeTransferBatchReqBuilder implements AutoCloseable {
 
@@ -126,8 +123,7 @@ public class PipeTransferBatchReqBuilder implements AutoCloseable {
    *     endpoint to transfer to (might be null), the second element is the batch to be transferred.
    */
   public synchronized Pair<TEndPoint, PipeTabletEventBatch> onEvent(
-      final TabletInsertionEvent event)
-      throws IOException, WALPipeException, WriteProcessException {
+      final TabletInsertionEvent event) throws IOException {
     if (!(event instanceof PipeRawTabletInsertionEvent)) {
       LOGGER.warn(
           "Unsupported event {} type {} when building transfer request", event, event.getClass());
@@ -142,16 +138,13 @@ public class PipeTransferBatchReqBuilder implements AutoCloseable {
     if (event instanceof PipeRawTabletInsertionEvent) {
       deviceId = ((PipeRawTabletInsertionEvent) event).getDeviceId();
     }
-    // else if (event instanceof PipeInsertNodeTabletInsertionEvent) {
-    //   deviceId = ((PipeInsertNodeTabletInsertionEvent) event).getDeviceId();
-    // }
 
     if (Objects.isNull(deviceId)) {
       return defaultBatch.onEvent(event) ? new Pair<>(null, defaultBatch) : null;
     }
 
     final TEndPoint endPoint = null;
-        // IoTDBDataNodeCacheLeaderClientManager.LEADER_CACHE_MANAGER.getLeaderEndPoint(deviceId);
+    // IoTDBDataNodeCacheLeaderClientManager.LEADER_CACHE_MANAGER.getLeaderEndPoint(deviceId);
     if (Objects.isNull(endPoint)) {
       return defaultBatch.onEvent(event) ? new Pair<>(null, defaultBatch) : null;
     }
@@ -181,11 +174,6 @@ public class PipeTransferBatchReqBuilder implements AutoCloseable {
   public boolean isEmpty() {
     return defaultBatch.isEmpty()
         && endPointToBatch.values().stream().allMatch(PipeTabletEventPlainBatch::isEmpty);
-  }
-
-  public synchronized void discardEventsOfPipe(final String pipeNameToDrop, final int regionId) {
-    defaultBatch.discardEventsOfPipe(pipeNameToDrop, regionId);
-    endPointToBatch.values().forEach(batch -> batch.discardEventsOfPipe(pipeNameToDrop, regionId));
   }
 
   @Override

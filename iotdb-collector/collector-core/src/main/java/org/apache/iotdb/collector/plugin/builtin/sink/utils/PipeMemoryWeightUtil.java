@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 
 import org.apache.iotdb.collector.config.PipeOptions;
 import org.apache.iotdb.collector.plugin.builtin.sink.event.row.PipeRow;
+
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.AbstractAlignedChunkMetadata;
 import org.apache.tsfile.file.metadata.ChunkMetadata;

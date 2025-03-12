@@ -19,6 +19,18 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.utils.builder;
 
+import org.apache.iotdb.pipe.api.exception.PipeException;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.tsfile.exception.write.WriteProcessException;
+import org.apache.tsfile.file.metadata.IDeviceID;
+import org.apache.tsfile.file.metadata.TableSchema;
+import org.apache.tsfile.utils.Pair;
+import org.apache.tsfile.utils.WriteUtils;
+import org.apache.tsfile.write.record.Tablet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -31,16 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.io.FileUtils;
-import org.apache.iotdb.pipe.api.exception.PipeException;
-import org.apache.tsfile.exception.write.WriteProcessException;
-import org.apache.tsfile.file.metadata.IDeviceID;
-import org.apache.tsfile.file.metadata.TableSchema;
-import org.apache.tsfile.utils.Pair;
-import org.apache.tsfile.utils.WriteUtils;
-import org.apache.tsfile.write.record.Tablet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PipeTableModeTsFileBuilder extends PipeTsFileBuilder {
 

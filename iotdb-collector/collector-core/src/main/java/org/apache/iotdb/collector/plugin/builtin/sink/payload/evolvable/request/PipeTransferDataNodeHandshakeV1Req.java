@@ -19,11 +19,11 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request;
 
-import java.io.IOException;
-
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeTransferHandshakeV1Req;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
+import java.io.IOException;
 
 public class PipeTransferDataNodeHandshakeV1Req extends PipeTransferHandshakeV1Req {
 

@@ -19,16 +19,17 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.property;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.ConnectException;
-import java.net.SocketException;
-import java.util.Optional;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.util.Optional;
 
 /**
  * This class defines the failed interfaces that thrift client needs to support so that the Thrift

@@ -64,14 +64,12 @@ public class PipeConsensusClientProperty {
     private int maxClientNumForEachNode =
         ClientPoolProperty.DefaultProperty.MAX_CLIENT_NUM_FOR_EACH_NODE;
 
-    public Builder setIsRpcThriftCompressionEnabled(
-        boolean isRpcThriftCompressionEnabled) {
+    public Builder setIsRpcThriftCompressionEnabled(boolean isRpcThriftCompressionEnabled) {
       this.isRpcThriftCompressionEnabled = isRpcThriftCompressionEnabled;
       return this;
     }
 
-    public Builder setSelectorNumOfClientManager(
-        int selectorNumOfClientManager) {
+    public Builder setSelectorNumOfClientManager(int selectorNumOfClientManager) {
       this.selectorNumOfClientManager = selectorNumOfClientManager;
       return this;
     }
@@ -82,8 +80,7 @@ public class PipeConsensusClientProperty {
       return this;
     }
 
-    public Builder setMaxClientNumForEachNode(
-        int maxClientNumForEachNode) {
+    public Builder setMaxClientNumForEachNode(int maxClientNumForEachNode) {
       this.maxClientNumForEachNode = maxClientNumForEachNode;
       return this;
     }

@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 import org.apache.iotdb.collector.plugin.builtin.sink.constant.IoTDBConstant;
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.rpc.TSStatusCode;
+
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.utils.Binary;

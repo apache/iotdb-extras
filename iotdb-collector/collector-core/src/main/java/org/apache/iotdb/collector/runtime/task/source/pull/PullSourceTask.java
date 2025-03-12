@@ -64,8 +64,11 @@ public class PullSourceTask extends SourceTask {
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
         new ThreadPoolExecutor(
-                parallelism,parallelism,0L,TimeUnit.SECONDS,new LinkedBlockingQueue<>(parallelism)
-        ));
+            parallelism,
+            parallelism,
+            0L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(parallelism)));
 
     final long creationTime = System.currentTimeMillis();
     consumers = new PullSourceConsumer[parallelism];

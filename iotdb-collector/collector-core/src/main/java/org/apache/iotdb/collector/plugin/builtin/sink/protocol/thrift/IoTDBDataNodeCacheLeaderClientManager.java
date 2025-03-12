@@ -17,13 +17,14 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift.client;
+package org.apache.iotdb.collector.plugin.builtin.sink.protocol.thrift;
+
+import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Weigher;
 import com.google.common.util.concurrent.AtomicDouble;
-import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

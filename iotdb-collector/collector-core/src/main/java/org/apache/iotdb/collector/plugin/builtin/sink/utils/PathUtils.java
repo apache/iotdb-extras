@@ -19,6 +19,7 @@
 package org.apache.iotdb.collector.plugin.builtin.sink.utils;
 
 import org.apache.iotdb.collector.plugin.builtin.sink.constant.IoTDBConstant;
+
 import org.apache.tsfile.common.constant.TsFileConstant;
 import org.apache.tsfile.exception.PathParseException;
 import org.apache.tsfile.file.metadata.IDeviceID;

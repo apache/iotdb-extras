@@ -19,6 +19,13 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.request;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
+import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
+import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
+
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,17 +33,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.IoTDBConnectorRequestVersion;
-import org.apache.iotdb.collector.plugin.builtin.sink.payload.thrift.request.PipeRequestType;
-import org.apache.iotdb.collector.plugin.builtin.sink.utils.TestOnly;
-import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
-
 public class PipeTransferTabletBatchReq extends TPipeTransferReq {
 
   private final transient List<PipeTransferTabletBinaryReq> binaryReqs = new ArrayList<>();
-  // private final transient List<PipeTransferTabletInsertNodeReq> insertNodeReqs = new ArrayList<>();
+  // private final transient List<PipeTransferTabletInsertNodeReq> insertNodeReqs = new
+  // ArrayList<>();
   private final transient List<PipeTransferTabletRawReq> tabletReqs = new ArrayList<>();
 
   private PipeTransferTabletBatchReq() {
@@ -86,7 +87,8 @@ public class PipeTransferTabletBatchReq extends TPipeTransferReq {
   //     } else {
   //       throw new UnsupportedOperationException(
   //           String.format(
-  //               "Unknown InsertBaseStatement %s constructed from PipeTransferTabletInsertNodeReq.",
+  //               "Unknown InsertBaseStatement %s constructed from
+  // PipeTransferTabletInsertNodeReq.",
   //               statement));
   //     }
   //   }
@@ -167,7 +169,8 @@ public class PipeTransferTabletBatchReq extends TPipeTransferReq {
   //   for (int i = 0; i < size; ++i) {
   //     batchReq.tabletReqs.add(
   //         PipeTransferTabletRawReq.toTPipeTransferRawReq(
-  //             Tablet.deserialize(transferReq.body), ReadWriteIOUtils.readBool(transferReq.body)));
+  //             Tablet.deserialize(transferReq.body),
+  // ReadWriteIOUtils.readBool(transferReq.body)));
   //   }
   //
   //   batchReq.version = transferReq.version;
@@ -176,23 +179,6 @@ public class PipeTransferTabletBatchReq extends TPipeTransferReq {
   //
   //   return batchReq;
   // }
-
-  /////////////////////////////// TestOnly ///////////////////////////////
-
-  @TestOnly
-  public List<PipeTransferTabletBinaryReq> getBinaryReqs() {
-    return binaryReqs;
-  }
-
-  // @TestOnly
-  // public List<PipeTransferTabletInsertNodeReq> getInsertNodeReqs() {
-  //   return insertNodeReqs;
-  // }
-
-  @TestOnly
-  public List<PipeTransferTabletRawReq> getTabletReqs() {
-    return tabletReqs;
-  }
 
   /////////////////////////////// Object ///////////////////////////////
 

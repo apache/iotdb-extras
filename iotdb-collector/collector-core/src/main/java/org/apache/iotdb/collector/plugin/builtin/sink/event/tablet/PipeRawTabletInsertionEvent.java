@@ -50,10 +50,6 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
   private final PipeRawTabletInsertionEvent sourceEvent;
   private boolean needToReport;
 
-  // private final PipeTabletMemoryBlock allocatedMemoryBlock;
-
-  private TabletInsertionEventParser eventParser;
-
   private PipeRawTabletInsertionEvent(
       final Boolean isTableModelEvent,
       final String databaseName,

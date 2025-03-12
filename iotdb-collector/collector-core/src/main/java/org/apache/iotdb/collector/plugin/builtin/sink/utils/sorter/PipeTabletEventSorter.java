@@ -19,11 +19,12 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.utils.sorter;
 
-import java.time.LocalDate;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
+
+import java.time.LocalDate;
 
 public class PipeTabletEventSorter {
 

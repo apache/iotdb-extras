@@ -20,7 +20,7 @@
 package org.apache.iotdb.collector.runtime.plugin.constructor;
 
 import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
-import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
+import org.apache.iotdb.collector.plugin.builtin.sink.protocol.demo.DemoSink;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
 import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
