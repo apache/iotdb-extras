@@ -32,6 +32,16 @@ Import the IoTDB-Table-Spark-Connector dependency in your project.
     <artifactId>spark-iotdb-table-connector-3.5</artifactId>
 </dependency>
 ```
+## Options
+| Key            | Default Value  | Comment                                                                                                   | Required |
+|----------------|----------------|-----------------------------------------------------------------------------------------------------------|----------|
+| iotdb.database | --             | The database name of Iotdb, which needs to be a database that already exists in IoTDB                     | true     |
+| iotdb.table    | --             | The table name in IoTDB needs to be a table that already exists in IoTDB                                  | true     |
+| iotdb.username | root           | the username to access IoTDB                                                                              | false    |
+| iotdb.password | root           | the password to access IoTDB                                                                              | false    |
+| iotdb.urls     | 127.0.0.1:6667 | The url for the client to connect to the datanode rpc. If there are multiple urls, separate them with ',' | false    |
+
+
 ## Read
 ### DataFrame
 ```scala
