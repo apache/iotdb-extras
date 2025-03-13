@@ -21,9 +21,9 @@ package org.apache.iotdb.spark.table.db.read
 
 import org.apache.iotdb.spark.table.db.IoTDBUtils
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.connector.expressions.filter.{AlwaysFalse, AlwaysTrue, And, Not, Or, Predicate}
+import org.apache.spark.sql.connector.expressions.filter.{And, Not, Or, Predicate}
 import org.apache.spark.sql.connector.expressions.{Expression, GeneralScalarExpression, Literal, NamedReference}
-import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType}
+import org.apache.spark.sql.types._
 
 class IoTDBExpressionSQLBuilder {
 
@@ -35,11 +35,6 @@ class IoTDBExpressionSQLBuilder {
     expression match {
       case literal: Literal[_] => visitLiteral(literal)
       case namedReference: NamedReference => visitNamedReference(namedReference)
-      case _: AlwaysFalse => visitAlwaysFalse()
-      case _: AlwaysTrue => visitAlwaysTrue()
-      case or: Or => visitOr(or)
-      case and: And => visitAnd(and)
-      case not: Not => visitNot(not)
       case expr: GeneralScalarExpression => visitGeneralScalarExpression(expr)
       case _ => throw new UnsupportedOperationException("Unsupported push down expression: " + expression)
     }
@@ -94,6 +89,11 @@ class IoTDBExpressionSQLBuilder {
       case "<=" => visitLessOrEqual(expr)
       case ">" => visitGreater(expr)
       case ">=" => visitGreaterOrEqual(expr)
+      case "AND" => visitAnd(expr.asInstanceOf[And])
+      case "OR" => visitOr(expr.asInstanceOf[Or])
+      case "NOT" => visitNot(expr.asInstanceOf[Not])
+      case "ALWAYS_TRUE" => visitAlwaysTrue()
+      case "ALWAYS_FALSE" => visitAlwaysFalse()
       case _ => throw new UnsupportedOperationException("Unsupported push down expression: " + expr)
     }
   }
