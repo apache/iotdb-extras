@@ -694,6 +694,16 @@
                 <version>${scalatest.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest_2.12</artifactId>
+                <version>${scalatest.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scalactic</groupId>
+                <artifactId>scalactic_2.12</artifactId>
+                <version>3.0.9</version>
+            </dependency>
+            <dependency>
                 <groupId>org.scalactic</groupId>
                 <artifactId>scalactic_2.11</artifactId>
                 <version>${scalatest.version}</version>

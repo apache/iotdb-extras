@@ -37,6 +37,7 @@
         <module>pulsar</module>
         <module>rabbitmq</module>
         <module>rocketmq</module>
+        <module>spark-table</module>
     </modules>
     <build>
         <pluginManagement>
