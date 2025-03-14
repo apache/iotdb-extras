@@ -101,14 +101,14 @@ public class PullSourceTask extends SourceTask {
           .get(taskId)
           .submit(
               () -> {
-                while (!isDropped.get()) {
+                while (dispatch.isRunning()) {
                   try {
                     consumers[finalI].onScheduler();
                   } catch (final Exception e) {
                     LOGGER.warn("Failed to pull source", e);
                   }
 
-                  waitUntilRunningOrDropped();
+                  dispatch.waitUntilRunningOrDropped();
                 }
               });
     }

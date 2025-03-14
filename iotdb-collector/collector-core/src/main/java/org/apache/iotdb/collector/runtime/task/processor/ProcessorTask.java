@@ -99,6 +99,7 @@ public class ProcessorTask extends Task {
     for (int i = 0; i < parallelism; i++) {
       processorConsumers[i] =
           new ProcessorConsumer(pluginRuntime.constructProcessor(parameters), sinkProducer);
+      processorConsumers[i].setDispatch(dispatch);
       try {
         processorConsumers[i].consumer().validate(new PipeParameterValidator(parameters));
         processorConsumers[i]
@@ -118,16 +119,18 @@ public class ProcessorTask extends Task {
     disruptor.handleEventsWithWorkerPool(processorConsumers);
 
     disruptor.setDefaultExceptionHandler(new ProcessorExceptionHandler());
-  }
 
-  @Override
-  public void startInternal() {
     disruptor.start();
   }
 
   @Override
+  public void startInternal() {
+    // do nothing
+  }
+
+  @Override
   public void stopInternal() {
-    disruptor.halt();
+    // do nothing
   }
 
   @Override

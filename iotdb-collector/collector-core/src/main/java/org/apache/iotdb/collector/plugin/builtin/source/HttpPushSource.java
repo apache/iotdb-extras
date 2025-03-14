@@ -66,7 +66,7 @@ public class HttpPushSource extends PushSource {
         final Event event = new DemoEvent(String.valueOf(new Random().nextInt(1000)));
         LOGGER.info("{} created successfully ...", event);
         supply(event);
-        TimeUnit.SECONDS.sleep(100);
+        TimeUnit.SECONDS.sleep(2);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

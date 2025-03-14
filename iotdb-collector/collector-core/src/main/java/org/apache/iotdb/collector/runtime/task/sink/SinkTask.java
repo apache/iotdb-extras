@@ -89,6 +89,7 @@ public class SinkTask extends Task {
     consumers = new SinkConsumer[parallelism];
     for (int i = 0; i < parallelism; i++) {
       consumers[i] = new SinkConsumer(pluginRuntime.constructSink(parameters));
+      consumers[i].setDispatch(dispatch);
       try {
         consumers[i].consumer().validate(new PipeParameterValidator(parameters));
         consumers[i]
@@ -109,16 +110,18 @@ public class SinkTask extends Task {
     disruptor.handleEventsWithWorkerPool(consumers);
 
     disruptor.setDefaultExceptionHandler(new SinkExceptionHandler());
-  }
 
-  @Override
-  public void startInternal() {
     disruptor.start();
   }
 
   @Override
+  public void startInternal() {
+    // do nothing
+  }
+
+  @Override
   public void stopInternal() {
-    disruptor.halt();
+    // do nothing
   }
 
   @Override
