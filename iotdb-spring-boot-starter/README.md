@@ -18,9 +18,9 @@
     under the License.
 
 -->
-# mybatis-generator-plugin
+# iotdb-spring-boot-starter
 
-* After 'clone' the project, execute 'mvn clean install' or 'mvn clean deploy' locally ('deploy' needs to modify 'distributionManagement' in 'pom'). This step is not necessary as it has already been uploaded to the Maven central repository
+* After 'clone' the project, execute 'mvn clean install'. This step is not necessary as it has already been uploaded to the Maven central repository
 
 * Add the following configuration to the 'pom' file of the project to be generated:
 
@@ -50,7 +50,7 @@
 
         public void queryTableSessionPool() throws IoTDBConnectionException, StatementExecutionException {
             ITableSession tableSession = ioTDBSessionPool.getSession();
-            final SessionDataSet sessionDataSet = tableSession.executeQueryStatement("select * from power_data_set limit 10");
+            final SessionDataSet sessionDataSet = tableSession.executeQueryStatement("select * from table1 limit 10");
             while (sessionDataSet.hasNext()) {
                 final RowRecord rowRecord = sessionDataSet.next();
                 final List<Field> fields = rowRecord.getFields();

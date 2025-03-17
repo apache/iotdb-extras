@@ -19,6 +19,7 @@ package org.apache.iotdb.iotdbspringbootstartexample.service;
 
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
+import org.apache.iotdb.isession.pool.ISessionPool;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.isession.pool.SessionDataSetWrapper;
 import org.apache.iotdb.rpc.IoTDBConnectionException;
@@ -38,7 +39,7 @@ public class IoTDBService {
     private ITableSessionPool ioTDBSessionPool;
 
     @Autowired
-    private SessionPool sessionPool;
+    private ISessionPool sessionPool;
 
 
     public void queryTableSessionPool() throws IoTDBConnectionException, StatementExecutionException {

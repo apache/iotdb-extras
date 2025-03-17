@@ -18,6 +18,7 @@
 package org.apache.iotdb.session;
 
 import org.apache.iotdb.config.IoTDBSessionProperties;
+import org.apache.iotdb.isession.pool.ISessionPool;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.SessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
@@ -35,7 +36,7 @@ public class IoTDBSessionPool {
 
     private final IoTDBSessionProperties properties;
     private ITableSessionPool tableSessionPool;
-    private SessionPool treeSessionPool;
+    private ISessionPool treeSessionPool;
 
     public IoTDBSessionPool(IoTDBSessionProperties properties) {
         this.properties = properties;
@@ -68,7 +69,7 @@ public class IoTDBSessionPool {
     }
 
     @Bean
-    public SessionPool treeSessionPool() {
+    public ISessionPool treeSessionPool() {
         if(treeSessionPool == null) {
             synchronized (IoTDBSessionPool.class) {
                 if(treeSessionPool == null) {

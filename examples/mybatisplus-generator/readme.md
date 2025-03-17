@@ -43,18 +43,18 @@
     ```
     Then we need to create a database 'table'
     ```
-    create table mix(
-        "device_id"    STRING TAG,
-        "deivce_name" STRING TAG,
-        "type"     INT32 FIELD,
-        "name"    DOUBLE FIELD,
-        "server_url_master"      FLOAT FIELD,
-        "server_url_slave"      BOOLEAN FIELD,
-        "prometheus_url_master"      STRING FIELD,
-        "prometheus_url_slave"      BLOB FIELD,
-        "username"    STRING ATTRIBUTE,
-        "create_time"     DATE FIELD,
-        "update_time"     DATE FIELD);
+    CREATE TABLE mix (
+        time TIMESTAMP TIME,
+        region STRING TAG,
+        plant_id STRING TAG,
+        device_id STRING TAG,
+        model_id STRING ATTRIBUTE,
+        maintenance STRING ATTRIBUTE,
+        temperature FLOAT FIELD,
+        humidity FLOAT FIELD,
+        status Boolean FIELD,
+        arrival_time TIMESTAMP FIELD
+    ) WITH (TTL=31536000000);
     ```
 
 ### 3. Build Dependencies with Maven in your Project
