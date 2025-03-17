@@ -29,7 +29,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Arrays;
 
 @Configuration
-@ConditionalOnClass({IoTDBSessionProperties.class}) // 确保相关类存在
+@ConditionalOnClass({IoTDBSessionProperties.class})
 @EnableConfigurationProperties(IoTDBSessionProperties.class)
 public class IoTDBSessionPool {
 

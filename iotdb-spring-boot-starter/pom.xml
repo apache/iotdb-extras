@@ -48,13 +48,11 @@
             <artifactId>spring-boot-starter</artifactId>
             <version>${spring-boot3.version}</version>
         </dependency>
-        <!-- springboot自动配置 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
             <version>${spring-boot3.version}</version>
         </dependency>
-        <!-- 用于关联配置文件和实体Bean -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
