@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE generatorConfiguration PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN" "http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+
+<!--
+
+       Licensed to the Apache Software Foundation (ASF) under one or more
+
+       contributor license agreements.  See the NOTICE file distributed with
+       this work for additional information regarding copyright ownership.
+       The ASF licenses this file to You under the Apache License, Version 2.0
+
+       (the "License"); you may not use this file except in compliance with
+
+       the License.  You may obtain a copy of the License at
+            http://www.apache.org/licenses/LICENSE-2.0
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+-->
+<generatorConfiguration>
+    <classPathEntry location="/apache/iotdb/iotdb-client/jdbc/target/iotdb-jdbc-2.0.2-SNAPSHOT-jar-with-dependencies.jar"/>
+    <!-- mvn mybatis-generator:generate hierarchical/flat-->
+    <context id="myBatis3Simple" targetRuntime="MyBatis3Simple" defaultModelType="flat">
+        <!--        <property name="suppressAllComments" value="true"/>-->
+        <!--        <property name="useActualColumnNames" value="false"/>-->
+        <!--        <property name="javaFormatter" value="org.mybatis.generator.api.dom.DefaultJavaFormatter"/>-->
+        <!--        <property name="xmlFormatter" value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
+        <plugin type="org.apache.iotdb.mybatis.plugin.LombokPlugin"/>
+        <plugin type="org.apache.iotdb.mybatis.plugin.BatchInsertPlugin"/>
+        <!--        <plugin type="org.apache.iotdb.mybatis.plugin.SerializablePlugin"/>-->
+        <plugin type="org.mybatis.generator.plugins.VirtualPrimaryKeyPlugin"/>
+        <!--        <commentGenerator type="generator.org.apache.iotdb.mybatis.plugin.CNCommentGenerator">-->
+        <!--            <property name="suppressAllComments" value="true"/>-->
+        <!--        </commentGenerator>-->
+        <commentGenerator type="org.apache.iotdb.mybatis.plugin.generator.SwaggerCommentGenerator">
+            <property name="suppressAllComments" value="true"/>
+            <property name="suppressDate" value="true"/>
+            <property name="addRemarkComments" value="true"/>
+        </commentGenerator>
+        <jdbcConnection driverClass="org.apache.iotdb.jdbc.IoTDBDriver" connectionURL="jdbc:iotdb://127.0.0.1:6667/test?sql_dialect=table" userId="root" password="root"/>
+        <javaTypeResolver type="org.apache.iotdb.mybatis.plugin.generator.resolver.IoTDBJavaTypeResolver">
+            <property name="forceBigDecimals" value="false"/>
+        </javaTypeResolver>
+        <javaModelGenerator targetPackage="org.apache.iotdb.mybatis.plugin.model" targetProject="src/main/java">
+            <!--            <property name="enableSubPackages" value="true"/>-->
+            <property name="trimStrings" value="true"/>
+        </javaModelGenerator>
+        <sqlMapGenerator targetPackage="org.apache.iotdb.mybatis.plugin.xml" targetProject="src/main/java">
+            <!--            <property name="enableSubPackages" value="true"/>-->
+        </sqlMapGenerator>
+        <javaClientGenerator type="XMLMAPPER" targetPackage="org.apache.iotdb.mybatis.plugin.mapper" targetProject="src/main/java">
+            <!--            <property name="enableSubPackages" value="true"/>-->
+        </javaClientGenerator>
+        <table schema="test" tableName="mix" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true">
+            <property name="virtualKeyColumns" value="time,device_id,device_name,device_tag"/>
+        </table>
+    </context>
+</generatorConfiguration>

@@ -81,6 +81,8 @@
                             <descriptors>
                                 <descriptor>src/assembly/spark-connector.xml</descriptor>
                                 <descriptor>src/assembly/flink-sql-connector.xml</descriptor>
+                                <descriptor>src/assembly/mybatis-generator-plugin.xml</descriptor>
+                                <descriptor>src/assembly/iotdb-spring-boot-starter.xml</descriptor>
                             </descriptors>
                             <finalName>apache-iotdb-${project.version}</finalName>
                         </configuration>

@@ -35,7 +35,7 @@ Import the IoTDB-Table-Spark-Connector dependency in your project.
 ## Options
 | Key            | Default Value  | Comment                                                                                                   | Required |
 |----------------|----------------|-----------------------------------------------------------------------------------------------------------|----------|
-| iotdb.database | --             | The database name of Iotdb, which needs to be a database that already exists in IoTDB                     | true     |
+| iotdb.database | --             | The database name of IoTDB, which needs to be a database that already exists in IoTDB                     | true     |
 | iotdb.table    | --             | The table name in IoTDB needs to be a table that already exists in IoTDB                                  | true     |
 | iotdb.username | root           | the username to access IoTDB                                                                              | false    |
 | iotdb.password | root           | the password to access IoTDB                                                                              | false    |
