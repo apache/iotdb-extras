@@ -27,7 +27,7 @@
         <!--        <property name="xmlFormatter" value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
         <plugin type="org.apache.iotdb.mybatis.plugin.LombokPlugin"/>
         <plugin type="org.apache.iotdb.mybatis.plugin.BatchInsertPlugin"/>
-<!--        <plugin type="org.apache.iotdb.mybatis.plugin.SerializablePlugin"/>-->
+        <!--        <plugin type="org.apache.iotdb.mybatis.plugin.SerializablePlugin"/>-->
         <plugin type="org.mybatis.generator.plugins.VirtualPrimaryKeyPlugin"/>
         <!--        <commentGenerator type="generator.org.apache.iotdb.mybatis.plugin.CNCommentGenerator">-->
         <!--            <property name="suppressAllComments" value="true"/>-->
@@ -42,14 +42,14 @@
             <property name="forceBigDecimals" value="false"/>
         </javaTypeResolver>
         <javaModelGenerator targetPackage="org.apache.iotdb.mybatis.plugin.model" targetProject="src/main/java">
-<!--            <property name="enableSubPackages" value="true"/>-->
+            <!--            <property name="enableSubPackages" value="true"/>-->
             <property name="trimStrings" value="true"/>
         </javaModelGenerator>
         <sqlMapGenerator targetPackage="org.apache.iotdb.mybatis.plugin.xml" targetProject="src/main/java">
-<!--            <property name="enableSubPackages" value="true"/>-->
+            <!--            <property name="enableSubPackages" value="true"/>-->
         </sqlMapGenerator>
         <javaClientGenerator type="XMLMAPPER" targetPackage="org.apache.iotdb.mybatis.plugin.mapper" targetProject="src/main/java">
-<!--            <property name="enableSubPackages" value="true"/>-->
+            <!--            <property name="enableSubPackages" value="true"/>-->
         </javaClientGenerator>
         <table schema="test" tableName="mix" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true">
             <property name="virtualKeyColumns" value="time,device_id,device_name,device_tag"/>
