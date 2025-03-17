@@ -25,7 +25,7 @@
 
 ### Version usage
 
-    IoTDB: 2.0.2  
+    IoTDB: 2.0.1-beta
     mybatisPlus: 3.5.10
 
 ### 1. Install IoTDB
