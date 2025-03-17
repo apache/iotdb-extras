@@ -17,14 +17,23 @@
 
 package org.apache.iotdb.iotdbspringbootstartexample;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.apache.iotdb.iotdbspringbootstartexample.service.IoTDBService;
+import org.apache.iotdb.rpc.IoTDBConnectionException;
+import org.apache.iotdb.rpc.StatementExecutionException;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootApplication
-public class IotdbSpringBootStartApplication {
+@SpringBootTest
+public class SpringBootIoTDBApplicationTests {
 
-    public static void main(String[] args) {
-        SpringApplication.run(IotdbSpringBootStartApplication.class, args);
+    @Autowired
+    private IoTDBService iotdbService;
+
+    @Test
+    void contextLoads() throws IoTDBConnectionException, StatementExecutionException {
+        iotdbService.querySessionPool();
+        iotdbService.queryTableSessionPool();
     }
 
 }

@@ -26,7 +26,7 @@ Grafana is an open source volume metrics monitoring and visualization tool, whic
 
 We developed the Grafana-Plugin for IoTDB, using the IoTDB REST service to present time series data and providing many visualization methods for time series data.
 
-Iotdb grafana plugin supports grafana version 9.3.0 and above
+IoTDB grafana plugin supports grafana version 9.3.0 and above
 
 ### How to use Grafana-Plugin
 
