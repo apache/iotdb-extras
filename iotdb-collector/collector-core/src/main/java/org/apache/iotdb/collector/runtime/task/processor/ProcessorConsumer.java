@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.runtime.task.processor;
 
+import org.apache.iotdb.collector.runtime.task.TaskDispatch;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
@@ -33,6 +34,8 @@ class ProcessorConsumer implements WorkHandler<EventContainer> {
   private final PipeProcessor processor;
   private final EventCollector eventCollector;
 
+  private TaskDispatch dispatch;
+
   ProcessorConsumer(final PipeProcessor processor, final EventCollector eventCollector) {
     this.processor = processor;
     this.eventCollector = eventCollector;
@@ -44,6 +47,8 @@ class ProcessorConsumer implements WorkHandler<EventContainer> {
 
   @Override
   public void onEvent(final EventContainer eventContainer) throws Exception {
+    dispatch.waitUntilRunningOrDropped();
+
     // TODO: retry strategy
     final Event event = eventContainer.getEvent();
     if (event instanceof TabletInsertionEvent) {
@@ -53,5 +58,9 @@ class ProcessorConsumer implements WorkHandler<EventContainer> {
     } else if (event != null) {
       processor.process(event, eventCollector);
     }
+  }
+
+  public void setDispatch(final TaskDispatch dispatch) {
+    this.dispatch = dispatch;
   }
 }

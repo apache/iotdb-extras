@@ -20,11 +20,9 @@
 package org.apache.iotdb.collector.api.v1.plugin.impl;
 
 import org.apache.iotdb.collector.api.v1.plugin.PluginApiService;
-import org.apache.iotdb.collector.api.v1.plugin.model.AlterPluginRequest;
 import org.apache.iotdb.collector.api.v1.plugin.model.CreatePluginRequest;
 import org.apache.iotdb.collector.api.v1.plugin.model.DropPluginRequest;
-import org.apache.iotdb.collector.api.v1.plugin.model.StartPluginRequest;
-import org.apache.iotdb.collector.api.v1.plugin.model.StopPluginRequest;
+import org.apache.iotdb.collector.service.RuntimeService;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
@@ -34,30 +32,34 @@ public class PluginApiServiceImpl extends PluginApiService {
   @Override
   public Response createPlugin(
       final CreatePluginRequest createPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("create plugin").build();
-  }
+    PluginApiServiceRequestValidationHandler.validateCreatePluginRequest(createPluginRequest);
 
-  @Override
-  public Response alterPlugin(
-      final AlterPluginRequest alterPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("alter plugin").build();
-  }
-
-  @Override
-  public Response startPlugin(
-      final StartPluginRequest startPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("start plugin").build();
-  }
-
-  @Override
-  public Response stopPlugin(
-      final StopPluginRequest stopPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("stop plugin").build();
+    return RuntimeService.plugin().isPresent()
+        ? RuntimeService.plugin()
+            .get()
+            .createPlugin(
+                createPluginRequest.getPluginName().toUpperCase(),
+                createPluginRequest.getClassName(),
+                createPluginRequest.getJarName(),
+                null,
+                true)
+        : Response.ok("create plugin").build();
   }
 
   @Override
   public Response dropPlugin(
       final DropPluginRequest dropPluginRequest, final SecurityContext securityContext) {
-    return Response.ok("drop plugin").build();
+    PluginApiServiceRequestValidationHandler.validateDropPluginRequest(dropPluginRequest);
+
+    return RuntimeService.plugin().isPresent()
+        ? RuntimeService.plugin().get().dropPlugin(dropPluginRequest.getPluginName().toUpperCase())
+        : Response.ok("drop plugin").build();
+  }
+
+  @Override
+  public Response showPlugin(final SecurityContext securityContext) {
+    return RuntimeService.plugin().isPresent()
+        ? RuntimeService.plugin().get().showPlugin()
+        : Response.ok("show plugin").build();
   }
 }

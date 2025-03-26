@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.runtime.task.source.pull;
 import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSourceRuntimeConfiguration;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
+import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
 import org.apache.iotdb.collector.service.RuntimeService;
@@ -50,8 +51,9 @@ public class PullSourceTask extends SourceTask {
   public PullSourceTask(
       final String taskId,
       final Map<String, String> attributes,
-      final EventCollector processorProducer) {
-    super(taskId, attributes, processorProducer);
+      final EventCollector processorProducer,
+      final TaskStateEnum taskState) {
+    super(taskId, attributes, processorProducer, taskState);
   }
 
   @Override
@@ -101,14 +103,14 @@ public class PullSourceTask extends SourceTask {
           .get(taskId)
           .submit(
               () -> {
-                while (!isDropped.get()) {
+                while (dispatch.isRunning() && TaskStateEnum.RUNNING.equals(taskState)) {
                   try {
                     consumers[finalI].onScheduler();
                   } catch (final Exception e) {
                     LOGGER.warn("Failed to pull source", e);
                   }
 
-                  waitUntilRunningOrDropped();
+                  dispatch.waitUntilRunningOrDropped();
                 }
               });
     }
@@ -116,12 +118,12 @@ public class PullSourceTask extends SourceTask {
 
   @Override
   public void startInternal() {
-    // do nothing
+    this.taskState = TaskStateEnum.RUNNING;
   }
 
   @Override
   public void stopInternal() {
-    // do nothing
+    this.taskState = TaskStateEnum.STOPPED;
   }
 
   @Override

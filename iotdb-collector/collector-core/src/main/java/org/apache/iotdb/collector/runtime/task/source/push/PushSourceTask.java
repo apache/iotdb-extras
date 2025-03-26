@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.runtime.task.source.push;
 import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSourceRuntimeConfiguration;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
+import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
 import org.apache.iotdb.collector.service.RuntimeService;
@@ -41,8 +42,9 @@ public class PushSourceTask extends SourceTask {
   public PushSourceTask(
       final String taskId,
       final Map<String, String> sourceParams,
-      final EventCollector processorProducer) {
-    super(taskId, sourceParams, processorProducer);
+      final EventCollector processorProducer,
+      final TaskStateEnum taskState) {
+    super(taskId, sourceParams, processorProducer, taskState);
   }
 
   @Override
@@ -64,7 +66,9 @@ public class PushSourceTask extends SourceTask {
         pushSources[i].customize(
             parameters,
             new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
-        pushSources[i].start();
+        if (TaskStateEnum.RUNNING.equals(taskState)) {
+          pushSources[i].start();
+        }
       } catch (final Exception e) {
         try {
           pushSources[i].close();
@@ -78,12 +82,42 @@ public class PushSourceTask extends SourceTask {
 
   @Override
   public void startInternal() {
-    // do nothing
+    if (this.taskState.equals(TaskStateEnum.RUNNING)) {
+      return;
+    }
+
+    if (pushSources != null) {
+      for (int i = 0; i < parallelism; i++) {
+        try {
+          pushSources[i].start();
+        } catch (final Exception e) {
+          LOGGER.warn("Failed to restart push source", e);
+          return;
+        }
+      }
+    }
+
+    this.taskState = TaskStateEnum.RUNNING;
   }
 
   @Override
   public void stopInternal() {
-    // do nothing
+    if (this.taskState.equals(TaskStateEnum.STOPPED)) {
+      return;
+    }
+
+    if (pushSources != null) {
+      for (int i = 0; i < parallelism; i++) {
+        try {
+          pushSources[i].close();
+        } catch (final Exception e) {
+          LOGGER.warn("Failed to stop source", e);
+          return;
+        }
+      }
+
+      this.taskState = TaskStateEnum.STOPPED;
+    }
   }
 
   @Override
