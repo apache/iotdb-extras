@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.runtime.plugin.constructor;
 
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMeta;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
+import org.apache.iotdb.collector.service.RuntimeService;
 import org.apache.iotdb.pipe.api.PipePlugin;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.exception.PipeException;
@@ -28,7 +29,6 @@ import org.apache.iotdb.pipe.api.exception.PipeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -81,13 +81,14 @@ public abstract class PluginConstructor {
       final Class<?> pluginClass =
           information.isBuiltin()
               ? pluginMetaKeeper.getBuiltinPluginClass(information.getPluginName())
-              : Class.forName(information.getClassName()); // TODO
+              : Class.forName(
+                  information.getClassName(),
+                  true,
+                  RuntimeService.plugin().isPresent()
+                      ? RuntimeService.plugin().get().getClassLoader(pluginName)
+                      : null);
       return (PipePlugin) pluginClass.getDeclaredConstructor().newInstance();
-    } catch (InstantiationException
-        | InvocationTargetException
-        | NoSuchMethodException
-        | IllegalAccessException
-        | ClassNotFoundException e) {
+    } catch (final Exception e) {
       String errorMessage =
           String.format(
               "Failed to reflect PipePlugin %s(%s) instance, because %s",

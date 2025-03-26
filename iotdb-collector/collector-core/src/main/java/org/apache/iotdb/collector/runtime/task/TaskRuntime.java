@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.runtime.task;
 import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
 import org.apache.iotdb.collector.runtime.task.sink.SinkTask;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
+import org.apache.iotdb.collector.service.PersistenceService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.core.Response;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class TaskRuntime implements AutoCloseable {
@@ -39,9 +41,11 @@ public class TaskRuntime implements AutoCloseable {
 
   public synchronized Response createTask(
       final String taskId,
+      final TaskStateEnum taskState,
       final Map<String, String> sourceAttribute,
       final Map<String, String> processorAttribute,
-      final Map<String, String> sinkAttribute) {
+      final Map<String, String> sinkAttribute,
+      final boolean isRestRequest) {
     try {
       if (tasks.containsKey(taskId)) {
         return Response.status(Response.Status.CONFLICT)
@@ -53,14 +57,28 @@ public class TaskRuntime implements AutoCloseable {
       final ProcessorTask processorTask =
           new ProcessorTask(taskId, processorAttribute, sinkTask.makeProducer());
       final SourceTask sourceTask =
-          SourceTask.construct(taskId, sourceAttribute, processorTask.makeProducer());
+          SourceTask.construct(taskId, sourceAttribute, processorTask.makeProducer(), taskState);
 
       final TaskCombiner taskCombiner = new TaskCombiner(sourceTask, processorTask, sinkTask);
-      tasks.put(taskId, taskCombiner);
       taskCombiner.create();
 
+      tasks.put(taskId, taskCombiner);
+
+      // storage task info to sqlite
+      if (isRestRequest) {
+        PersistenceService.task()
+            .ifPresent(
+                taskPersistence ->
+                    taskPersistence.tryPersistenceTask(
+                        taskId,
+                        TaskStateEnum.RUNNING,
+                        sourceAttribute,
+                        processorAttribute,
+                        sinkAttribute));
+      }
+
       LOGGER.info("Successfully created task {}", taskId);
-      return Response.status(Response.Status.CREATED)
+      return Response.status(Response.Status.OK)
           .entity(String.format("Successfully created task %s", taskId))
           .build();
     } catch (final Exception e) {
@@ -80,6 +98,10 @@ public class TaskRuntime implements AutoCloseable {
 
     try {
       tasks.get(taskId).start();
+
+      PersistenceService.task()
+          .ifPresent(
+              taskPersistence -> taskPersistence.tryAlterTaskState(taskId, TaskStateEnum.RUNNING));
 
       LOGGER.info("Task {} start successfully", taskId);
       return Response.status(Response.Status.OK)
@@ -103,6 +125,10 @@ public class TaskRuntime implements AutoCloseable {
     try {
       tasks.get(taskId).stop();
 
+      PersistenceService.task()
+          .ifPresent(
+              taskPersistence -> taskPersistence.tryAlterTaskState(taskId, TaskStateEnum.STOPPED));
+
       LOGGER.info("Task {} stop successfully", taskId);
       return Response.status(Response.Status.OK)
           .entity(String.format("task %s stop successfully", taskId))
@@ -116,14 +142,19 @@ public class TaskRuntime implements AutoCloseable {
   }
 
   public synchronized Response dropTask(final String taskId) {
-    if (!tasks.containsKey(taskId)) {
+    if (Objects.isNull(tasks.get(taskId)) || !tasks.containsKey(taskId)) {
       return Response.status(Response.Status.NOT_FOUND)
           .entity(String.format("task %s not found", taskId))
           .build();
     }
 
     try {
-      tasks.remove(taskId).drop();
+      final TaskCombiner task = tasks.get(taskId);
+      task.drop();
+      tasks.remove(taskId);
+
+      // remove task info from sqlite
+      PersistenceService.task().ifPresent(taskPersistence -> taskPersistence.tryDeleteTask(taskId));
 
       LOGGER.info("Task {} drop successfully", taskId);
       return Response.status(Response.Status.OK)

@@ -19,4 +19,21 @@
 
 package org.apache.iotdb.collector.api.v1.plugin.impl;
 
-public class PluginApiServiceRequestValidationHandler {}
+import org.apache.iotdb.collector.api.v1.plugin.model.CreatePluginRequest;
+import org.apache.iotdb.collector.api.v1.plugin.model.DropPluginRequest;
+
+import java.util.Objects;
+
+public class PluginApiServiceRequestValidationHandler {
+  private PluginApiServiceRequestValidationHandler() {}
+
+  public static void validateCreatePluginRequest(final CreatePluginRequest createPluginRequest) {
+    Objects.requireNonNull(createPluginRequest.getPluginName(), "plugin name cannot be null");
+    Objects.requireNonNull(createPluginRequest.getClassName(), "class name cannot be null");
+    Objects.requireNonNull(createPluginRequest.getJarName(), "jar name cannot be null");
+  }
+
+  public static void validateDropPluginRequest(final DropPluginRequest dropPluginRequest) {
+    Objects.requireNonNull(dropPluginRequest.getPluginName(), "plugin name cannot be null");
+  }
+}

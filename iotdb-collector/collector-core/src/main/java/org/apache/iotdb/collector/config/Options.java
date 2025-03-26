@@ -36,6 +36,7 @@ public class Options {
     try {
       Class.forName(ApiServiceOptions.class.getName());
       Class.forName(TaskRuntimeOptions.class.getName());
+      Class.forName(PluginRuntimeOptions.class.getName());
     } catch (final ClassNotFoundException e) {
       throw new RuntimeException("Failed to load options", e);
     }

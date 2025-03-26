@@ -25,6 +25,7 @@ import org.apache.iotdb.collector.api.v1.task.model.CreateTaskRequest;
 import org.apache.iotdb.collector.api.v1.task.model.DropTaskRequest;
 import org.apache.iotdb.collector.api.v1.task.model.StartTaskRequest;
 import org.apache.iotdb.collector.api.v1.task.model.StopTaskRequest;
+import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.service.RuntimeService;
 
 import javax.ws.rs.core.Response;
@@ -42,9 +43,11 @@ public class TaskApiServiceImpl extends TaskApiService {
             .get()
             .createTask(
                 createTaskRequest.getTaskId(),
+                TaskStateEnum.RUNNING,
                 createTaskRequest.getSourceAttribute(),
                 createTaskRequest.getProcessorAttribute(),
-                createTaskRequest.getSinkAttribute())
+                createTaskRequest.getSinkAttribute(),
+                true)
         : Response.serverError().entity("Task runtime is down").build();
   }
 

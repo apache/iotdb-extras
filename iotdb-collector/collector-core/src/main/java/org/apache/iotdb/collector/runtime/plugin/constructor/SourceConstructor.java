@@ -42,7 +42,7 @@ public class SourceConstructor extends PluginConstructor {
 
   @Override
   public final PipeSource reflectPlugin(PipeParameters sourceParameters) {
-    if (sourceParameters.hasAttribute("source")) {
+    if (!sourceParameters.hasAttribute("source")) {
       throw new IllegalArgumentException("source attribute is required");
     }
 

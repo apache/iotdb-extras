@@ -19,30 +19,32 @@
 
 package org.apache.iotdb.collector.runtime.plugin.meta;
 
+import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PluginMetaKeeper {
 
-  protected final Map<String, PluginMeta> pipePluginNameToMetaMap = new ConcurrentHashMap<>();
-  protected final Map<String, Class<?>> builtinPipePluginNameToClassMap = new ConcurrentHashMap<>();
+  private final Map<String, PluginMeta> pipePluginNameToMetaMap = new ConcurrentHashMap<>();
+  private final Map<String, Class<?>> builtinPipePluginNameToClassMap = new ConcurrentHashMap<>();
+  private final Map<String, String> jarNameToMd5Map = new ConcurrentHashMap<>();
+  private final Map<String, Integer> jarNameToReferenceCountMap = new ConcurrentHashMap<>();
 
   public PluginMetaKeeper() {
     loadBuiltinPlugins();
   }
 
   private void loadBuiltinPlugins() {
-    //    for (final BuiltinPipePlugin builtinPipePlugin : BuiltinPipePlugin.values()) {
-    //      final String pipePluginName = builtinPipePlugin.getPipePluginName();
-    //      final Class<?> pipePluginClass = builtinPipePlugin.getPipePluginClass();
-    //      final String className = builtinPipePlugin.getClassName();
-    //
-    //      addPipePluginMeta(pipePluginName, new PluginMeta(pipePluginName, className));
-    //      addBuiltinPluginClass(pipePluginName, pipePluginClass);
-    //      addPipePluginVisibility(
-    //          pipePluginName, VisibilityUtils.calculateFromPluginClass(pipePluginClass));
-    //    }
+    for (final BuiltinPlugin builtinPlugin : BuiltinPlugin.values()) {
+      final String pluginName = builtinPlugin.getPluginName();
+      final Class<?> pluginClass = builtinPlugin.getPluginClass();
+      final String className = builtinPlugin.getClassName();
+
+      addPipePluginMeta(pluginName, new PluginMeta(pluginName, className));
+      addBuiltinPluginClass(pluginName, pluginClass);
+    }
   }
 
   public void addPipePluginMeta(String pluginName, PluginMeta pluginMeta) {
@@ -80,6 +82,35 @@ public class PluginMetaKeeper {
       }
     }
     return null;
+  }
+
+  public boolean containsJar(final String jarName) {
+    return jarNameToMd5Map.containsKey(jarName);
+  }
+
+  public boolean jarNameExistsAndMatchesMd5(final String jarName, final String md5) {
+    return jarNameToMd5Map.containsKey(jarName) && jarNameToMd5Map.get(jarName).equals(md5);
+  }
+
+  public void addJarNameAndMd5(final String jarName, final String md5) {
+    if (jarNameToReferenceCountMap.containsKey(jarName)) {
+      jarNameToReferenceCountMap.put(jarName, jarNameToReferenceCountMap.get(jarName) + 1);
+    } else {
+      jarNameToReferenceCountMap.put(jarName, 1);
+      jarNameToMd5Map.put(jarName, md5);
+    }
+  }
+
+  public void removeJarNameAndMd5IfPossible(final String jarName) {
+    if (jarNameToReferenceCountMap.containsKey(jarName)) {
+      final int count = jarNameToReferenceCountMap.get(jarName);
+      if (count == 1) {
+        jarNameToReferenceCountMap.remove(jarName);
+        jarNameToMd5Map.remove(jarName);
+      } else {
+        jarNameToReferenceCountMap.put(jarName, count - 1);
+      }
+    }
   }
 
   @Override
