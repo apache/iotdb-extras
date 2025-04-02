@@ -12,7 +12,7 @@ The server doesn't expose any resources.
 The server doesn't provide any prompts.
 
 ### Tools
-The server offers six core tools:
+The server offers three core tools:
 
 #### Query Tools
 - `read_query`
@@ -21,17 +21,6 @@ The server offers six core tools:
      - `query` (string): The SELECT SQL query to execute
    - Returns: Query results as array of objects
 
-- `write_query`
-   - Execute INSERT, UPDATE, or DELETE queries
-   - Input:
-     - `query` (string): The SQL modification query
-   - Returns: `{ affected_rows: number }`
-
-- `create_table`
-   - Create new tables in the database
-   - Input:
-     - `query` (string): CREATE TABLE SQL statement
-   - Returns: Confirmation of table creation
 
 #### Schema Tools
 - `list_tables`
@@ -45,17 +34,31 @@ The server offers six core tools:
      - `table_name` (string): Name of table to describe
    - Returns: Array of column definitions with names and types
 
-#### Analysis Tools
-- `append_insight`
-   - Add new business insights to the memo resource
-   - Input:
-     - `insight` (string): Business insight discovered from data analysis
-   - Returns: Confirmation of insight addition
-   - Triggers update of memo://insights resource
-
 
 
 ## Claude Desktop Integration
+
+## Prerequisites
+- Python with `uv` package manager
+- IoTDB installation
+- MCP server dependencies
+
+## Development
+
+```
+# Clone the repository
+git clone https://github.com/JackieTien97/iotdb_mcp_server.git
+cd iotdb_mcp_server
+
+# Create virtual environment
+uv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install development dependencies
+uv sync
+```
+
+
 
 Configure the MCP server in Claude Desktop's configuration file:
 
