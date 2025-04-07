@@ -41,42 +41,6 @@ paths:
         "200":
           $ref: '#/components/responses/SuccessExecutionStatus'
 
-  /plugin/v1/alter:
-    post:
-      operationId: alterPlugin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AlterPluginRequest'
-      responses:
-        "200":
-          $ref: '#/components/responses/SuccessExecutionStatus'
-
-  /plugin/v1/start:
-    post:
-      operationId: startPlugin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StartPluginRequest'
-      responses:
-        "200":
-          $ref: '#/components/responses/SuccessExecutionStatus'
-
-  /plugin/v1/stop:
-    post:
-      operationId: stopPlugin
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StopPluginRequest'
-      responses:
-        "200":
-          $ref: '#/components/responses/SuccessExecutionStatus'
-
   /plugin/v1/drop:
     post:
       operationId: dropPlugin
@@ -89,55 +53,27 @@ paths:
         "200":
           $ref: '#/components/responses/SuccessExecutionStatus'
 
+  /plugin/v1/show:
+    post:
+      operationId: showPlugin
+      responses:
+        "200":
+          $ref: '#/components/responses/SuccessExecutionStatus'
+
 components:
   schemas:
     CreatePluginRequest:
       properties:
-        sourceAttribute:
-          type: object
-          additionalProperties:
-            type: string
-        processorAttribute:
-          type: object
-          additionalProperties:
-            type: string
-        sinkAttribute:
-          type: object
-          additionalProperties:
-            type: string
-        taskId:
+        pluginName:
           type: string
-
-    AlterPluginRequest:
-      properties:
-        sourceAttribute:
-          type: object
-          additionalProperties:
-            type: string
-        processorAttribute:
-          type: object
-          additionalProperties:
-            type: string
-        sinkAttribute:
-          type: object
-          additionalProperties:
-            type: string
-        taskId:
+        className:
           type: string
-
-    StartPluginRequest:
-      properties:
-        taskId:
-          type: string
-
-    StopPluginRequest:
-      properties:
-        taskId:
+        jarName:
           type: string
 
     DropPluginRequest:
       properties:
-        taskId:
+        pluginName:
           type: string
 
     ExecutionStatus:

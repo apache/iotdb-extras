@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.runtime.task.source;
 
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
+import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.source.pull.PullSourceTask;
 import org.apache.iotdb.collector.runtime.task.source.push.PushSourceTask;
@@ -34,20 +35,24 @@ import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SOURCE_P
 public abstract class SourceTask extends Task {
 
   protected final EventCollector processorProducer;
+  protected TaskStateEnum taskState;
 
   protected SourceTask(
       final String taskId,
       final Map<String, String> attributes,
-      final EventCollector processorProducer) {
+      final EventCollector processorProducer,
+      final TaskStateEnum taskState) {
     super(
         taskId, attributes, TASK_SOURCE_PARALLELISM_NUM.key(), TASK_SOURCE_PARALLELISM_NUM.value());
     this.processorProducer = processorProducer;
+    this.taskState = taskState;
   }
 
   public static SourceTask construct(
       final String taskId,
       final Map<String, String> attributes,
-      final EventCollector processorProducer)
+      final EventCollector processorProducer,
+      final TaskStateEnum taskState)
       throws Exception {
     final PluginRuntime pluginRuntime =
         RuntimeService.plugin().isPresent() ? RuntimeService.plugin().get() : null;
@@ -57,10 +62,10 @@ public abstract class SourceTask extends Task {
 
     final PipeParameters parameters = new PipeParameters(attributes);
     if (pluginRuntime.isPullSource(parameters)) {
-      return new PullSourceTask(taskId, attributes, processorProducer);
+      return new PullSourceTask(taskId, attributes, processorProducer, taskState);
     }
     if (pluginRuntime.isPushSource(parameters)) {
-      return new PushSourceTask(taskId, attributes, processorProducer);
+      return new PushSourceTask(taskId, attributes, processorProducer, taskState);
     }
     throw new IllegalArgumentException("Unsupported source type");
   }

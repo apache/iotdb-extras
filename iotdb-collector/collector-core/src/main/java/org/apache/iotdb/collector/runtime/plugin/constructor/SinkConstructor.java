@@ -38,7 +38,7 @@ public class SinkConstructor extends PluginConstructor {
 
   @Override
   public final PipeSink reflectPlugin(PipeParameters sinkParameters) {
-    if (sinkParameters.hasAttribute("sink")) {
+    if (!sinkParameters.hasAttribute("sink")) {
       throw new IllegalArgumentException("sink attribute is required");
     }
 
