@@ -169,7 +169,7 @@
         <!-- This is the matching version of spring-boot for spring 5.3.30 -->
         <spring-boot.version>2.7.18</spring-boot.version>
         <!-- This is the last version to support the javax namespace -->
-        <spring.version>5.3.33</spring.version>
+        <spring.version>5.3.39</spring.version>
         <!-- This was the last version to support Java 8 -->
         <swagger.version>1.6.14</swagger.version>
         <thrift.exec-cmd.executable>chmod</thrift.exec-cmd.executable>
@@ -693,6 +693,16 @@
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest_2.11</artifactId>
                 <version>${scalatest.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest_2.12</artifactId>
+                <version>${scalatest.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scalactic</groupId>
+                <artifactId>scalactic_2.12</artifactId>
+                <version>3.0.9</version>
             </dependency>
             <dependency>
                 <groupId>org.scalactic</groupId>

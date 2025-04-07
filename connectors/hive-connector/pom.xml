@@ -42,6 +42,7 @@
             <groupId>org.apache.tsfile</groupId>
             <artifactId>common</artifactId>
             <version>${tsfile.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.tsfile</groupId>
