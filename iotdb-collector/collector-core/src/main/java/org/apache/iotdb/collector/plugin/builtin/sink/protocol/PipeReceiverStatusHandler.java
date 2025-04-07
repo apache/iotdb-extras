@@ -103,7 +103,7 @@ public class PipeReceiverStatusHandler {
       case 1808: // PIPE_RECEIVER_TEMPORARY_UNAVAILABLE_EXCEPTION
         {
           LOGGER.info("Temporary unavailable exception: will retry forever. status: {}", status);
-          throw new PipeRuntimeConnectorCriticalException(exceptionMessage);
+          throw new PipeException(exceptionMessage);
         }
 
       case 1810: // PIPE_RECEIVER_USER_CONFLICT_EXCEPTION
@@ -141,11 +141,11 @@ public class PipeReceiverStatusHandler {
                       + " seconds",
               status);
           exceptionEventHasBeenRetried.set(true);
-          throw new PipeRuntimeConnectorRetryTimesConfigurableException(
+          throw new PipeException(
               exceptionMessage,
               (int)
                   Math.max(
-                      PipeSubtask.MAX_RETRY_TIMES,
+                      5,
                       Math.min(CONFLICT_RETRY_MAX_TIMES, retryMaxMillisWhenConflictOccurs * 1.1)));
         }
 
@@ -176,11 +176,11 @@ public class PipeReceiverStatusHandler {
                       + " seconds",
               status);
           exceptionEventHasBeenRetried.set(true);
-          throw new PipeRuntimeConnectorRetryTimesConfigurableException(
+          throw new PipeException(
               exceptionMessage,
               (int)
                   Math.max(
-                      PipeSubtask.MAX_RETRY_TIMES,
+                      5,
                       Math.min(
                           CONFLICT_RETRY_MAX_TIMES, retryMaxMillisWhenOtherExceptionsOccur * 1.1)));
         }
@@ -199,50 +199,5 @@ public class PipeReceiverStatusHandler {
     exceptionFirstEncounteredTime.set(0);
     exceptionEventHasBeenRetried.set(false);
     exceptionRecordedMessage.set("");
-  }
-
-  /////////////////////////////// Prior status specifier ///////////////////////////////
-
-  private static final List<Integer> STATUS_PRIORITY =
-      Collections.unmodifiableList(
-          Arrays.asList(
-              TSStatusCode.SUCCESS_STATUS.getStatusCode(),
-              TSStatusCode.PIPE_RECEIVER_IDEMPOTENT_CONFLICT_EXCEPTION.getStatusCode(),
-              TSStatusCode.REDIRECTION_RECOMMEND.getStatusCode(),
-              TSStatusCode.PIPE_RECEIVER_USER_CONFLICT_EXCEPTION.getStatusCode(),
-              TSStatusCode.PIPE_RECEIVER_TEMPORARY_UNAVAILABLE_EXCEPTION.getStatusCode()));
-
-  /**
-   * This method is used to get the highest priority {@link TSStatus} from a list of {@link
-   * TSStatus}. The priority of each status is determined by its {@link TSStatusCode}, and the
-   * priority sequence is defined in the {@link #STATUS_PRIORITY} list.
-   *
-   * <p>Specifically, it iterates through the input {@link TSStatus} list. For each {@link
-   * TSStatus}, if its {@link TSStatusCode} is not in the {@link #STATUS_PRIORITY} list, it directly
-   * returns this {@link TSStatus}. Otherwise, it compares the current {@link TSStatus} with the
-   * highest priority {@link TSStatus} found so far (initially set to the {@link
-   * TSStatusCode#SUCCESS_STATUS}). If the current {@link TSStatus} has a higher priority, it
-   * updates the highest priority {@link TSStatus} to the current {@link TSStatus}.
-   *
-   * <p>Finally, the method returns the highest priority {@link TSStatus}.
-   *
-   * @param givenStatusList a list of {@link TSStatus} from which the highest priority {@link
-   *     TSStatus} is to be found
-   * @return the highest priority {@link TSStatus} from the input list
-   */
-  public static TSStatus getPriorStatus(final List<TSStatus> givenStatusList) {
-    final TSStatus resultStatus = new TSStatus(TSStatusCode.SUCCESS_STATUS.getStatusCode());
-    for (final TSStatus givenStatus : givenStatusList) {
-      if (!STATUS_PRIORITY.contains(givenStatus.getCode())) {
-        return givenStatus;
-      }
-
-      if (STATUS_PRIORITY.indexOf(givenStatus.getCode())
-          > STATUS_PRIORITY.indexOf(resultStatus.getCode())) {
-        resultStatus.setCode(givenStatus.getCode());
-      }
-    }
-    resultStatus.setSubStatus(givenStatusList);
-    return resultStatus;
   }
 }

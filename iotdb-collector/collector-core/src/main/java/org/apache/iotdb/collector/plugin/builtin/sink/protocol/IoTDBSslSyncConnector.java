@@ -163,7 +163,6 @@ public abstract class IoTDBSslSyncConnector extends IoTDBConnector {
   }
 
   protected void transferFilePieces(
-      final Map<Pair<String, Long>, Double> pipe2WeightMap,
       final File file,
       final Pair<IoTDBSyncClient, Boolean> clientAndStatus,
       final boolean isMultiFile)
@@ -237,11 +236,9 @@ public abstract class IoTDBSslSyncConnector extends IoTDBConnector {
       final String fileName, final long position, final byte[] payLoad) throws IOException;
 
   @Override
-  public void close() {
+  public void close() throws Exception {
     if (clientManager != null) {
       clientManager.close();
     }
-
-    super.close();
   }
 }

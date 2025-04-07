@@ -45,12 +45,20 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
     throw new UnsupportedOperationException();
   }
 
+  public Tablet getTablet() {
+    return tablet;
+  }
+
   public boolean isAligned() {
     return isAligned;
   }
 
   public boolean isTableModelEvent() {
     return false;
+  }
+
+  public String getDeviceId() {
+    return null;
   }
 
   public String getTableModelDatabaseName() {

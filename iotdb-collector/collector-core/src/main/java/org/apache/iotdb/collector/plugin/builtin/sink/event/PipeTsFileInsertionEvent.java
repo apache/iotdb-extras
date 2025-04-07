@@ -39,6 +39,10 @@ public class PipeTsFileInsertionEvent extends PipeInsertionEvent implements TsFi
     throw new PipeException("");
   }
 
+  public File getTsFile() {
+    return tsFile;
+  }
+
   @Override
   public Iterable<TabletInsertionEvent> toTabletInsertionEvents() throws PipeException {
     return toTabletInsertionEvents(Long.MAX_VALUE);

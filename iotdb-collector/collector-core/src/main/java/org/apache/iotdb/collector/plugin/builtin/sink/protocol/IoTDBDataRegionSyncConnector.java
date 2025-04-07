@@ -19,7 +19,9 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.protocol;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBDataNodeSyncClientManager;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClient;
+import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClientManager;
 import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeTsFileInsertionEvent;
 import org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch.PipeTabletEventBatch;
@@ -59,11 +61,48 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
+public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IoTDBDataRegionSyncConnector.class);
 
   private PipeTransferBatchReqBuilder tabletBatchBuilder;
+
+  protected IoTDBDataNodeSyncClientManager clientManager;
+
+  @Override
+  protected IoTDBSyncClientManager constructClient(
+      final List<TEndPoint> nodeUrls,
+      final boolean useSSL,
+      final String trustStorePath,
+      final String trustStorePwd,
+      /* The following parameters are used locally. */
+      final boolean useLeaderCache,
+      final String loadBalanceStrategy,
+      /* The following parameters are used to handshake with the receiver. */
+      final String username,
+      final String password,
+      final boolean shouldReceiverConvertOnTypeMismatch,
+      final String loadTsFileStrategy,
+      final boolean validateTsFile,
+      final boolean shouldMarkAsPipeRequest) {
+    clientManager =
+        new IoTDBDataNodeSyncClientManager(
+            nodeUrls,
+            useSSL,
+            Objects.nonNull(trustStorePath)
+                ? /*IoTDBConfig.addDataHomeDir(trustStorePath)*/ ""
+                : null,
+            trustStorePwd,
+            useLeaderCache,
+            loadBalanceStrategy,
+            username,
+            password,
+            shouldReceiverConvertOnTypeMismatch,
+            loadTsFileStrategy,
+            validateTsFile,
+            shouldMarkAsPipeRequest);
+    return clientManager;
+  }
 
   @Override
   public void customize(
@@ -91,59 +130,25 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
 
   @Override
   public void transfer(final TabletInsertionEvent tabletInsertionEvent) throws Exception {
-    // PipeProcessor can change the type of TabletInsertionEvent
-    if (!(tabletInsertionEvent instanceof PipeRawTabletInsertionEvent)) {
-      LOGGER.warn(
-          "IoTDBThriftSyncConnector only support " + "PipeRawTabletInsertionEvent. " + "Ignore {}.",
-          tabletInsertionEvent);
-      return;
-    }
-
-    try {
-      if (isTabletBatchModeEnabled) {
-        final Pair<TEndPoint, PipeTabletEventBatch> endPointAndBatch =
-            tabletBatchBuilder.onEvent(tabletInsertionEvent);
-        if (Objects.nonNull(endPointAndBatch)) {
-          doTransferWrapper(endPointAndBatch);
-        }
-      } else {
-        doTransferWrapper((PipeRawTabletInsertionEvent) tabletInsertionEvent);
+    if (isTabletBatchModeEnabled) {
+      final Pair<TEndPoint, PipeTabletEventBatch> endPointAndBatch =
+          tabletBatchBuilder.onEvent(tabletInsertionEvent);
+      if (Objects.nonNull(endPointAndBatch)) {
+        doTransferWrapper(endPointAndBatch);
       }
-    } catch (final Exception e) {
-      throw new PipeConnectionException(
-          String.format(
-              "Failed to transfer tablet insertion event %s, because %s.",
-              ((PipeRawTabletInsertionEvent) tabletInsertionEvent).coreReportMessage(),
-              e.getMessage()),
-          e);
+    } else {
+      doTransferWrapper((PipeRawTabletInsertionEvent) tabletInsertionEvent);
     }
   }
 
   @Override
   public void transfer(final TsFileInsertionEvent tsFileInsertionEvent) throws Exception {
-    // PipeProcessor can change the type of tsFileInsertionEvent
-    if (!(tsFileInsertionEvent instanceof PipeTsFileInsertionEvent)) {
-      LOGGER.warn(
-          "IoTDBThriftSyncConnector only support PipeTsFileInsertionEvent. Ignore {}.",
-          tsFileInsertionEvent);
-      return;
+    // In order to commit in order
+    if (isTabletBatchModeEnabled && !tabletBatchBuilder.isEmpty()) {
+      doTransferWrapper();
     }
 
-    try {
-      // In order to commit in order
-      if (isTabletBatchModeEnabled && !tabletBatchBuilder.isEmpty()) {
-        doTransferWrapper();
-      }
-
-      doTransferWrapper((PipeTsFileInsertionEvent) tsFileInsertionEvent);
-    } catch (final Exception e) {
-      throw new PipeConnectionException(
-          String.format(
-              "Failed to transfer tsfile insertion event %s, because %s.",
-              ((PipeTsFileInsertionEvent) tsFileInsertionEvent).coreReportMessage(),
-              e.getMessage()),
-          e);
-    }
+    doTransferWrapper((PipeTsFileInsertionEvent) tsFileInsertionEvent);
   }
 
   @Override
@@ -217,13 +222,9 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
     final Map<Pair<String, Long>, Double> pipe2WeightMap = batchToTransfer.deepCopyPipe2WeightMap();
 
     for (final Pair<String, File> dbTsFile : dbTsFilePairs) {
-      doTransfer(pipe2WeightMap, dbTsFile.right, null, dbTsFile.left);
+      doTransfer(dbTsFile.right, null, dbTsFile.left);
       try {
-        RetryUtils.retryOnException(
-            () -> {
-              FileUtils.delete(dbTsFile.right);
-              return null;
-            });
+        FileUtils.delete(dbTsFile.right);
       } catch (final NoSuchFileException e) {
         LOGGER.info("The file {} is not found, may already be deleted.", dbTsFile);
       } catch (final Exception e) {
@@ -248,7 +249,7 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
       final TPipeTransferReq req =
           compressIfNeeded(
               PipeTransferTabletRawReqV2.toTPipeTransferReq(
-                  pipeRawTabletInsertionEvent.convertToTablet(),
+                  pipeRawTabletInsertionEvent.getTablet(),
                   pipeRawTabletInsertionEvent.isAligned(),
                   pipeRawTabletInsertionEvent.isTableModelEvent()
                       ? pipeRawTabletInsertionEvent.getTableModelDatabaseName()
@@ -271,7 +272,7 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
           status,
           String.format(
               "Transfer PipeRawTabletInsertionEvent %s error, result status %s",
-              pipeRawTabletInsertionEvent.coreReportMessage(), status),
+              pipeRawTabletInsertionEvent, status),
           pipeRawTabletInsertionEvent.toString());
     }
     if (status.isSetRedirectNode()) {
@@ -283,19 +284,14 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
   private void doTransferWrapper(final PipeTsFileInsertionEvent pipeTsFileInsertionEvent)
       throws PipeException, IOException {
     doTransfer(
-        Collections.singletonMap(
-            new Pair<>(
-                pipeTsFileInsertionEvent.getPipeName(), pipeTsFileInsertionEvent.getCreationTime()),
-            1.0),
         pipeTsFileInsertionEvent.getTsFile(),
-        pipeTsFileInsertionEvent.isWithMod() ? pipeTsFileInsertionEvent.getModFile() : null,
+        null,
         pipeTsFileInsertionEvent.isTableModelEvent()
             ? pipeTsFileInsertionEvent.getTableModelDatabaseName()
             : null);
   }
 
   private void doTransfer(
-      final Map<Pair<String, Long>, Double> pipeName2WeightMap,
       final File tsFile,
       final File modFile,
       final String dataBaseName)
@@ -306,8 +302,8 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
 
     // 1. Transfer tsFile, and mod file if exists and receiver's version >= 2
     if (Objects.nonNull(modFile) && clientManager.supportModsIfIsDataNodeReceiver()) {
-      transferFilePieces(pipeName2WeightMap, modFile, clientAndStatus, true);
-      transferFilePieces(pipeName2WeightMap, tsFile, clientAndStatus, true);
+      transferFilePieces(modFile, clientAndStatus, true);
+      transferFilePieces(tsFile, clientAndStatus, true);
 
       // 2. Transfer file seal signal with mod, which means the file is transferred completely
       try {
@@ -329,7 +325,7 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
             e);
       }
     } else {
-      transferFilePieces(pipeName2WeightMap, tsFile, clientAndStatus, false);
+      transferFilePieces(tsFile, clientAndStatus, false);
 
       // 2. Transfer file seal signal without mod, which means the file is transferred completely
       try {
@@ -362,7 +358,7 @@ public class IoTDBDataRegionSyncConnector extends IoTDBDataNodeSyncConnector {
   }
 
   @Override
-  public void close() {
+  public void close() throws Exception {
     if (tabletBatchBuilder != null) {
       tabletBatchBuilder.close();
     }

@@ -29,6 +29,7 @@ import org.apache.iotdb.pipe.api.customizer.configuration.PipeConnectorRuntimeCo
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.exception.PipeParameterNotValidException;
+import org.apache.iotdb.rpc.UrlUtils;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
 
 import org.slf4j.Logger;
@@ -368,7 +369,7 @@ public abstract class IoTDBConnector implements PipeConnector {
 
       if (parameters.hasAttribute(CONNECTOR_IOTDB_NODE_URLS_KEY)) {
         givenNodeUrls.addAll(
-            NodeUrlUtils.parseTEndPointUrls(
+            parseTEndPointUrls(
                 Arrays.asList(
                     parameters
                         .getStringByKeys(CONNECTOR_IOTDB_NODE_URLS_KEY)
@@ -378,7 +379,7 @@ public abstract class IoTDBConnector implements PipeConnector {
 
       if (parameters.hasAttribute(SINK_IOTDB_NODE_URLS_KEY)) {
         givenNodeUrls.addAll(
-            NodeUrlUtils.parseTEndPointUrls(
+            parseTEndPointUrls(
                 Arrays.asList(
                     parameters
                         .getStringByKeys(SINK_IOTDB_NODE_URLS_KEY)
@@ -394,8 +395,19 @@ public abstract class IoTDBConnector implements PipeConnector {
 
     return givenNodeUrls;
   }
+  
+  private static List<TEndPoint> parseTEndPointUrls(List<String> endPointUrls) {
+    if (endPointUrls == null) {
+      throw new NumberFormatException("endPointUrls is null");
+    }
+    List<TEndPoint> result = new ArrayList<>();
+    for (String url : endPointUrls) {
+      result.add(UrlUtils.parseTEndPointIpv4AndIpv6Url(url));
+    }
+    return result;
+  }
 
-  private void checkNodeUrls(final Set<TEndPoint> nodeUrls) throws PipeParameterNotValidException {
+  private static void checkNodeUrls(final Set<TEndPoint> nodeUrls) throws PipeParameterNotValidException {
     for (final TEndPoint nodeUrl : nodeUrls) {
       if (Objects.isNull(nodeUrl.ip) || nodeUrl.ip.isEmpty()) {
         LOGGER.warn(PARSE_URL_ERROR_FORMATTER, "host cannot be empty");
@@ -412,17 +424,5 @@ public abstract class IoTDBConnector implements PipeConnector {
     return isRpcCompressionEnabled
         ? PipeTransferCompressedReq.toTPipeTransferReq(req, compressors)
         : req;
-  }
-
-  public boolean isRpcCompressionEnabled() {
-    return isRpcCompressionEnabled;
-  }
-
-  public List<PipeCompressor> getCompressors() {
-    return compressors;
-  }
-
-  public PipeReceiverStatusHandler statusHandler() {
-    return receiverStatusHandler;
   }
 }
