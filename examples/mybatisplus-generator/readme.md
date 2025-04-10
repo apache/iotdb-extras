@@ -18,10 +18,10 @@
     under the License.
 
 -->
-# Mybatis-Generator Demo
+# MybatisPlus-Generator Demo
 ## Introduction
 
-    This demo shows how to use IoTDB-Mybatis-Generator
+    This demo shows how to use IoTDB-MybatisPlus-Generator
 
 ### Version usage
 
