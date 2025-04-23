@@ -154,8 +154,7 @@
         <scalatest.version>3.0.9</scalatest.version>
         <slf4j.version>2.0.9</slf4j.version>
         <snappy-java.version>1.1.10.4</snappy-java.version>
-        <sonar.coverage.jacoco.xmlReportPaths>target/jacoco-merged-reports/jacoco.xml
-        </sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>target/jacoco-merged-reports/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <!-- Exclude all generated code -->
         <sonar.exclusions>**/generated-sources</sonar.exclusions>
         <!-- URL of the ASF SonarQube server -->
@@ -954,6 +953,11 @@
                 <version>${moquette.version}</version>
             </dependency>
             <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>${commons-codec.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.apache.iotdb</groupId>
                 <artifactId>service-rpc</artifactId>
                 <version>${iotdb.version}</version>
@@ -1728,8 +1732,7 @@
                                 <requireJavaVersion>
                                     <version>1.8.0</version>
                                 </requireJavaVersion>
-                                <banVulnerable
-                                        implementation="org.sonatype.ossindex.maven.enforcer.BanVulnerableDependencies">
+                                <banVulnerable implementation="org.sonatype.ossindex.maven.enforcer.BanVulnerableDependencies">
                                     <excludeCoordinates>
                                         <!-- TODO: For this CVE no fix exists yet (Keep an eye on it) -->
                                         <exclude>
@@ -2042,16 +2045,7 @@
                 <jdk>16</jdk>
             </activation>
             <properties>
-                <argLine>--illegal-access=permit --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
-                    --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED
-                    --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED
-                    --add-opens=java.base/java.net=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
-                </argLine>
+                <argLine>--illegal-access=permit --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</argLine>
             </properties>
         </profile>
         <!--
@@ -2064,16 +2058,7 @@
                 <jdk>[17,)</jdk>
             </activation>
             <properties>
-                <argLine>--add-opens=java.base/java.util.concurrent=ALL-UNNAMED
-                    --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED
-                    --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED
-                    --add-opens=java.base/java.net=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
-                    --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
-                </argLine>
+                <argLine>--add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</argLine>
             </properties>
         </profile>
         <!-- Current version of spotless cannot support JDK21 -->
@@ -2160,8 +2145,7 @@
                                         <fileSet>
                                             <directory>${project.build.directory}</directory>
                                             <includes>
-                                                <include>apache-iotdb-extras-${project.version}-source-release.zip
-                                                </include>
+                                                <include>apache-iotdb-extras-${project.version}-source-release.zip</include>
                                             </includes>
                                         </fileSet>
                                     </fileSets>
