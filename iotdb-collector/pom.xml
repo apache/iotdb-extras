@@ -32,5 +32,6 @@
     <modules>
         <module>collector-core</module>
         <module>collector-openapi</module>
+        <module>collector-distribution</module>
     </modules>
 </project>

@@ -22,10 +22,12 @@ package org.apache.iotdb.collector.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -36,6 +38,8 @@ public class Configuration {
   private static final Logger LOGGER = LoggerFactory.getLogger(Configuration.class);
 
   private static final String CONFIG_FILE_NAME = "application.properties";
+  public static final String COLLECTOR_CONF = "COLLECTOR_CONF";
+  public static final String COLLECTOR_HOME = "COLLECTOR_HOME";
 
   private final Options options = new Options();
 
@@ -69,17 +73,42 @@ public class Configuration {
   }
 
   private Optional<URL> getPropsUrl() {
-    final URL url = Options.class.getResource("/" + CONFIG_FILE_NAME);
+    String urlString = getConfDir();
+    if (urlString == null) {
+      final URL uri = Options.class.getResource("/" + CONFIG_FILE_NAME);
+      if (uri != null) {
+        return Optional.of(uri);
+      } else {
+        LOGGER.warn(
+            "Cannot find IOTDB_COLLECTOR_HOME or IOTDB_COLLECTOR_CONF environment variable when loading "
+                + "config file {}, use default configuration",
+            CONFIG_FILE_NAME);
+        return Optional.empty();
+      }
+    } else if (!urlString.endsWith(".properties")) {
+      urlString += (File.separatorChar + CONFIG_FILE_NAME);
+    }
 
-    if (url != null) {
-      return Optional.of(url);
-    } else {
-      LOGGER.warn(
-          "Cannot find IOTDB_COLLECTOR_HOME or IOTDB_COLLECTOR_CONF environment variable when loading "
-              + "config file {}, use default configuration",
-          CONFIG_FILE_NAME);
+    try {
+      if (!urlString.startsWith("file:") && !urlString.startsWith("classpath:")) {
+        urlString = "file:" + urlString;
+      }
+      return Optional.of(new URL(urlString));
+    } catch (final MalformedURLException e) {
+      LOGGER.warn("get url failed", e);
       return Optional.empty();
     }
+  }
+
+  public String getConfDir() {
+    String confString = System.getProperty(COLLECTOR_CONF, null);
+    if (confString == null) {
+      confString = System.getProperty(COLLECTOR_HOME, null);
+      if (confString != null) {
+        confString = confString + File.separatorChar + "conf";
+      }
+    }
+    return confString;
   }
 
   public void logAllOptions() {

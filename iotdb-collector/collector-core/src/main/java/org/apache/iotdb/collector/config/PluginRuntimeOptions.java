@@ -23,10 +23,10 @@ import java.io.File;
 
 public class PluginRuntimeOptions extends Options {
   public static final Option<String> PLUGIN_LIB_DIR =
-      new Option<String>("plugin_lib_dir", "ext" + File.separator + "plugin") {
+      new Option<String>("plugin_lib_dir", "system" + File.separator + "plugin") {
         @Override
         public void setValue(final String valueString) {
-          value = valueString;
+          value = addHomeDir(valueString);
         }
       };
 
@@ -35,7 +35,17 @@ public class PluginRuntimeOptions extends Options {
           "plugin_install_lib_dir", PLUGIN_LIB_DIR.value() + File.separator + "install") {
         @Override
         public void setValue(final String valueString) {
-          value = valueString;
+          value = addHomeDir(valueString);
+        }
+      };
+
+  public static final Option<String> PLUGIN_DATABASE_FILE_PATH =
+      new Option<String>(
+          "plugin_database_file_path",
+          "system" + File.separator + "database" + File.separator + "plugin.db") {
+        @Override
+        public void setValue(final String valueString) {
+          value = addHomeDir(valueString);
         }
       };
 }

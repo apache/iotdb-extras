@@ -21,6 +21,8 @@ package org.apache.iotdb.collector.plugin.api;
 
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 
 public abstract class PushSource implements PipeSource {
@@ -29,6 +31,14 @@ public abstract class PushSource implements PipeSource {
 
   public PushSource() {
     this.collector = null;
+  }
+
+  @Override
+  public final void customize(
+      PipeParameters pipeParameters,
+      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration)
+      throws Exception {
+    throw new UnsupportedOperationException();
   }
 
   public final void setCollector(final EventCollector collector) {

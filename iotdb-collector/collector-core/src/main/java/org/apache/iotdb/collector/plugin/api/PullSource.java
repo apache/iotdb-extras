@@ -20,5 +20,15 @@
 package org.apache.iotdb.collector.plugin.api;
 
 import org.apache.iotdb.pipe.api.PipeSource;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
-public abstract class PullSource implements PipeSource {}
+public abstract class PullSource implements PipeSource {
+
+  @Override
+  public final void customize(
+      PipeParameters pipeParameters,
+      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
+    throw new UnsupportedOperationException();
+  }
+}

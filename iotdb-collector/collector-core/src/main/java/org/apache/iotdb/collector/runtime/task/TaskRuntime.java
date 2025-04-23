@@ -82,6 +82,8 @@ public class TaskRuntime implements AutoCloseable {
           .entity(String.format("Successfully created task %s", taskId))
           .build();
     } catch (final Exception e) {
+      tasks.remove(taskId);
+
       LOGGER.warn("Failed to create task {} because {}", taskId, e.getMessage(), e);
       return Response.serverError()
           .entity(String.format("Failed to create task %s, because %s", taskId, e.getMessage()))

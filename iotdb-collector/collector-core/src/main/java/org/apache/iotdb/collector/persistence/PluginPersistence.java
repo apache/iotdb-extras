@@ -19,8 +19,9 @@
 
 package org.apache.iotdb.collector.persistence;
 
-import org.apache.iotdb.collector.runtime.plugin.utils.PluginFileUtils;
+import org.apache.iotdb.collector.config.PluginRuntimeOptions;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.collector.utils.PluginFileUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,8 @@ public class PluginPersistence extends Persistence {
   @Override
   protected void initDatabaseFileIfPossible() {
     try {
-      final Path pluginDatabaseFilePath = Paths.get(DBConstant.PLUGIN_DATABASE_FILE_PATH);
+      final Path pluginDatabaseFilePath =
+          Paths.get(PluginRuntimeOptions.PLUGIN_DATABASE_FILE_PATH.value());
       if (!Files.exists(pluginDatabaseFilePath)) {
         Files.createFile(pluginDatabaseFilePath);
       }

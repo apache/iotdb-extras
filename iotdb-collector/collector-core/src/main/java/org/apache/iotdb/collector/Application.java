@@ -22,6 +22,7 @@ package org.apache.iotdb.collector;
 import org.apache.iotdb.collector.config.Configuration;
 import org.apache.iotdb.collector.service.ApiService;
 import org.apache.iotdb.collector.service.IService;
+import org.apache.iotdb.collector.service.PeriodicalJobService;
 import org.apache.iotdb.collector.service.PersistenceService;
 import org.apache.iotdb.collector.service.RuntimeService;
 
@@ -41,6 +42,7 @@ public class Application {
     services.add(new RuntimeService());
     services.add(new ApiService());
     services.add(new PersistenceService());
+    services.add(new PeriodicalJobService());
   }
 
   public static void main(String[] args) {

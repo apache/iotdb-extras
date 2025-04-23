@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.runtime.plugin.constructor;
 
 import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
 import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
+import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSyncConnector;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
 import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -33,7 +34,9 @@ public class SinkConstructor extends PluginConstructor {
 
   @Override
   protected void initConstructors() {
-    pluginConstructors.put(BuiltinPlugin.IOTDB_THRIFT_SINK.getPluginName(), DemoSink::new);
+    pluginConstructors.put(BuiltinPlugin.IOTDB_DEMO_SINK.getPluginName(), DemoSink::new);
+    pluginConstructors.put(
+        BuiltinPlugin.IOTDB_SYNC_SINK.getPluginName(), IoTDBDataRegionSyncConnector::new);
   }
 
   @Override
@@ -45,7 +48,7 @@ public class SinkConstructor extends PluginConstructor {
     return (PipeSink)
         reflectPluginByKey(
             sinkParameters
-                .getStringOrDefault("sink", BuiltinPlugin.IOTDB_THRIFT_SINK.getPluginName())
+                .getStringOrDefault("sink", BuiltinPlugin.IOTDB_DEMO_SINK.getPluginName())
                 .toLowerCase());
   }
 }
