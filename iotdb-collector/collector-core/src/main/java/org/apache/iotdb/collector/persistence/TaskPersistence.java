@@ -22,9 +22,9 @@ package org.apache.iotdb.collector.persistence;
 import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.service.RuntimeService;
-import org.apache.iotdb.tsfile.utils.PublicBAOS;
-import org.apache.iotdb.tsfile.utils.ReadWriteIOUtils;
 
+import org.apache.tsfile.utils.PublicBAOS;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -19,9 +19,9 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.compressor;
 
-import org.apache.iotdb.tsfile.compress.ICompressor;
-import org.apache.iotdb.tsfile.compress.IUnCompressor;
-import org.apache.iotdb.tsfile.file.metadata.enums.CompressionType;
+import org.apache.tsfile.compress.ICompressor;
+import org.apache.tsfile.compress.IUnCompressor;
+import org.apache.tsfile.file.metadata.enums.CompressionType;
 
 import java.io.IOException;
 

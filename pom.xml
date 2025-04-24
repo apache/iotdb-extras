@@ -41,7 +41,7 @@
     </modules>
     <properties>
         <!-- Explicitly set a variable used by all dependencies to the IoTDB dependencies, as the release plugin will not update these on a release -->
-        <iotdb.version>2.0.1-beta</iotdb.version>
+        <iotdb.version>2.0.2</iotdb.version>
         <tsfile.version>2.0.1</tsfile.version>
         <!-- This was the last version to support Java 8 -->
         <airlift-units.version>1.7</airlift-units.version>
@@ -186,7 +186,7 @@
         <thrift.version>0.14.1</thrift.version>
         <!-- This was the last version to support Java 8 -->
         <tomcat.version>9.0.86</tomcat.version>
-        <tsfile.version>2.1.0-250219-SNAPSHOT</tsfile.version>
+        <tsfile.version>2.0.2</tsfile.version>
         <xz.version>1.9</xz.version>
         <zeppelin.version>0.11.1</zeppelin.version>
         <zstd-jni.version>1.5.5-5</zstd-jni.version>
