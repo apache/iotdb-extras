@@ -19,6 +19,9 @@
 
 package org.apache.iotdb.collector.persistence;
 
+import org.apache.iotdb.collector.config.PluginRuntimeOptions;
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
+
 public class DBConstant {
 
   public static final String CREATE_PLUGIN_TABLE_SQL =
@@ -41,9 +44,11 @@ public class DBConstant {
           + "    create_time         TEXT NOT NULL\n"
           + ");";
 
-  public static final String PLUGIN_DATABASE_FILE_PATH = "ext/db/plugin.db";
-  public static final String TASK_DATABASE_FILE_PATH = "ext/db/task.db";
+  public static final String PLUGIN_DATABASE_FILE_PATH = "system/database/plugin.db";
+  public static final String TASK_DATABASE_FILE_PATH = "system/database/task.db";
 
-  public static final String PLUGIN_DATABASE_URL = "jdbc:sqlite:" + PLUGIN_DATABASE_FILE_PATH;
-  public static final String TASK_DATABASE_URL = "jdbc:sqlite:" + TASK_DATABASE_FILE_PATH;
+  public static final String PLUGIN_DATABASE_URL =
+      "jdbc:sqlite:" + PluginRuntimeOptions.PLUGIN_DATABASE_FILE_PATH.value();
+  public static final String TASK_DATABASE_URL =
+      "jdbc:sqlite:" + TaskRuntimeOptions.TASK_DATABASE_FILE_PATH.value();
 }

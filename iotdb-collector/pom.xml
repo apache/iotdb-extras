@@ -30,7 +30,8 @@
     <packaging>pom</packaging>
     <name>IoTDB: Collector</name>
     <modules>
-        <module>collector-core</module>
         <module>collector-openapi</module>
+        <module>collector-core</module>
+        <module>collector-distribution</module>
     </modules>
 </project>

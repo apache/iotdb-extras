@@ -49,6 +49,11 @@ public class CollectorRuntimeEnvironment implements PipeRuntimeEnvironment {
     return creationTime;
   }
 
+  @Override
+  public int getRegionId() {
+    return getInstanceIndex();
+  }
+
   public int getParallelism() {
     return parallelism;
   }

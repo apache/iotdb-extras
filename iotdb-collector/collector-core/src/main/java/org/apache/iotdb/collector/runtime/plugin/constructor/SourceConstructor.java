@@ -24,6 +24,7 @@ import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.IoTDBPushSource;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -38,6 +39,7 @@ public class SourceConstructor extends PluginConstructor {
   protected void initConstructors() {
     pluginConstructors.put(BuiltinPlugin.HTTP_PULL_SOURCE.getPluginName(), HttpPullSource::new);
     pluginConstructors.put(BuiltinPlugin.HTTP_PUSH_SOURCE.getPluginName(), HttpPushSource::new);
+    pluginConstructors.put(BuiltinPlugin.SUBSCRIPTION_SOURCE.getPluginName(), IoTDBPushSource::new);
   }
 
   @Override

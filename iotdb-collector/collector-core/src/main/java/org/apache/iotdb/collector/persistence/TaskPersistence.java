@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.persistence;
 
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.service.RuntimeService;
 import org.apache.iotdb.tsfile.utils.PublicBAOS;
@@ -55,7 +56,8 @@ public class TaskPersistence extends Persistence {
   @Override
   protected void initDatabaseFileIfPossible() {
     try {
-      final Path taskDatabaseFilePath = Paths.get(DBConstant.TASK_DATABASE_FILE_PATH);
+      final Path taskDatabaseFilePath =
+          Paths.get(TaskRuntimeOptions.TASK_DATABASE_FILE_PATH.value());
       if (!Files.exists(taskDatabaseFilePath)) {
         Files.createFile(taskDatabaseFilePath);
       }
@@ -119,6 +121,7 @@ public class TaskPersistence extends Persistence {
 
     if (Objects.isNull(response) || response.getStatus() != Response.Status.OK.getStatusCode()) {
       LOGGER.warn("Failed to recover task persistence message, because {}", response);
+      tryDeleteTask(taskId);
     }
   }
 
@@ -160,6 +163,8 @@ public class TaskPersistence extends Persistence {
       statement.setBytes(5, sinkAttributeBuffer);
       statement.setString(6, String.valueOf(new Timestamp(System.currentTimeMillis())));
       statement.executeUpdate();
+
+      LOGGER.info("successfully persisted task {} info", taskId);
     } catch (final SQLException | IOException e) {
       LOGGER.warn("Failed to persistence task message, because {}", e.getMessage());
     }
@@ -186,6 +191,8 @@ public class TaskPersistence extends Persistence {
       final PreparedStatement statement = connection.prepareStatement(deleteSQL);
       statement.setString(1, taskId);
       statement.executeUpdate();
+
+      LOGGER.info("successfully deleted task {}", taskId);
     } catch (final SQLException e) {
       LOGGER.warn("Failed to delete task persistence message, because {}", e.getMessage());
     }
@@ -199,6 +206,8 @@ public class TaskPersistence extends Persistence {
       statement.setInt(1, taskState.getTaskState());
       statement.setString(2, taskId);
       statement.executeUpdate();
+
+      LOGGER.info("successfully altered task {}", taskId);
     } catch (SQLException e) {
       LOGGER.warn("Failed to alter task persistence message, because {}", e.getMessage());
     }

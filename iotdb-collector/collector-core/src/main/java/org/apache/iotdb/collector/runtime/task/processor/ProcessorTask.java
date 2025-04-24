@@ -20,13 +20,13 @@
 package org.apache.iotdb.collector.runtime.task.processor;
 
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorProcessorRuntimeConfiguration;
+import org.apache.iotdb.collector.plugin.api.event.PeriodicalEvent;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
+import org.apache.iotdb.collector.service.PeriodicalJobService;
 import org.apache.iotdb.collector.service.RuntimeService;
-import org.apache.iotdb.commons.concurrent.IoTThreadFactory;
-import org.apache.iotdb.commons.concurrent.threadpool.WrappedThreadPoolExecutor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE;
@@ -67,14 +68,12 @@ public class ProcessorTask extends Task {
 
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
-        new WrappedThreadPoolExecutor(
+        new ThreadPoolExecutor(
             parallelism,
             parallelism,
             0L,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(parallelism),
-            new IoTThreadFactory(taskId), // TODO: thread name
-            taskId));
+            new LinkedBlockingQueue<>(parallelism))); // TODO: thread name
 
     disruptor =
         new Disruptor<>(
@@ -121,16 +120,21 @@ public class ProcessorTask extends Task {
     disruptor.setDefaultExceptionHandler(new ProcessorExceptionHandler());
 
     disruptor.start();
+
+    // Scheduled and proactive sink actions
+    PeriodicalJobService.register(taskId, () -> sinkProducer.collect(new PeriodicalEvent()));
   }
 
   @Override
   public void startInternal() {
-    // do nothing
+    // resume proactive sink actions
+    PeriodicalJobService.resumeSingleTask(taskId);
   }
 
   @Override
   public void stopInternal() {
-    // do nothing
+    // pause proactive sink actions
+    PeriodicalJobService.pauseSingleTask(taskId);
   }
 
   @Override
@@ -144,6 +148,9 @@ public class ProcessorTask extends Task {
         }
       }
     }
+
+    // remove proactive sink actions
+    PeriodicalJobService.deregister(taskId);
 
     disruptor.shutdown();
 

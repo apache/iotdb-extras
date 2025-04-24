@@ -21,7 +21,6 @@ package org.apache.iotdb.collector.plugin.builtin.source;
 
 import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.event.DemoEvent;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -40,11 +39,6 @@ public class HttpPullSource extends PullSource {
 
   @Override
   public void validate(PipeParameterValidator pipeParameterValidator) {}
-
-  @Override
-  public void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {}
 
   @Override
   public void customize(

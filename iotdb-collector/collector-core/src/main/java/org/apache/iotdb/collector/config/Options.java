@@ -22,9 +22,12 @@ package org.apache.iotdb.collector.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static org.apache.iotdb.collector.config.Configuration.COLLECTOR_HOME;
 
 public class Options {
 
@@ -37,6 +40,7 @@ public class Options {
       Class.forName(ApiServiceOptions.class.getName());
       Class.forName(TaskRuntimeOptions.class.getName());
       Class.forName(PluginRuntimeOptions.class.getName());
+      Class.forName(PipeRuntimeOptions.class.getName());
     } catch (final ClassNotFoundException e) {
       throw new RuntimeException("Failed to load options", e);
     }
@@ -72,6 +76,15 @@ public class Options {
     }
 
     public abstract void setValue(final String valueString);
+
+    protected String addHomeDir(String dir) {
+      final String homeDir = System.getProperty(COLLECTOR_HOME, null);
+      if (!new File(dir).isAbsolute() && homeDir != null && !homeDir.isEmpty()) {
+        dir =
+            !homeDir.endsWith(File.separator) ? homeDir + File.separatorChar + dir : homeDir + dir;
+      }
+      return dir;
+    }
 
     @Override
     public String toString() {

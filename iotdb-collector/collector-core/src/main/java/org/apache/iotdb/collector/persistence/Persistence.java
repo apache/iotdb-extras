@@ -29,6 +29,7 @@ public abstract class Persistence {
 
   public Persistence(final String databaseUrl) {
     this.databaseUrl = databaseUrl;
+
     initDatabaseFileIfPossible();
     initTableIfPossible();
   }

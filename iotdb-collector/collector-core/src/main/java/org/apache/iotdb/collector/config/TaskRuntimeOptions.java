@@ -19,6 +19,8 @@
 
 package org.apache.iotdb.collector.config;
 
+import java.io.File;
+
 public class TaskRuntimeOptions extends Options {
 
   public static final Option<Integer> TASK_SOURCE_PARALLELISM_NUM =
@@ -48,7 +50,7 @@ public class TaskRuntimeOptions extends Options {
   public static final Option<Integer> TASK_PROCESSOR_RING_BUFFER_SIZE =
       new Option<Integer>("task_processor_ring_buffer_size", 1024) {
         @Override
-        public void setValue(String valueString) {
+        public void setValue(final String valueString) {
           value = Integer.parseInt(valueString);
         }
       };
@@ -56,8 +58,18 @@ public class TaskRuntimeOptions extends Options {
   public static final Option<Integer> TASK_SINK_RING_BUFFER_SIZE =
       new Option<Integer>("task_sink_ring_buffer_size", 1024) {
         @Override
-        public void setValue(String valueString) {
+        public void setValue(final String valueString) {
           value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<String> TASK_DATABASE_FILE_PATH =
+      new Option<String>(
+          "task_database_file_path",
+          "system" + File.separator + "database" + File.separator + "task.db") {
+        @Override
+        public void setValue(final String valueString) {
+          value = addHomeDir(valueString);
         }
       };
 }

@@ -25,8 +25,6 @@ import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
 import org.apache.iotdb.collector.service.RuntimeService;
-import org.apache.iotdb.commons.concurrent.IoTThreadFactory;
-import org.apache.iotdb.commons.concurrent.threadpool.WrappedThreadPoolExecutor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -39,6 +37,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM;
@@ -59,14 +58,12 @@ public class SinkTask extends Task {
 
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
-        new WrappedThreadPoolExecutor(
+        new ThreadPoolExecutor(
             parallelism,
             parallelism,
             0L,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(parallelism),
-            new IoTThreadFactory(taskId), // TODO: thread name
-            taskId));
+            new LinkedBlockingQueue<>(parallelism))); // TODO: thread name
 
     disruptor =
         new Disruptor<>(

@@ -20,9 +20,12 @@
 package org.apache.iotdb.collector.plugin.builtin;
 
 import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
+import org.apache.iotdb.collector.plugin.builtin.processor.SubscriptionProcessor;
 import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
+import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSyncConnector;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.IoTDBPushSource;
 
 public enum BuiltinPlugin {
 
@@ -31,12 +34,15 @@ public enum BuiltinPlugin {
 
   // Pull Sources
   HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),
+  SUBSCRIPTION_SOURCE("subscription-source", IoTDBPushSource.class),
 
   // Processors
   DO_NOTHING_PROCESSOR("do-nothing-processor", DoNothingProcessor.class),
+  SUBSCRIPTION_PROCESSOR("subscription-processor", SubscriptionProcessor.class),
 
   // Sinks
-  IOTDB_THRIFT_SINK("iotdb-thrift-sink", DemoSink.class);
+  IOTDB_DEMO_SINK("iotdb-demo-sink", DemoSink.class),
+  IOTDB_SYNC_SINK("iotdb-sync-sink", IoTDBDataRegionSyncConnector.class);
 
   private final String collectorPluginName;
   private final Class<?> collectorPluginClass;

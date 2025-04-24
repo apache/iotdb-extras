@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.runtime.plugin.utils;
+package org.apache.iotdb.collector.utils;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
