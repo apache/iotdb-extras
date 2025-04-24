@@ -127,7 +127,13 @@ object IoTDBUtils {
       case BinaryType => TSDataType.BLOB
       case DateType => TSDataType.DATE
       case TimestampType => TSDataType.STRING
-      case _ => TSDataType.STRING
+      case _ => {
+        var errMsg = s"Unable to convert Spark data type $sparkDataType to IoTDB data type."
+        if (sparkDataType.simpleString.toLowerCase.contains("decimal")) {
+          errMsg += s"For float numbers in insert into values sql, you should add the suffix 'f' or 'd' to represent float or double."
+        }
+        throw new IllegalArgumentException(errMsg)
+      }
     }
   }
 

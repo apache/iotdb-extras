@@ -25,7 +25,7 @@ import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{NullType, StructType}
 import org.apache.tsfile.enums.TSDataType
 import org.apache.tsfile.write.record.Tablet
 import org.apache.tsfile.write.record.Tablet.ColumnCategory
@@ -57,10 +57,15 @@ class IoTDBDataWriter(options: IoTDBOptions, writeSchema: StructType, tableSchem
       } else {
         tableSchema.fields(i)
       }
-      val columnCategoryStr = tableSchemaMap.getOrElse(fieldInTableSchema.name, tableSchema.fields(i)).metadata.getString(IoTDBUtils.COLUMN_CATEGORY)
+      val actualColumnSchema = tableSchemaMap.getOrElse(fieldInTableSchema.name, tableSchema.fields(i))
+      val columnCategoryStr = actualColumnSchema.metadata.getString(IoTDBUtils.COLUMN_CATEGORY)
       val columnCategory = IoTDBUtils.getIoTDBColumnCategory(columnCategoryStr)
       if (fieldInTableSchema.name != IoTDBUtils.TIME) {
-        val dataType = writeSchemaField.dataType
+        val dataType = if (writeSchemaField.dataType == NullType) {
+          actualColumnSchema.dataType
+        } else {
+          writeSchemaField.dataType
+        }
         columnNameList.add(fieldInTableSchema.name)
         dataTypeList.add(IoTDBUtils.getIoTDBDataType(dataType))
         columnCategoryList.add(columnCategory)
