@@ -47,4 +47,4 @@ jobs:
       - name: Compiler Test
         shell: bash
         run: |
-          mvn clean package -P with-integration-tests -ntp
+          mvn clean verify -P with-integration-tests -ntp
