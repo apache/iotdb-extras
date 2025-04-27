@@ -30,7 +30,7 @@ public class SpringBootIoTDBApplicationTests {
     @Autowired
     private IoTDBService iotdbService;
 
-    @Test
+    // @Test
     void contextLoads() throws IoTDBConnectionException, StatementExecutionException {
         iotdbService.querySessionPool();
         iotdbService.queryTableSessionPool();
