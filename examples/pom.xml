@@ -38,7 +38,17 @@
         <module>rabbitmq</module>
         <module>rocketmq</module>
         <module>spark-table</module>
+        <module>mybatis-generator</module>
+        <module>mybatisplus-generator</module>
     </modules>
+    <profiles>
+        <profile>
+            <id>with-springboot</id>
+            <modules>
+                <module>iotdb-spring-boot-start</module>
+            </modules>
+        </profile>
+    </profiles>
     <build>
         <pluginManagement>
             <plugins>

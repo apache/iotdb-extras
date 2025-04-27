@@ -2069,6 +2069,12 @@
                 <spotless.skip>true</spotless.skip>
             </properties>
         </profile>
+        <profile>
+            <id>with-springboot</id>
+            <modules>
+                <module>iotdb-spring-boot-starter</module>
+            </modules>
+        </profile>
         <!-- Make sure the source assembly has the right name -->
         <profile>
             <id>apache-release</id>
