@@ -28,6 +28,7 @@
     </parent>
     <groupId>org.apache.iotdb</groupId>
     <artifactId>iotdb-spring-boot-starter</artifactId>
+    <name>IoTDB Extras: SpringBoot Starter</name>
     <version>2.0.2-SNAPSHOT</version>
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

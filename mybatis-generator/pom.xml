@@ -8,6 +8,7 @@
     </parent>
     <groupId>org.apache.iotdb</groupId>
     <artifactId>mybatis-generator-plugin</artifactId>
+    <name>IoTDB Extras: Mybatis Generator Plugin</name>
     <version>2.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>

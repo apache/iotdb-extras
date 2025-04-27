@@ -28,6 +28,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <artifactId>mybatis-generator-example</artifactId>
+    <name>IoTDB: Example: Mybatis Generator</name>
     <version>2.0.2-SNAPHOT</version>
     <build>
         <plugins>
