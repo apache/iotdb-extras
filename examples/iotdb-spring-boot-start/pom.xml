@@ -31,10 +31,12 @@
     <groupId>org.apache.iotdb</groupId>
     <artifactId>iotdb-spring-boot-start-example</artifactId>
     <version>2.0.2-SNAPHOT</version>
-    <name>iotdb-spring-boot-start</name>
+    <name>IoTDB: Example: SpringBoot Starter</name>
     <description>iotdb-spring-boot-start</description>
     <properties>
         <java.version>17</java.version>
+        <spring-boot.version>3.4.5</spring-boot.version>
+        <spring.version>6.2.6</spring.version>
     </properties>
     <dependencies>
         <dependency>
