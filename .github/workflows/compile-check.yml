@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [8, 11]
+        java: [8, 11, 17, 21]
         os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -47,22 +47,8 @@ jobs:
       - name: Compiler Test
         shell: bash
         run: |
-          mvn clean verify -P with-integration-tests -ntp
-  compile-check-jdk17-and-above:
-    strategy:
-      fail-fast: false
-      matrix:
-        java: [17, 21]
-        os: [ ubuntu-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: liberica
-          java-version: ${{ matrix.java }}
-      - name: Compiler Test
-        shell: bash
-        run: |
-          mvn clean verify -P with-integration-tests -P with-springboot -ntp
+          if [ "${{ matrix.java }}" -ge 17 ]; then
+            mvn clean verify -P with-integration-tests -P with-springboot -ntp
+          else
+            mvn clean verify -P with-integration-tests -ntp
+          fi
