@@ -22,7 +22,6 @@ import org.apache.iotdb.isession.pool.ISessionPool;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.SessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -35,64 +34,76 @@ import java.util.Arrays;
 @EnableConfigurationProperties(IoTDBSessionProperties.class)
 public class IoTDBSessionPool {
 
-  private final IoTDBSessionProperties properties;
-  private ITableSessionPool tableSessionPool;
-  private ISessionPool treeSessionPool;
+    private final IoTDBSessionProperties properties;
+    private ITableSessionPool tableSessionPool;
+    private ISessionPool treeSessionPool;
 
-  public IoTDBSessionPool(IoTDBSessionProperties properties) {
-    this.properties = properties;
-  }
-
-  @Bean
-  public ITableSessionPool tableSessionPool() {
-    if (tableSessionPool == null) {
-      synchronized (IoTDBSessionPool.class) {
-        if (tableSessionPool == null) {
-          tableSessionPool =
-              new TableSessionPoolBuilder()
-                  .nodeUrls(Arrays.asList(properties.getUrl().split(";")))
-                  .user(properties.getUsername())
-                  .password(properties.getPassword())
-                  .database(properties.getDatabase())
-                  .maxSize(properties.getMax_size())
-                  .fetchSize(properties.getFetch_size())
-                  .enableAutoFetch(properties.getEnable_auto_fetch())
-                  .useSSL(properties.getUse_ssl())
-                  .queryTimeoutInMs(properties.getQuery_timeout_in_ms())
-                  .maxRetryCount(properties.getMax_retry_count())
-                  .waitToGetSessionTimeoutInMs(properties.getQuery_timeout_in_ms())
-                  .enableCompression(properties.isEnable_compression())
-                  .retryIntervalInMs(properties.getRetry_interval_in_ms())
-                  .build();
-        }
-      }
+    public IoTDBSessionPool(IoTDBSessionProperties properties) {
+        this.properties = properties;
     }
-    return tableSessionPool;
-  }
 
-  @Bean
-  public ISessionPool treeSessionPool() {
-    if (treeSessionPool == null) {
-      synchronized (IoTDBSessionPool.class) {
-        if (treeSessionPool == null) {
-          treeSessionPool =
-              new SessionPool.Builder()
-                  .nodeUrls(Arrays.asList(properties.getUrl().split(";")))
-                  .user(properties.getUsername())
-                  .password(properties.getPassword())
-                  .maxSize(properties.getMax_size())
-                  .fetchSize(properties.getFetch_size())
-                  .enableAutoFetch(properties.getEnable_auto_fetch())
-                  .useSSL(properties.getUse_ssl())
-                  .queryTimeoutInMs(properties.getQuery_timeout_in_ms())
-                  .maxRetryCount(properties.getMax_retry_count())
-                  .waitToGetSessionTimeoutInMs(properties.getQuery_timeout_in_ms())
-                  .enableCompression(properties.isEnable_compression())
-                  .retryIntervalInMs(properties.getRetry_interval_in_ms())
-                  .build();
+    @Bean
+    public ITableSessionPool tableSessionPool() {
+        if(tableSessionPool == null) {
+            synchronized (IoTDBSessionPool.class) {
+                if(tableSessionPool == null) {
+                    tableSessionPool = new TableSessionPoolBuilder().
+                            nodeUrls(Arrays.asList(properties.getUrl().split(";"))).
+                            user(properties.getUsername()).
+                            password(properties.getPassword()).
+                            database(properties.getDatabase()).
+                            maxSize(properties.getMax_size()).
+                            fetchSize(properties.getFetch_size()).
+                            enableAutoFetch(properties.getEnable_auto_fetch()).
+                            useSSL(properties.getUse_ssl()).
+                            queryTimeoutInMs(properties.getQuery_timeout_in_ms()).
+                            maxRetryCount(properties.getMax_retry_count()).
+                            waitToGetSessionTimeoutInMs(properties.getQuery_timeout_in_ms()).
+                            enableCompression(properties.isEnable_compression()).
+                            retryIntervalInMs(properties.getRetry_interval_in_ms()).
+                            trustStore(properties.getTrust_store()).
+                            trustStorePwd(properties.getTrust_store_pwd()).
+                            connectionTimeoutInMs(properties.getConnection_timeout_in_ms()).
+                            zoneId(properties.getZone_id()).
+                            thriftDefaultBufferSize(properties.getThrift_default_buffer_size()).
+                            thriftMaxFrameSize(properties.getThrift_max_frame_size()).
+                            enableRedirection(properties.isEnable_redirection()).build();
+                }
+            }
         }
-      }
+        return tableSessionPool;
     }
-    return treeSessionPool;
-  }
+
+    @Bean
+    public ISessionPool treeSessionPool() {
+        if(treeSessionPool == null) {
+            synchronized (IoTDBSessionPool.class) {
+                if(treeSessionPool == null) {
+                    treeSessionPool = new SessionPool.Builder().
+                            nodeUrls(Arrays.asList(properties.getUrl().split(";"))).
+                            user(properties.getUsername()).
+                            password(properties.getPassword()).
+                            maxSize(properties.getMax_size()).
+                            fetchSize(properties.getFetch_size()).
+                            enableAutoFetch(properties.getEnable_auto_fetch()).
+                            useSSL(properties.getUse_ssl()).
+                            queryTimeoutInMs(properties.getQuery_timeout_in_ms()).
+                            maxRetryCount(properties.getMax_retry_count()).
+                            waitToGetSessionTimeoutInMs(properties.getQuery_timeout_in_ms()).
+                            enableCompression(properties.isEnable_compression()).
+                            retryIntervalInMs(properties.getRetry_interval_in_ms()).
+                            trustStore(properties.getTrust_store()).
+                            trustStorePwd(properties.getTrust_store_pwd()).
+                            connectionTimeoutInMs(properties.getConnection_timeout_in_ms()).
+                            zoneId(properties.getZone_id()).
+                            thriftDefaultBufferSize(properties.getThrift_default_buffer_size()).
+                            thriftMaxFrameSize(properties.getThrift_max_frame_size()).
+                            enableRedirection(properties.isEnable_redirection()).
+                            enableRecordsAutoConvertTablet(properties.isEnable_records_auto_convert_tablet()).
+                            build();
+                }
+            }
+        }
+        return treeSessionPool;
+    }
 }
