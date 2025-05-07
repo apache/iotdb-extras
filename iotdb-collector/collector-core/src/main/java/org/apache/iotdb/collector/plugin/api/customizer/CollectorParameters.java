@@ -19,18 +19,16 @@
 
 package org.apache.iotdb.collector.plugin.api.customizer;
 
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
-import java.util.Map;
+public class CollectorParameters {
+  private static final Set<String> PARAM_SET =
+      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("source", "processor", "sink")));
 
-public class CollectorParameters extends PipeParameters {
-  public CollectorParameters(final Map<String, String> attributes) {
-    super(attributes);
-    this.attributes.forEach(
-        (key, value) -> {
-          if (!"taskId".equals(key)) {
-            attributes.put(key, value.replace("_", "-"));
-          }
-        });
+  public static boolean matchAnyParam(final String param) {
+    return PARAM_SET.contains(param);
   }
 }

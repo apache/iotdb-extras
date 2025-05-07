@@ -19,14 +19,14 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
-import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import java.util.Map;
 
 public abstract class Task {
 
   protected final String taskId;
-  protected final CollectorParameters parameters;
+  protected final PipeParameters parameters;
 
   protected final int parallelism;
 
@@ -38,7 +38,7 @@ public abstract class Task {
       final String parallelismKey,
       final int parallelismValue) {
     this.taskId = taskId;
-    this.parameters = new CollectorParameters(attributes);
+    this.parameters = new PipeParameters(attributes);
 
     this.parallelism = parameters.getIntOrDefault(parallelismKey, parallelismValue);
 

@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
+import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
 import org.apache.iotdb.collector.runtime.task.event.ProgressReportEvent;
 import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
 import org.apache.iotdb.collector.runtime.task.sink.SinkTask;
@@ -202,7 +203,12 @@ public class TaskRuntime implements AutoCloseable {
   }
 
   private Map<String, String> convert(final Map<String, String> attributes) {
-    attributes.forEach((key, value) -> attributes.put(key, value.replace("_", "-")));
+    attributes.forEach(
+        (key, value) -> {
+          if (!CollectorParameters.matchAnyParam(key)) {
+            attributes.put(key, value.replace("-", "_"));
+          }
+        });
     return attributes;
   }
 }
