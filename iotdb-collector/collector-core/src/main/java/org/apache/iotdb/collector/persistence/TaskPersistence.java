@@ -20,19 +20,18 @@
 package org.apache.iotdb.collector.persistence;
 
 import org.apache.iotdb.collector.config.TaskRuntimeOptions;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
+import org.apache.iotdb.collector.runtime.task.event.ProgressReportEvent;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.collector.utils.SerializationUtil;
 
-import org.apache.tsfile.utils.PublicBAOS;
-import org.apache.tsfile.utils.ReadWriteIOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.Response;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,9 +40,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public class TaskPersistence extends Persistence {
 
@@ -68,9 +67,9 @@ public class TaskPersistence extends Persistence {
 
   @Override
   protected void initTableIfPossible() {
-    try (final Connection connection = getConnection()) {
-      final PreparedStatement statement =
-          connection.prepareStatement(DBConstant.CREATE_TASK_TABLE_SQL);
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement =
+            connection.prepareStatement(DBConstant.CREATE_TASK_TABLE_SQL)) {
       statement.executeUpdate();
     } catch (final SQLException e) {
       LOGGER.warn("Failed to create task database", e);
@@ -82,10 +81,9 @@ public class TaskPersistence extends Persistence {
     final String queryAllTaskSQL =
         "SELECT task_id, task_state, source_attribute, processor_attribute, sink_attribute, create_time FROM task";
 
-    try (final Connection connection = getConnection()) {
-      final PreparedStatement statement = connection.prepareStatement(queryAllTaskSQL);
-      final ResultSet taskResultSet = statement.executeQuery();
-
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(queryAllTaskSQL);
+        final ResultSet taskResultSet = statement.executeQuery()) {
       while (taskResultSet.next()) {
         final String taskId = taskResultSet.getString(1);
         final TaskStateEnum taskState = TaskStateEnum.values()[taskResultSet.getInt(2)];
@@ -96,9 +94,9 @@ public class TaskPersistence extends Persistence {
         tryRecoverTask(
             taskId,
             taskState,
-            deserialize(sourceAttribute),
-            deserialize(processorAttribute),
-            deserialize(sinkAttribute));
+            SerializationUtil.deserialize(sourceAttribute),
+            SerializationUtil.deserialize(processorAttribute),
+            SerializationUtil.deserialize(sinkAttribute));
       }
     } catch (final SQLException e) {
       LOGGER.warn("Failed to resume task persistence message, because {}", e.getMessage());
@@ -125,21 +123,6 @@ public class TaskPersistence extends Persistence {
     }
   }
 
-  private Map<String, String> deserialize(final byte[] buffer) {
-    final Map<String, String> attribute = new HashMap<>();
-    final ByteBuffer attributeBuffer = ByteBuffer.wrap(buffer);
-
-    final int size = ReadWriteIOUtils.readInt(attributeBuffer);
-    for (int i = 0; i < size; i++) {
-      final String key = ReadWriteIOUtils.readString(attributeBuffer);
-      final String value = ReadWriteIOUtils.readString(attributeBuffer);
-
-      attribute.put(key, value);
-    }
-
-    return attribute;
-  }
-
   public void tryPersistenceTask(
       final String taskId,
       final TaskStateEnum taskState,
@@ -147,21 +130,22 @@ public class TaskPersistence extends Persistence {
       final Map<String, String> processorAttribute,
       final Map<String, String> sinkAttribute) {
     final String insertSQL =
-        "INSERT INTO task(task_id, task_state , source_attribute, processor_attribute, sink_attribute, create_time) values(?, ?, ?, ?, ?, ?)";
+        "INSERT INTO task(task_id, task_state , source_attribute, processor_attribute, sink_attribute,task_progress, create_time) values(?, ?,?, ?, ?, ?, ?)";
 
-    try (final Connection connection = getConnection()) {
-      final PreparedStatement statement = connection.prepareStatement(insertSQL);
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(insertSQL)) {
 
-      final byte[] sourceAttributeBuffer = serialize(sourceAttribute);
-      final byte[] processorAttributeBuffer = serialize(processorAttribute);
-      final byte[] sinkAttributeBuffer = serialize(sinkAttribute);
+      final byte[] sourceAttributeBuffer = SerializationUtil.serialize(sourceAttribute);
+      final byte[] processorAttributeBuffer = SerializationUtil.serialize(processorAttribute);
+      final byte[] sinkAttributeBuffer = SerializationUtil.serialize(sinkAttribute);
 
       statement.setString(1, taskId);
       statement.setInt(2, taskState.getTaskState());
       statement.setBytes(3, sourceAttributeBuffer);
       statement.setBytes(4, processorAttributeBuffer);
       statement.setBytes(5, sinkAttributeBuffer);
-      statement.setString(6, String.valueOf(new Timestamp(System.currentTimeMillis())));
+      statement.setBytes(6, null);
+      statement.setString(7, String.valueOf(new Timestamp(System.currentTimeMillis())));
       statement.executeUpdate();
 
       LOGGER.info("successfully persisted task {} info", taskId);
@@ -170,25 +154,11 @@ public class TaskPersistence extends Persistence {
     }
   }
 
-  private byte[] serialize(final Map<String, String> attribute) throws IOException {
-    try (final PublicBAOS byteArrayOutputStream = new PublicBAOS();
-        final DataOutputStream outputStream = new DataOutputStream(byteArrayOutputStream)) {
-      ReadWriteIOUtils.write(attribute.size(), outputStream);
-      for (final Map.Entry<String, String> entry : attribute.entrySet()) {
-        ReadWriteIOUtils.write(entry.getKey(), outputStream);
-        ReadWriteIOUtils.write(entry.getValue(), outputStream);
-      }
-
-      return ByteBuffer.wrap(byteArrayOutputStream.getBuf(), 0, byteArrayOutputStream.size())
-          .array();
-    }
-  }
-
   public void tryDeleteTask(final String taskId) {
     final String deleteSQL = "DELETE FROM task WHERE task_id = ?";
 
-    try (final Connection connection = getConnection()) {
-      final PreparedStatement statement = connection.prepareStatement(deleteSQL);
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(deleteSQL)) {
       statement.setString(1, taskId);
       statement.executeUpdate();
 
@@ -201,15 +171,55 @@ public class TaskPersistence extends Persistence {
   public void tryAlterTaskState(final String taskId, final TaskStateEnum taskState) {
     final String alterSQL = "UPDATE task SET task_state = ? WHERE task_id = ?";
 
-    try (final Connection connection = getConnection()) {
-      final PreparedStatement statement = connection.prepareStatement(alterSQL);
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(alterSQL)) {
       statement.setInt(1, taskState.getTaskState());
       statement.setString(2, taskId);
       statement.executeUpdate();
 
       LOGGER.info("successfully altered task {}", taskId);
-    } catch (SQLException e) {
+    } catch (final SQLException e) {
       LOGGER.warn("Failed to alter task persistence message, because {}", e.getMessage());
     }
+  }
+
+  public void tryReportTaskProgress(final ProgressReportEvent reportEvent) {
+    if (reportEvent.getInstancesProgress() == null
+        || reportEvent.getInstancesProgress().isEmpty()) {
+      return;
+    }
+
+    final String reportSQL = "UPDATE task SET task_progress = ? WHERE task_id = ?";
+
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(reportSQL)) {
+      statement.setBytes(
+          1, SerializationUtil.serializeInstances(reportEvent.getInstancesProgress()));
+      statement.setString(2, reportEvent.getTaskId());
+      statement.executeUpdate();
+    } catch (final SQLException | IOException e) {
+      LOGGER.warn("Failed to report task progress because {}", e.getMessage());
+    }
+  }
+
+  public Optional<Map<Integer, ProgressIndex>> getTasksProgress(final String taskId) {
+    final String queryProgressSQL = "SELECT task_progress FROM task WHERE task_id = ?";
+
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(queryProgressSQL)) {
+      statement.setString(1, taskId);
+
+      try (final ResultSet resultSet = statement.executeQuery()) {
+        final byte[] bytes = resultSet.getBytes("task_progress");
+
+        return bytes == null
+            ? Optional.empty()
+            : Optional.of(SerializationUtil.deserializeInstances(bytes));
+      }
+    } catch (final SQLException e) {
+      LOGGER.warn("Failed to retrieve task progress because {}", e.getMessage());
+    }
+
+    return Optional.empty();
   }
 }

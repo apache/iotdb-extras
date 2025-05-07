@@ -54,7 +54,13 @@ public class SinkTask extends Task {
   private SinkConsumer[] consumers;
 
   public SinkTask(final String taskId, final Map<String, String> attributes) {
-    super(taskId, attributes, TASK_SINK_PARALLELISM_NUM.key(), TASK_SINK_PARALLELISM_NUM.value());
+    super(
+        taskId,
+        attributes,
+        TASK_SINK_PARALLELISM_NUM.key(),
+        attributes.containsKey(TASK_SINK_PARALLELISM_NUM.key())
+            ? Integer.parseInt(TASK_SINK_PARALLELISM_NUM.key())
+            : TASK_SINK_PARALLELISM_NUM.value());
 
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,

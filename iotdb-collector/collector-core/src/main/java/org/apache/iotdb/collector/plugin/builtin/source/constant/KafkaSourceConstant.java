@@ -17,23 +17,14 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api;
+package org.apache.iotdb.collector.plugin.builtin.source.constant;
 
-import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
-import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+public class KafkaSourceConstant {
+  public static final String KAFKA_SOURCE_TOPIC_KEY = "topic";
+  public static final String KAFKA_SOURCE_URL_KEY = "url";
+  public static final String KAFKA_SOURCE_GROUP_ID_KEY = "group-id";
 
-import java.util.Optional;
-
-public abstract class PullSource implements PipeSource {
-
-  @Override
-  public final void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
-    throw new UnsupportedOperationException();
-  }
-
-  public abstract Optional<ProgressIndex> report();
+  public static final String KAFKA_SOURCE_TOPIC_VALUE = "my_topic";
+  public static final String KAFKA_SOURCE_URL_VALUE = "localhost:9092";
+  public static final String KAFKA_SOURCE_GROUP_ID_VALUE = "multi-thread-group";
 }

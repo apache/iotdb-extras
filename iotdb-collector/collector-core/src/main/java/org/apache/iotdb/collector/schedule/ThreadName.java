@@ -16,24 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.iotdb.collector.schedule;
 
-package org.apache.iotdb.collector.plugin.api;
+public enum ThreadName {
+  SCHEDULE_PUSH_EVENT_JOB("Schedule-Push-Event-Job"),
+  SCHEDULE_REPORT_PROGRESS_JOB("Schedule-Report-ProgressIndex-Job");
 
-import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
-import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+  private final String name;
 
-import java.util.Optional;
-
-public abstract class PullSource implements PipeSource {
-
-  @Override
-  public final void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
-    throw new UnsupportedOperationException();
+  ThreadName(final String name) {
+    this.name = name;
   }
 
-  public abstract Optional<ProgressIndex> report();
+  public String getName() {
+    return name;
+  }
 }

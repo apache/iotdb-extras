@@ -22,9 +22,9 @@ package org.apache.iotdb.collector;
 import org.apache.iotdb.collector.config.Configuration;
 import org.apache.iotdb.collector.service.ApiService;
 import org.apache.iotdb.collector.service.IService;
-import org.apache.iotdb.collector.service.PeriodicalJobService;
 import org.apache.iotdb.collector.service.PersistenceService;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.collector.service.ScheduleService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +41,8 @@ public class Application {
   private Application() {
     services.add(new RuntimeService());
     services.add(new ApiService());
+    services.add(new ScheduleService());
     services.add(new PersistenceService());
-    services.add(new PeriodicalJobService());
   }
 
   public static void main(String[] args) {

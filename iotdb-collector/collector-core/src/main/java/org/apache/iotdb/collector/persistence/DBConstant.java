@@ -41,6 +41,7 @@ public class DBConstant {
           + "    source_attribute    BLOB NOT NULL,\n"
           + "    processor_attribute BLOB NOT NULL,\n"
           + "    sink_attribute      BLOB NOT NULL,\n"
+          + "    task_progress       BLOB NOT NULL,\n"
           + "    create_time         TEXT NOT NULL\n"
           + ");";
 

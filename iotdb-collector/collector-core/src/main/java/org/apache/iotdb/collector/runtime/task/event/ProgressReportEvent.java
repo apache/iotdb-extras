@@ -17,23 +17,31 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api;
+package org.apache.iotdb.collector.runtime.task.event;
 
 import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
-import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
-import java.util.Optional;
+import java.util.Map;
 
-public abstract class PullSource implements PipeSource {
+public class ProgressReportEvent {
+  private final String taskId;
+  private final Map<Integer, ProgressIndex> instancesProgress;
 
-  @Override
-  public final void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
-    throw new UnsupportedOperationException();
+  public ProgressReportEvent(
+      final String taskId, final Map<Integer, ProgressIndex> instancesProgress) {
+    this.taskId = taskId;
+    this.instancesProgress = instancesProgress;
   }
 
-  public abstract Optional<ProgressIndex> report();
+  public String getTaskId() {
+    return taskId;
+  }
+
+  public ProgressIndex getInstanceProgress(final int instanceId) {
+    return instancesProgress.get(instanceId);
+  }
+
+  public Map<Integer, ProgressIndex> getInstancesProgress() {
+    return instancesProgress;
+  }
 }

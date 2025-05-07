@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.plugin.builtin.source;
 
 import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.api.event.DemoEvent;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -29,6 +30,7 @@ import org.apache.iotdb.pipe.api.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -58,6 +60,8 @@ public class HttpPushSource extends PushSource {
   private void doWork() {
     try {
       while (isStarted && !Thread.currentThread().isInterrupted()) {
+        markPausePosition();
+
         final Event event = new DemoEvent(String.valueOf(new Random().nextInt(1000)));
         LOGGER.info("{} created successfully ...", event);
         supply(event);
@@ -82,5 +86,10 @@ public class HttpPushSource extends PushSource {
       }
       workerThread = null;
     }
+  }
+
+  @Override
+  public Optional<ProgressIndex> report() {
+    return Optional.empty();
   }
 }

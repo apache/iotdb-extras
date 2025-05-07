@@ -72,4 +72,20 @@ public class TaskRuntimeOptions extends Options {
           value = addHomeDir(valueString);
         }
       };
+
+  public static final Option<Long> EXECUTOR_CRON_HEARTBEAT_EVENT_INTERVAL_SECONDS =
+      new Option<Long>("executor_cron_heartbeat_event_interval_seconds", 20L) {
+        @Override
+        public void setValue(final String valueString) {
+          value = Long.parseLong(valueString);
+        }
+      };
+
+  public static final Option<Integer> TASK_PROGRESS_REPORT_INTERVAL =
+      new Option<Integer>("task_progress_report_interval", 60) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
 }

@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.plugin.builtin.source;
 
 import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.event.DemoEvent;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -29,6 +30,7 @@ import org.apache.iotdb.pipe.api.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -58,4 +60,9 @@ public class HttpPullSource extends PullSource {
 
   @Override
   public void close() {}
+
+  @Override
+  public Optional<ProgressIndex> report() {
+    return Optional.empty();
+  }
 }

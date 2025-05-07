@@ -17,23 +17,24 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api;
+package org.apache.iotdb.collector.schedule;
 
-import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
-import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 
-import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public abstract class PullSource implements PipeSource {
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
-  @Override
-  public final void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
-    throw new UnsupportedOperationException();
+public class ScheduleReportProgressJob extends ScheduleJob {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScheduleReportProgressJob.class);
+
+  public ScheduleReportProgressJob() {
+    super(
+        new ScheduledThreadPoolExecutor(1),
+        TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value());
+
+    LOGGER.info("new single scheduled thread pool: {}", ThreadName.SCHEDULE_REPORT_PROGRESS_JOB);
   }
-
-  public abstract Optional<ProgressIndex> report();
 }
