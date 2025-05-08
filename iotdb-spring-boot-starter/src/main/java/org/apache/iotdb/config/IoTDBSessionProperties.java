@@ -24,7 +24,7 @@ import java.time.ZoneId;
 
 @ConfigurationProperties(prefix = "iotdb.session")
 public class IoTDBSessionProperties {
-    private String url;
+    private String node_urls;
     private String username;
     private String password;
     private String database;
@@ -42,18 +42,18 @@ public class IoTDBSessionProperties {
     private String trust_store_pwd;
     private int connection_timeout_in_ms;
     private ZoneId zone_id;
-    private int thrift_default_buffer_size;
-    private int thrift_max_frame_size;
+    private int thrift_default_buffer_size = 1024;
+    private int thrift_max_frame_size = 67108864;
     private boolean enable_redirection;
     private boolean enable_records_auto_convert_tablet =
             SessionConfig.DEFAULT_RECORDS_AUTO_CONVERT_TABLET;
 
-    public String getUrl() {
-        return url;
+    public String getNode_urls() {
+        return node_urls;
     }
 
-    public void setUrl(String url) {
-        this.url = url;
+    public void setNode_urls(String node_urls) {
+        this.node_urls = node_urls;
     }
 
     public String getUsername() {

@@ -53,6 +53,8 @@ public class IoTDBService {
             }
             System.out.println();
         }
+        sessionDataSet.close();
+        tableSession.close();
     }
 
     public void querySessionPool() throws IoTDBConnectionException, StatementExecutionException {
@@ -65,5 +67,6 @@ public class IoTDBService {
             }
             System.out.println();
         }
+        sessionDataSetWrapper.close();
     }
 }

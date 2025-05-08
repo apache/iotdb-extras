@@ -48,7 +48,7 @@ public class IoTDBSessionPool {
             synchronized (IoTDBSessionPool.class) {
                 if(tableSessionPool == null) {
                     tableSessionPool = new TableSessionPoolBuilder().
-                            nodeUrls(Arrays.asList(properties.getUrl().split(";"))).
+                            nodeUrls(Arrays.asList(properties.getNode_urls().split(";"))).
                             user(properties.getUsername()).
                             password(properties.getPassword()).
                             database(properties.getDatabase()).
@@ -67,7 +67,8 @@ public class IoTDBSessionPool {
                             zoneId(properties.getZone_id()).
                             thriftDefaultBufferSize(properties.getThrift_default_buffer_size()).
                             thriftMaxFrameSize(properties.getThrift_max_frame_size()).
-                            enableRedirection(properties.isEnable_redirection()).build();
+                            enableRedirection(properties.isEnable_redirection()).
+                            build();
                 }
             }
         }
@@ -80,7 +81,7 @@ public class IoTDBSessionPool {
             synchronized (IoTDBSessionPool.class) {
                 if(treeSessionPool == null) {
                     treeSessionPool = new SessionPool.Builder().
-                            nodeUrls(Arrays.asList(properties.getUrl().split(";"))).
+                            nodeUrls(Arrays.asList(properties.getNode_urls().split(";"))).
                             user(properties.getUsername()).
                             password(properties.getPassword()).
                             maxSize(properties.getMax_size()).
