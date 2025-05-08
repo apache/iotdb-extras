@@ -19,18 +19,24 @@
 
 package org.apache.iotdb.collector.runtime.task.source.pull;
 
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSourceRuntimeConfiguration;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
+import org.apache.iotdb.collector.runtime.task.event.ProgressReportEvent;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
+import org.apache.iotdb.collector.service.PersistenceService;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.collector.service.ScheduleService;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -111,6 +117,33 @@ public class PullSourceTask extends SourceTask {
                 }
               });
     }
+
+    // register storage progress schedule job
+    ScheduleService.reportProgress()
+        .ifPresent(
+            reportEvent -> {
+              reportEvent.register(
+                  taskId,
+                  () -> {
+                    if (consumers != null && consumers.length > 0) {
+                      Map<Integer, ProgressIndex> progresses = new HashMap<>();
+                      for (int i = 0; i < consumers.length; i++) {
+                        final int finalI = i;
+                        consumers[i]
+                            .consumer()
+                            .report()
+                            .ifPresent(progressIndex -> progresses.put(finalI, progressIndex));
+                      }
+
+                      PersistenceService.task()
+                          .ifPresent(
+                              task ->
+                                  task.tryReportTaskProgress(
+                                      new ProgressReportEvent(taskId, progresses)));
+                    }
+                  },
+                  TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value());
+            });
   }
 
   @Override

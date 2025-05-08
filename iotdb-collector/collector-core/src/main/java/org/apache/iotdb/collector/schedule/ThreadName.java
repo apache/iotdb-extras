@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.iotdb.collector.schedule;
 
-package org.apache.iotdb.collector.plugin.api.customizer;
+public enum ThreadName {
+  SCHEDULE_PUSH_EVENT_JOB("Schedule-Push-Event-Job"),
+  SCHEDULE_REPORT_PROGRESS_JOB("Schedule-Report-ProgressIndex-Job");
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+  private final String name;
 
-public class CollectorParameters {
-  private static final Set<String> PARAM_SET =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("source", "processor", "sink")));
+  ThreadName(final String name) {
+    this.name = name;
+  }
 
-  public static boolean matchAnyParam(final String param) {
-    return PARAM_SET.contains(param);
+  public String getName() {
+    return name;
   }
 }

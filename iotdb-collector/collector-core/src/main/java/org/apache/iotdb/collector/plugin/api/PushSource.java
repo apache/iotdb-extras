@@ -19,13 +19,19 @@
 
 package org.apache.iotdb.collector.plugin.api;
 
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
+import org.apache.iotdb.collector.runtime.task.TaskDispatch;
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 
+import java.util.Optional;
+
 public abstract class PushSource implements PipeSource {
+
+  private TaskDispatch dispatch;
 
   protected EventCollector collector;
 
@@ -50,7 +56,25 @@ public abstract class PushSource implements PipeSource {
     throw new UnsupportedOperationException();
   }
 
+  public final void markPausePosition() {
+    dispatch.waitUntilRunningOrDropped();
+  }
+
+  public final void pause() {
+    dispatch.pause();
+  }
+
+  public final void resume() {
+    dispatch.resume();
+  }
+
   public final void supply(final Event event) throws Exception {
     collector.collect(event);
   }
+
+  public final void setDispatch(final TaskDispatch dispatch) {
+    this.dispatch = dispatch;
+  }
+
+  public abstract Optional<ProgressIndex> report();
 }

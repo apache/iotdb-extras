@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.plugin.builtin.source;
 import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.builtin.source.constant.IoTDBPushSourceConstant;
 import org.apache.iotdb.collector.plugin.builtin.source.event.SubDemoEvent;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 
 public class IoTDBPushSource extends PushSource {
@@ -96,6 +98,8 @@ public class IoTDBPushSource extends PushSource {
       consumer.subscribe(topic);
 
       while (isStarted && !Thread.currentThread().isInterrupted()) {
+        markPausePosition();
+
         final List<SubscriptionMessage> messages = consumer.poll(timeout);
         for (final SubscriptionMessage message : messages) {
           final short messageType = message.getMessageType();
@@ -125,5 +129,10 @@ public class IoTDBPushSource extends PushSource {
       }
       workerThread = null;
     }
+  }
+
+  @Override
+  public Optional<ProgressIndex> report() {
+    return Optional.empty();
   }
 }

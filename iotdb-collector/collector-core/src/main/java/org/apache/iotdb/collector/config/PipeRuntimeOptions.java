@@ -272,12 +272,4 @@ public class PipeRuntimeOptions extends Options {
           value = Integer.parseInt(valueString);
         }
       };
-
-  public static final Option<Long> EXECUTOR_CRON_HEARTBEAT_EVENT_INTERVAL_SECONDS =
-      new Option<Long>("executor_cron_heartbeat_event_interval_seconds", 20L) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Long.parseLong(valueString);
-        }
-      };
 }

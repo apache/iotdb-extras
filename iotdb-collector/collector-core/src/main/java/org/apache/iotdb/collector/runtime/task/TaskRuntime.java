@@ -19,16 +19,21 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
+import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
+import org.apache.iotdb.collector.runtime.task.event.ProgressReportEvent;
 import org.apache.iotdb.collector.runtime.task.processor.ProcessorTask;
 import org.apache.iotdb.collector.runtime.task.sink.SinkTask;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
 import org.apache.iotdb.collector.service.PersistenceService;
+import org.apache.iotdb.collector.service.RuntimeService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.Response;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,11 +58,26 @@ public class TaskRuntime implements AutoCloseable {
             .build();
       }
 
-      final SinkTask sinkTask = new SinkTask(taskId, sinkAttribute);
+      RuntimeService.progress()
+          .ifPresent(
+              progress ->
+                  progress.addTaskProgress(
+                      taskId,
+                      new ProgressReportEvent(
+                          taskId,
+                          PersistenceService.task().isPresent()
+                              ? PersistenceService.task()
+                                  .get()
+                                  .getTasksProgress(taskId)
+                                  .orElseGet(HashMap::new)
+                              : new HashMap<>())));
+
+      final SinkTask sinkTask = new SinkTask(taskId, convert(sinkAttribute));
       final ProcessorTask processorTask =
-          new ProcessorTask(taskId, processorAttribute, sinkTask.makeProducer());
+          new ProcessorTask(taskId, convert(processorAttribute), sinkTask.makeProducer());
       final SourceTask sourceTask =
-          SourceTask.construct(taskId, sourceAttribute, processorTask.makeProducer(), taskState);
+          SourceTask.construct(
+              taskId, convert(sourceAttribute), processorTask.makeProducer(), taskState);
 
       final TaskCombiner taskCombiner = new TaskCombiner(sourceTask, processorTask, sinkTask);
       taskCombiner.create();
@@ -82,6 +102,7 @@ public class TaskRuntime implements AutoCloseable {
           .entity(String.format("Successfully created task %s", taskId))
           .build();
     } catch (final Exception e) {
+      RuntimeService.progress().ifPresent(progress -> progress.removeTaskProgress(taskId));
       tasks.remove(taskId);
 
       LOGGER.warn("Failed to create task {} because {}", taskId, e.getMessage(), e);
@@ -131,6 +152,8 @@ public class TaskRuntime implements AutoCloseable {
           .ifPresent(
               taskPersistence -> taskPersistence.tryAlterTaskState(taskId, TaskStateEnum.STOPPED));
 
+      RuntimeService.progress().ifPresent(progress -> progress.removeTaskProgress(taskId));
+
       LOGGER.info("Task {} stop successfully", taskId);
       return Response.status(Response.Status.OK)
           .entity(String.format("task %s stop successfully", taskId))
@@ -178,5 +201,22 @@ public class TaskRuntime implements AutoCloseable {
     }
     tasks.clear();
     LOGGER.info("Task runtime closed in {}ms", System.currentTimeMillis() - currentTime);
+  }
+
+  private Map<String, String> convert(final Map<String, String> attributes) {
+    final Map<String, String> modifyParamMap = new HashMap<>();
+    final Iterator<Map.Entry<String, String>> paramIterator = attributes.entrySet().iterator();
+
+    while (paramIterator.hasNext()) {
+      final Map.Entry<String, String> param = paramIterator.next();
+
+      if (!CollectorParameters.matchAnyParam(param.getKey())) {
+        modifyParamMap.put(param.getKey().replace("-", "_"), param.getValue());
+        paramIterator.remove();
+      }
+    }
+    attributes.putAll(modifyParamMap);
+
+    return attributes;
   }
 }

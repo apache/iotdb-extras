@@ -111,6 +111,7 @@
         <json-smart.version>2.5.0</json-smart.version>
         <jtransforms.version>3.1</jtransforms.version>
         <junit.version>4.13.2</junit.version>
+        <kafka.version>2.8.2</kafka.version>
         <!-- This was the last version to support Java 8 -->
         <logback.version>1.3.15</logback.version>
         <lz4-java.version>1.8.0</lz4-java.version>
@@ -979,6 +980,11 @@
                 <groupId>org.apache.iotdb</groupId>
                 <artifactId>iotdb-session</artifactId>
                 <version>${iotdb.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>${kafka.version}</version>
             </dependency>
             <!-- Conflict:
         json-smart (pulls in 9.3),

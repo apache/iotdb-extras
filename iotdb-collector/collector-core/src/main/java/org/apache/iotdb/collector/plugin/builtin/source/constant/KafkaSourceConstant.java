@@ -17,18 +17,14 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api.customizer;
+package org.apache.iotdb.collector.plugin.builtin.source.constant;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+public class KafkaSourceConstant {
+  public static final String KAFKA_SOURCE_TOPIC_KEY = "topic";
+  public static final String KAFKA_SOURCE_URL_KEY = "url";
+  public static final String KAFKA_SOURCE_GROUP_ID_KEY = "group-id";
 
-public class CollectorParameters {
-  private static final Set<String> PARAM_SET =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("source", "processor", "sink")));
-
-  public static boolean matchAnyParam(final String param) {
-    return PARAM_SET.contains(param);
-  }
+  public static final String KAFKA_SOURCE_TOPIC_VALUE = "my_topic";
+  public static final String KAFKA_SOURCE_URL_VALUE = "localhost:9092";
+  public static final String KAFKA_SOURCE_GROUP_ID_VALUE = "multi-thread-group";
 }

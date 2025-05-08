@@ -19,9 +19,12 @@
 
 package org.apache.iotdb.collector.plugin.api;
 
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+
+import java.util.Optional;
 
 public abstract class PullSource implements PipeSource {
 
@@ -31,4 +34,6 @@ public abstract class PullSource implements PipeSource {
       PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
     throw new UnsupportedOperationException();
   }
+
+  public abstract Optional<ProgressIndex> report();
 }

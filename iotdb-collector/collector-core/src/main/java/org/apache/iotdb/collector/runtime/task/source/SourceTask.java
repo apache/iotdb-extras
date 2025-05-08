@@ -43,7 +43,12 @@ public abstract class SourceTask extends Task {
       final EventCollector processorProducer,
       final TaskStateEnum taskState) {
     super(
-        taskId, attributes, TASK_SOURCE_PARALLELISM_NUM.key(), TASK_SOURCE_PARALLELISM_NUM.value());
+        taskId,
+        attributes,
+        TASK_SOURCE_PARALLELISM_NUM.key(),
+        attributes.containsKey(TASK_SOURCE_PARALLELISM_NUM.key())
+            ? Integer.parseInt(attributes.get(TASK_SOURCE_PARALLELISM_NUM.key()))
+            : TASK_SOURCE_PARALLELISM_NUM.value());
     this.processorProducer = processorProducer;
     this.taskState = taskState;
   }

@@ -17,18 +17,24 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api.customizer;
+package org.apache.iotdb.collector.runtime.progress;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 
-public class CollectorParameters {
-  private static final Set<String> PARAM_SET =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("source", "processor", "sink")));
+public class ProgressIndex {
+  private final Map<String, String> progressInfo;
+  private final Integer instanceIndex;
 
-  public static boolean matchAnyParam(final String param) {
-    return PARAM_SET.contains(param);
+  public ProgressIndex(final Integer instanceIndex, final Map<String, String> progressInfo) {
+    this.instanceIndex = instanceIndex;
+    this.progressInfo = progressInfo;
+  }
+
+  public Integer getInstanceIndex() {
+    return instanceIndex;
+  }
+
+  public Map<String, String> getProgressInfo() {
+    return progressInfo;
   }
 }

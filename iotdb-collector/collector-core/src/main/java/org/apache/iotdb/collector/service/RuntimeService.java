@@ -20,11 +20,13 @@
 package org.apache.iotdb.collector.service;
 
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
+import org.apache.iotdb.collector.runtime.progress.ProgressRuntime;
 import org.apache.iotdb.collector.runtime.task.TaskRuntime;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -34,11 +36,13 @@ public class RuntimeService implements IService {
 
   private static final AtomicReference<TaskRuntime> TASK = new AtomicReference<>();
   private static final AtomicReference<PluginRuntime> PLUGIN = new AtomicReference<>();
+  private static final AtomicReference<ProgressRuntime> PROGRESS = new AtomicReference<>();
 
   @Override
   public synchronized void start() {
     TASK.set(new TaskRuntime());
     PLUGIN.set(new PluginRuntime());
+    PROGRESS.set(new ProgressRuntime());
   }
 
   public static Optional<TaskRuntime> task() {
@@ -47,6 +51,10 @@ public class RuntimeService implements IService {
 
   public static Optional<PluginRuntime> plugin() {
     return Optional.of(PLUGIN.get());
+  }
+
+  public static Optional<ProgressRuntime> progress() {
+    return Optional.of(PROGRESS.get());
   }
 
   @Override
@@ -73,6 +81,18 @@ public class RuntimeService implements IService {
               }
             });
     PLUGIN.set(null);
+
+    progress()
+        .ifPresent(
+            progressRuntime -> {
+              try {
+                progressRuntime.close();
+              } catch (final IOException e) {
+                LOGGER.warn(
+                    "[RuntimeService] Failed to close progress runtime: {}", e.getMessage(), e);
+              }
+            });
+    PROGRESS.set(null);
   }
 
   @Override

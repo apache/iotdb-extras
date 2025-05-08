@@ -17,18 +17,24 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api.customizer;
+package org.apache.iotdb.collector.schedule;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 
-public class CollectorParameters {
-  private static final Set<String> PARAM_SET =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("source", "processor", "sink")));
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-  public static boolean matchAnyParam(final String param) {
-    return PARAM_SET.contains(param);
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+
+public class ScheduleReportProgressJob extends ScheduleJob {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScheduleReportProgressJob.class);
+
+  public ScheduleReportProgressJob() {
+    super(
+        new ScheduledThreadPoolExecutor(1),
+        TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value());
+
+    LOGGER.info("new single scheduled thread pool: {}", ThreadName.SCHEDULE_REPORT_PROGRESS_JOB);
   }
 }

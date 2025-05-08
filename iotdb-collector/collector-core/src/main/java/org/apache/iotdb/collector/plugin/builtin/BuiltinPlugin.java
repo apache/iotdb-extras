@@ -26,11 +26,13 @@ import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSy
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
 import org.apache.iotdb.collector.plugin.builtin.source.IoTDBPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.KafkaSource;
 
 public enum BuiltinPlugin {
 
   // Push Sources
   HTTP_PUSH_SOURCE("http-push-source", HttpPushSource.class),
+  KAFKA_SOURCE("kafka-source", KafkaSource.class),
 
   // Pull Sources
   HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),

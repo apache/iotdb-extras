@@ -19,18 +19,24 @@
 
 package org.apache.iotdb.collector.runtime.task.source.push;
 
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSourceRuntimeConfiguration;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.collector.runtime.task.TaskStateEnum;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
+import org.apache.iotdb.collector.runtime.task.event.ProgressReportEvent;
 import org.apache.iotdb.collector.runtime.task.source.SourceTask;
+import org.apache.iotdb.collector.service.PersistenceService;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.collector.service.ScheduleService;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class PushSourceTask extends SourceTask {
@@ -60,15 +66,16 @@ public class PushSourceTask extends SourceTask {
     for (int i = 0; i < parallelism; i++) {
       pushSources[i] = (PushSource) pluginRuntime.constructSource(parameters);
       pushSources[i].setCollector(processorProducer);
-
+      pushSources[i].setDispatch(dispatch);
       try {
         pushSources[i].validate(new PipeParameterValidator(parameters));
         pushSources[i].customize(
             parameters,
             new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
-        if (TaskStateEnum.RUNNING.equals(taskState)) {
-          pushSources[i].start();
+        if (TaskStateEnum.STOPPED.equals(taskState)) {
+          pushSources[i].pause();
         }
+        pushSources[i].start();
       } catch (final Exception e) {
         try {
           pushSources[i].close();
@@ -78,6 +85,33 @@ public class PushSourceTask extends SourceTask {
         }
       }
     }
+
+    // register storage progress schedule job
+    ScheduleService.reportProgress()
+        .ifPresent(
+            reportEvent -> {
+              reportEvent.register(
+                  taskId,
+                  () -> {
+                    if (pushSources != null && pushSources.length > 0) {
+                      Map<Integer, ProgressIndex> progresses = new HashMap<>();
+                      for (int i = 0; i < pushSources.length; i++) {
+                        final int finalI = i;
+                        pushSources[i]
+                            .report()
+                            .ifPresent(progressIndex -> progresses.put(finalI, progressIndex));
+                      }
+
+                      PersistenceService.task()
+                          .ifPresent(
+                              task ->
+                                  task.tryReportTaskProgress(
+                                      new ProgressReportEvent(taskId, progresses)));
+                      LOGGER.info("successfully reported task progress {}", progresses);
+                    }
+                  },
+                  TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value());
+            });
   }
 
   @Override
@@ -89,7 +123,7 @@ public class PushSourceTask extends SourceTask {
     if (pushSources != null) {
       for (int i = 0; i < parallelism; i++) {
         try {
-          pushSources[i].start();
+          pushSources[i].resume();
         } catch (final Exception e) {
           LOGGER.warn("Failed to restart push source", e);
           return;
@@ -109,7 +143,7 @@ public class PushSourceTask extends SourceTask {
     if (pushSources != null) {
       for (int i = 0; i < parallelism; i++) {
         try {
-          pushSources[i].close();
+          pushSources[i].pause();
         } catch (final Exception e) {
           LOGGER.warn("Failed to stop source", e);
           return;

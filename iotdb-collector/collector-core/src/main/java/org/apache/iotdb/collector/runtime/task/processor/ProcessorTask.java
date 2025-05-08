@@ -19,14 +19,15 @@
 
 package org.apache.iotdb.collector.runtime.task.processor;
 
+import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorProcessorRuntimeConfiguration;
 import org.apache.iotdb.collector.plugin.api.event.PeriodicalEvent;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
 import org.apache.iotdb.collector.runtime.task.event.EventContainer;
-import org.apache.iotdb.collector.service.PeriodicalJobService;
 import org.apache.iotdb.collector.service.RuntimeService;
+import org.apache.iotdb.collector.service.ScheduleService;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -64,7 +65,9 @@ public class ProcessorTask extends Task {
         taskId,
         attributes,
         TASK_PROCESS_PARALLELISM_NUM.key(),
-        TASK_PROCESS_PARALLELISM_NUM.value());
+        attributes.containsKey(TASK_PROCESS_PARALLELISM_NUM.key())
+            ? Integer.parseInt(TASK_PROCESS_PARALLELISM_NUM.key())
+            : TASK_PROCESS_PARALLELISM_NUM.value());
 
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
@@ -122,19 +125,25 @@ public class ProcessorTask extends Task {
     disruptor.start();
 
     // Scheduled and proactive sink actions
-    PeriodicalJobService.register(taskId, () -> sinkProducer.collect(new PeriodicalEvent()));
+    ScheduleService.pushEvent()
+        .ifPresent(
+            event ->
+                event.register(
+                    taskId,
+                    () -> sinkProducer.collect(new PeriodicalEvent()),
+                    TaskRuntimeOptions.EXECUTOR_CRON_HEARTBEAT_EVENT_INTERVAL_SECONDS.value()));
   }
 
   @Override
   public void startInternal() {
     // resume proactive sink actions
-    PeriodicalJobService.resumeSingleTask(taskId);
+    ScheduleService.pushEvent().ifPresent(event -> event.resumeSingleJob(taskId));
   }
 
   @Override
   public void stopInternal() {
     // pause proactive sink actions
-    PeriodicalJobService.pauseSingleTask(taskId);
+    ScheduleService.pushEvent().ifPresent(event -> event.pauseSingleJob(taskId));
   }
 
   @Override
@@ -150,7 +159,7 @@ public class ProcessorTask extends Task {
     }
 
     // remove proactive sink actions
-    PeriodicalJobService.deregister(taskId);
+    ScheduleService.pushEvent().ifPresent(event -> event.deregister(taskId));
 
     disruptor.shutdown();
 
