@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.core.Response;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -203,12 +204,19 @@ public class TaskRuntime implements AutoCloseable {
   }
 
   private Map<String, String> convert(final Map<String, String> attributes) {
-    attributes.forEach(
-        (key, value) -> {
-          if (!CollectorParameters.matchAnyParam(key)) {
-            attributes.put(key, value.replace("-", "_"));
-          }
-        });
+    final Map<String, String> modifyParamMap = new HashMap<>();
+    final Iterator<Map.Entry<String, String>> paramIterator = attributes.entrySet().iterator();
+
+    while (paramIterator.hasNext()) {
+      final Map.Entry<String, String> param = paramIterator.next();
+
+      if (!CollectorParameters.matchAnyParam(param.getKey())) {
+        modifyParamMap.put(param.getKey().replace("-", "_"), param.getValue());
+        paramIterator.remove();
+      }
+    }
+    attributes.putAll(modifyParamMap);
+
     return attributes;
   }
 }
