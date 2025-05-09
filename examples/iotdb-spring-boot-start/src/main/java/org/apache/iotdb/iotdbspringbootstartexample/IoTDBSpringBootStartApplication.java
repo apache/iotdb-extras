@@ -23,8 +23,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class IoTDBSpringBootStartApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(IoTDBSpringBootStartApplication.class, args);
-    }
-
+  public static void main(String[] args) {
+    SpringApplication.run(IoTDBSpringBootStartApplication.class, args);
+  }
 }
