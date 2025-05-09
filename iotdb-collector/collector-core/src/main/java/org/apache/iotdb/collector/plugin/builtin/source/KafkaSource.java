@@ -31,6 +31,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,7 @@ public class KafkaSource extends PushSource {
 
   private Thread workerThread;
   private volatile boolean isStarted = false;
+  private volatile KafkaConsumer<String, String> consumer;
 
   // kafka config
   private String topic;
@@ -110,7 +112,8 @@ public class KafkaSource extends PushSource {
     props.put("auto.offset.reset", "none");
     props.put("enable.auto.commit", "false");
 
-    try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
+    try {
+      consumer = new KafkaConsumer<>(props);
       final TopicPartition currentWorkTopicPartition = new TopicPartition(topic, instanceIndex);
       offset = Long.parseLong(startIndex.getProgressInfo().getOrDefault("offset", "0"));
 
@@ -120,7 +123,17 @@ public class KafkaSource extends PushSource {
       while (isStarted && !Thread.currentThread().isInterrupted()) {
         markPausePosition();
 
-        final ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+        final ConsumerRecords<String, String> records;
+        try {
+          records = consumer.poll(Duration.ofMillis(100));
+        } catch (final WakeupException e) {
+          if (!isStarted) {
+            break;
+          } else {
+            throw e;
+          }
+        }
+
         for (final ConsumerRecord<String, String> record : records) {
           LOGGER.info(
               "Partition{} consumed offset={} key={} value={}",
@@ -134,13 +147,24 @@ public class KafkaSource extends PushSource {
         }
       }
     } catch (final InterruptedException e) {
-      throw new RuntimeException(e);
+      LOGGER.info("Worker thread interrupted");
+    } catch (final Exception e) {
+      LOGGER.warn("Error in Kafka consumer loop", e);
+    } finally {
+      if (consumer != null) {
+        consumer.close();
+        consumer = null;
+      }
     }
   }
 
   @Override
   public void close() throws Exception {
     isStarted = false;
+    if (consumer != null) {
+      consumer.wakeup();
+    }
+
     if (workerThread != null) {
       workerThread.interrupt();
       try {
