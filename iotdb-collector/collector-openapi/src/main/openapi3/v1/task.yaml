@@ -87,6 +87,13 @@ paths:
         "200":
           $ref: '#/components/responses/SuccessExecutionStatus'
 
+  /task/v1/show:
+    post:
+      operationId: showTask
+      responses:
+        "200":
+          $ref: '#/components/responses/SuccessExecutionStatus'
+
 components:
   schemas:
     CreateTaskRequest:

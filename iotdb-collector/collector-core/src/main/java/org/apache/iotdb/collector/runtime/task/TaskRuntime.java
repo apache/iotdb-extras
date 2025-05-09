@@ -103,6 +103,8 @@ public class TaskRuntime implements AutoCloseable {
           .build();
     } catch (final Exception e) {
       RuntimeService.progress().ifPresent(progress -> progress.removeTaskProgress(taskId));
+      PersistenceService.task().ifPresent(task -> tasks.remove(taskId));
+
       tasks.remove(taskId);
 
       LOGGER.warn("Failed to create task {} because {}", taskId, e.getMessage(), e);
@@ -191,6 +193,12 @@ public class TaskRuntime implements AutoCloseable {
           .entity(String.format("Failed to drop task %s, because %s", taskId, e.getMessage()))
           .build();
     }
+  }
+
+  public Response showTask() {
+    return PersistenceService.task().isPresent()
+        ? Response.ok(PersistenceService.task().get().showTasks()).build()
+        : Response.serverError().build();
   }
 
   @Override
