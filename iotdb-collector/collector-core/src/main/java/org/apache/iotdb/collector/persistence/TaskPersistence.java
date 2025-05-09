@@ -250,7 +250,9 @@ public class TaskPersistence extends Persistence {
 
       return result;
     } catch (final SQLException e) {
-      throw new RuntimeException(e);
+      LOGGER.warn("Failed to show tasks because {}", e.getMessage());
     }
+
+    return result;
   }
 }
