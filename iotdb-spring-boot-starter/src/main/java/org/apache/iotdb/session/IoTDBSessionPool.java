@@ -50,7 +50,7 @@ public class IoTDBSessionPool {
         if (tableSessionPool == null) {
           tableSessionPool =
               new TableSessionPoolBuilder()
-                  .nodeUrls(Arrays.asList(properties.getUrl().split(";")))
+                  .nodeUrls(Arrays.asList(properties.getNode_urls().split(";")))
                   .user(properties.getUsername())
                   .password(properties.getPassword())
                   .database(properties.getDatabase())
@@ -63,6 +63,13 @@ public class IoTDBSessionPool {
                   .waitToGetSessionTimeoutInMs(properties.getQuery_timeout_in_ms())
                   .enableCompression(properties.isEnable_compression())
                   .retryIntervalInMs(properties.getRetry_interval_in_ms())
+                  .trustStore(properties.getTrust_store())
+                  .trustStorePwd(properties.getTrust_store_pwd())
+                  .connectionTimeoutInMs(properties.getConnection_timeout_in_ms())
+                  .zoneId(properties.getZone_id())
+                  .thriftDefaultBufferSize(properties.getThrift_default_buffer_size())
+                  .thriftMaxFrameSize(properties.getThrift_max_frame_size())
+                  .enableRedirection(properties.isEnable_redirection())
                   .build();
         }
       }
@@ -77,7 +84,7 @@ public class IoTDBSessionPool {
         if (treeSessionPool == null) {
           treeSessionPool =
               new SessionPool.Builder()
-                  .nodeUrls(Arrays.asList(properties.getUrl().split(";")))
+                  .nodeUrls(Arrays.asList(properties.getNode_urls().split(";")))
                   .user(properties.getUsername())
                   .password(properties.getPassword())
                   .maxSize(properties.getMax_size())
@@ -89,6 +96,14 @@ public class IoTDBSessionPool {
                   .waitToGetSessionTimeoutInMs(properties.getQuery_timeout_in_ms())
                   .enableCompression(properties.isEnable_compression())
                   .retryIntervalInMs(properties.getRetry_interval_in_ms())
+                  .trustStore(properties.getTrust_store())
+                  .trustStorePwd(properties.getTrust_store_pwd())
+                  .connectionTimeoutInMs(properties.getConnection_timeout_in_ms())
+                  .zoneId(properties.getZone_id())
+                  .thriftDefaultBufferSize(properties.getThrift_default_buffer_size())
+                  .thriftMaxFrameSize(properties.getThrift_max_frame_size())
+                  .enableRedirection(properties.isEnable_redirection())
+                  .enableRecordsAutoConvertTablet(properties.isEnable_records_auto_convert_tablet())
                   .build();
         }
       }

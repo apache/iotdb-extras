@@ -17,11 +17,15 @@
 
 package org.apache.iotdb.config;
 
+import org.apache.iotdb.isession.SessionConfig;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.time.ZoneId;
 
 @ConfigurationProperties(prefix = "iotdb.session")
 public class IoTDBSessionProperties {
-  private String url;
+  private String node_urls;
   private String username;
   private String password;
   private String database;
@@ -30,18 +34,27 @@ public class IoTDBSessionProperties {
   private Integer fetch_size = 1024;
   private long query_timeout_in_ms = 60000L;
   private boolean enable_auto_fetch = true;
-  private boolean use_ssl = false;
   private int max_retry_count = 60;
   private long wait_to_get_session_timeout_in_msit = 60000L;
   private boolean enable_compression = false;
-  private long retry_interval_in_ms = 500L;
+  private long retry_interval_in_ms = SessionConfig.RETRY_INTERVAL_IN_MS;
+  private boolean use_ssl = false;
+  private String trust_store;
+  private String trust_store_pwd;
+  private int connection_timeout_in_ms;
+  private ZoneId zone_id;
+  private int thrift_default_buffer_size = 1024;
+  private int thrift_max_frame_size = 67108864;
+  private boolean enable_redirection;
+  private boolean enable_records_auto_convert_tablet =
+      SessionConfig.DEFAULT_RECORDS_AUTO_CONVERT_TABLET;
 
-  public String getUrl() {
-    return url;
+  public String getNode_urls() {
+    return node_urls;
   }
 
-  public void setUrl(String url) {
-    this.url = url;
+  public void setNode_urls(String node_urls) {
+    this.node_urls = node_urls;
   }
 
   public String getUsername() {
@@ -170,5 +183,69 @@ public class IoTDBSessionProperties {
 
   public void setRetry_interval_in_ms(long retry_interval_in_ms) {
     this.retry_interval_in_ms = retry_interval_in_ms;
+  }
+
+  public String getTrust_store() {
+    return trust_store;
+  }
+
+  public void setTrust_store(String trust_store) {
+    this.trust_store = trust_store;
+  }
+
+  public String getTrust_store_pwd() {
+    return trust_store_pwd;
+  }
+
+  public void setTrust_store_pwd(String trust_store_pwd) {
+    this.trust_store_pwd = trust_store_pwd;
+  }
+
+  public int getConnection_timeout_in_ms() {
+    return connection_timeout_in_ms;
+  }
+
+  public void setConnection_timeout_in_ms(int connection_timeout_in_ms) {
+    this.connection_timeout_in_ms = connection_timeout_in_ms;
+  }
+
+  public ZoneId getZone_id() {
+    return zone_id;
+  }
+
+  public void setZone_id(ZoneId zone_id) {
+    this.zone_id = zone_id;
+  }
+
+  public int getThrift_default_buffer_size() {
+    return thrift_default_buffer_size;
+  }
+
+  public void setThrift_default_buffer_size(int thrift_default_buffer_size) {
+    this.thrift_default_buffer_size = thrift_default_buffer_size;
+  }
+
+  public int getThrift_max_frame_size() {
+    return thrift_max_frame_size;
+  }
+
+  public void setThrift_max_frame_size(int thrift_max_frame_size) {
+    this.thrift_max_frame_size = thrift_max_frame_size;
+  }
+
+  public boolean isEnable_redirection() {
+    return enable_redirection;
+  }
+
+  public void setEnable_redirection(boolean enable_redirection) {
+    this.enable_redirection = enable_redirection;
+  }
+
+  public boolean isEnable_records_auto_convert_tablet() {
+    return enable_records_auto_convert_tablet;
+  }
+
+  public void setEnable_records_auto_convert_tablet(boolean enable_records_auto_convert_tablet) {
+    this.enable_records_auto_convert_tablet = enable_records_auto_convert_tablet;
   }
 }
