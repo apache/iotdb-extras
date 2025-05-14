@@ -17,14 +17,18 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.source.constant;
+package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
-public class KafkaSourceConstant {
-  public static final String KAFKA_SOURCE_TOPIC_KEY = "topic";
-  public static final String KAFKA_SOURCE_URL_KEY = "url";
-  public static final String KAFKA_SOURCE_GROUP_ID_KEY = "group-id";
+public class IoTDBPushSourceConstant {
+  public static final String HOST_KEY = "host";
+  public static final String PORT_KEY = "port";
+  public static final String TOPIC_KEY = "topic";
+  public static final String TIMEOUT_KEY = "timeout";
+  public static final String DEVICE_ID_KEY = "deviceId";
 
-  public static final String KAFKA_SOURCE_TOPIC_VALUE = "my_topic";
-  public static final String KAFKA_SOURCE_URL_VALUE = "localhost:9092";
-  public static final String KAFKA_SOURCE_GROUP_ID_VALUE = "multi-thread-group";
+  public static final String HOST_VALUE = "127.0.0.1";
+  public static final Integer PORT_VALUE = 6668;
+  public static final String TOPIC_VALUE = "root_all";
+  public static final Long TIMEOUT_VALUE = 10000L;
+  public static final String DEVICE_ID_VALUE = "root.test.demo";
 }

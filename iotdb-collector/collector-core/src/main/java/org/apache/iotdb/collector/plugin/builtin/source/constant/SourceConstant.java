@@ -19,16 +19,9 @@
 
 package org.apache.iotdb.collector.plugin.builtin.source.constant;
 
-public class IoTDBPushSourceConstant {
-  public static final String HOST_KEY = "host";
-  public static final String PORT_KEY = "port";
-  public static final String TOPIC_KEY = "topic";
-  public static final String TIMEOUT_KEY = "timeout";
-  public static final String DEVICE_ID_KEY = "deviceId";
+public class SourceConstant {
 
-  public static final String HOST_VALUE = "127.0.0.1";
-  public static final Integer PORT_VALUE = 6668;
-  public static final String TOPIC_VALUE = "root_all";
-  public static final Long TIMEOUT_VALUE = 10000L;
-  public static final String DEVICE_ID_VALUE = "root.test.demo";
+  public static final String REPORT_TIME_INTERVAL_KEY = "report-time-interval";
+
+  public static final String REPORT_TIME_INTERVAL_DEFAULT_VALUE = "60";
 }

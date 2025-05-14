@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.source.event;
+package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
 import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.collector.plugin.builtin.source.event.common.PipeRowCollector;

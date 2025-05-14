@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.processor;
 
-import org.apache.iotdb.collector.plugin.builtin.source.event.SubDemoEvent;
+import org.apache.iotdb.collector.plugin.builtin.source.iotdb.SubDemoEvent;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeProcessorRuntimeConfiguration;
