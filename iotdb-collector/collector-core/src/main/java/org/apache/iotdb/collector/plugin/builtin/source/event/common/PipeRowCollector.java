@@ -95,7 +95,7 @@ public class PipeRowCollector implements RowCollector {
     this.tablet = null;
   }
 
-  public List<TabletInsertionEvent> convertToTabletInsertionEvents(final boolean shouldReport) {
+  public List<TabletInsertionEvent> convertToTabletInsertionEvents() {
     collectTabletInsertionEvent();
 
     return tabletInsertionEventList;

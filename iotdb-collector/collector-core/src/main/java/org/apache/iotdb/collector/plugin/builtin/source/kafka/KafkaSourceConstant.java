@@ -42,9 +42,9 @@ public class KafkaSourceConstant {
   public static final String KAFKA_SOURCE_PARTITION_ASSIGN_STRATEGY_KEY =
       "partition.assign.strategy";
 
-  public static final String KAFKA_SOURCE_TOPIC_DEFAULT_VALUE = "";
+  public static final String KAFKA_SOURCE_TOPIC_DEFAULT_VALUE = "my_topic";
   public static final String KAFKA_SOURCE_BOOTSTRAP_SERVERS_DEFAULT_VALUE = "localhost:9092";
-  public static final String KAFKA_SOURCE_GROUP_ID_DEFAULT_VALUE = "";
+  public static final String KAFKA_SOURCE_GROUP_ID_DEFAULT_VALUE = "multi-thread-group";
   public static final String KAFKA_SOURCE_KEY_DESERIALIZER_DEFAULT_VALUE =
       StringDeserializer.class.getName();
   public static final String KAFKA_SOURCE_VALUE_DESERIALIZER_DEFAULT_VALUE =

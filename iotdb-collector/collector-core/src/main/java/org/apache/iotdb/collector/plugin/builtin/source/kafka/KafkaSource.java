@@ -32,12 +32,20 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.utils.Binary;
+import org.apache.tsfile.write.record.Tablet;
+import org.apache.tsfile.write.schema.IMeasurementSchema;
+import org.apache.tsfile.write.schema.MeasurementSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -100,8 +108,9 @@ public class KafkaSource extends PushSource {
 
   @Override
   public void validate(PipeParameterValidator validator) throws Exception {
-    validateRequiredParam(validator, KAFKA_SOURCE_TOPIC_KEY);
-    validateRequiredParam(validator, KAFKA_SOURCE_GROUP_ID_KEY);
+    validateRequiredParam(validator, validator.getParameters().getString(KAFKA_SOURCE_TOPIC_KEY));
+    validateRequiredParam(
+        validator, validator.getParameters().getString(KAFKA_SOURCE_GROUP_ID_KEY));
 
     validateParam(
         validator,
@@ -115,10 +124,31 @@ public class KafkaSource extends PushSource {
         enableAutoCommit -> BOOLEAN_SET.contains(String.valueOf(enableAutoCommit)),
         KAFKA_SOURCE_ENABLE_AUTO_COMMIT_DEFAULT_VALUE);
 
-    validateIntegerParam(validator, KAFKA_SOURCE_SESSION_TIMEOUT_MS_KEY, value -> value > 0);
-    validateIntegerParam(validator, KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_KEY, value -> value > 0);
-    validateIntegerParam(validator, KAFKA_SOURCE_MAX_POLL_RECORDS_KEY, value -> value > 0);
-    validateIntegerParam(validator, REPORT_TIME_INTERVAL_KEY, value -> value > 0);
+    validateIntegerParam(
+        validator,
+        KAFKA_SOURCE_SESSION_TIMEOUT_MS_KEY,
+        KAFKA_SOURCE_SESSION_TIMEOUT_MS_DEFAULT_VALUE,
+        value -> value > 0);
+    validateIntegerParam(
+        validator,
+        KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_KEY,
+        KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_DEFAULT_VALUE,
+        value -> value > 0);
+    validateIntegerParam(
+        validator,
+        KAFKA_SOURCE_MAX_POLL_RECORDS_KEY,
+        KAFKA_SOURCE_MAX_POLL_RECORDS_DEFAULT_VALUE,
+        value -> value > 0);
+    validateIntegerParam(
+        validator,
+        REPORT_TIME_INTERVAL_KEY,
+        REPORT_TIME_INTERVAL_DEFAULT_VALUE,
+        value -> value > 0);
+  }
+
+  private void validateRequiredParam(
+      final PipeParameterValidator validator, final String paramKey) {
+    validator.validate(Objects::nonNull, String.format("%s is required", paramKey), paramKey);
   }
 
   private void validateParam(
@@ -134,17 +164,13 @@ public class KafkaSource extends PushSource {
         paramValue);
   }
 
-  private void validateRequiredParam(
-      final PipeParameterValidator validator, final String paramKey) {
-    validator.validate(Objects::nonNull, String.format("%s is required", paramKey));
-  }
-
   private void validateIntegerParam(
       final PipeParameterValidator validator,
       final String paramKey,
+      final String paramDefaultValue,
       final Predicate<Integer> validationCondition) {
     final int paramValue =
-        validator.getParameters().getIntOrDefault(paramKey, Integer.parseInt(paramKey));
+        validator.getParameters().getIntOrDefault(paramKey, Integer.parseInt(paramDefaultValue));
 
     validator.validate(
         value -> validationCondition.test((Integer) value),
@@ -243,7 +269,7 @@ public class KafkaSource extends PushSource {
       while (isStarted && !Thread.currentThread().isInterrupted()) {
         markPausePosition();
 
-        processRecords(consumer.poll(Duration.ofMillis(100)));
+        process(consumer.poll(Duration.ofMillis(100)));
 
         if (enableAutoCommit) {
           consumer.commitSync();
@@ -278,26 +304,64 @@ public class KafkaSource extends PushSource {
     consumer = new KafkaConsumer<>(props);
   }
 
-  private void processRecords(final ConsumerRecords<String, String> records) {
-    records.forEach(
-        record -> {
-          try {
-            supplyRecord(record);
-          } catch (final Exception e) {
-            LOGGER.warn("Failed to process record at offset {}", record.offset(), e);
+  private void process(final ConsumerRecords<String, String> records) {
+    if (!records.isEmpty()) {
+      for (final ConsumerRecord<String, String> record : records) {
+        final List<IMeasurementSchema> schemaList = new ArrayList<>();
+        final String[] dataArray = record.value().trim().split(",");
+        final String deviceId = dataArray[0];
+        long timestamp = Long.parseLong(dataArray[1]);
+        final String[] measurements = dataArray[2].trim().split(":");
+        final String[] typeStrings = dataArray[3].trim().split(":");
+        final TSDataType[] types = new TSDataType[measurements.length];
+        final String[] valueStrings = dataArray[4].trim().split(":");
+        final Object[] values = new Object[measurements.length];
+
+        for (int i = 0; i < typeStrings.length; i++) {
+          types[i] = TSDataType.valueOf(typeStrings[i]);
+        }
+
+        for (int i = 0; i < measurements.length; i++) {
+          schemaList.add(new MeasurementSchema(measurements[i], types[i]));
+        }
+
+        for (int i = 0; i < valueStrings.length; i++) {
+          switch (types[i]) {
+            case INT64:
+              values[i] = new long[] {Long.parseLong(valueStrings[i])};
+              break;
+            case DOUBLE:
+              values[i] = new double[] {Double.parseDouble(valueStrings[i])};
+              break;
+            case INT32:
+              values[i] = new int[] {Integer.parseInt(valueStrings[i])};
+              break;
+            case TEXT:
+              values[i] =
+                  new Binary[] {new Binary(valueStrings[i].getBytes(StandardCharsets.UTF_8))};
+              break;
+            case FLOAT:
+              values[i] = new float[] {Float.parseFloat(valueStrings[i])};
+              break;
+            case BOOLEAN:
+              values[i] = new boolean[] {Boolean.parseBoolean(valueStrings[i])};
+              break;
+            default:
           }
-        });
-  }
+        }
+        final Tablet tablet = new Tablet(deviceId, schemaList, values.length);
+        tablet.setTimestamps(new long[] {timestamp});
+        tablet.setRowSize(values.length);
+        tablet.setValues(values);
 
-  private void supplyRecord(final ConsumerRecord<String, String> record) {
-    offset = record.offset();
-
-    LOGGER.debug(
-        "Consumed record: partition={}, offset={}, key={}, value={}",
-        instanceIndex,
-        record.offset(),
-        record.key(),
-        record.value());
+        final KafkaEvent event = new KafkaEvent(tablet, deviceId);
+        try {
+          supply(event);
+        } catch (final Exception e) {
+          LOGGER.warn("failed to supply KafkaEvent {}", event, e);
+        }
+      }
+    }
   }
 
   @Override
