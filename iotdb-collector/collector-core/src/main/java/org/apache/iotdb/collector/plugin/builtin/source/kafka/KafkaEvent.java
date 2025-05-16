@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
+package org.apache.iotdb.collector.plugin.builtin.source.kafka;
 
 import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 
 import org.apache.tsfile.write.record.Tablet;
 
-public class SubDemoEvent extends PipeRawTabletInsertionEvent {
+public class KafkaEvent extends PipeRawTabletInsertionEvent {
 
-  public SubDemoEvent(final Tablet tablet, final String deviceId) {
+  public KafkaEvent(final Tablet tablet, final String deviceId) {
     super(tablet, deviceId);
   }
 }

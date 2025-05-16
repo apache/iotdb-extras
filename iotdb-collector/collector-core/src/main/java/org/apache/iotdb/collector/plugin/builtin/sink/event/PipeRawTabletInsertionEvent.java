@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.event;
 
+import org.apache.iotdb.collector.plugin.builtin.source.event.common.PipeRowCollector;
 import org.apache.iotdb.pipe.api.access.Row;
 import org.apache.iotdb.pipe.api.collector.RowCollector;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
@@ -30,15 +31,16 @@ import java.util.function.BiConsumer;
 public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
     implements TabletInsertionEvent, AutoCloseable {
 
-  public PipeRawTabletInsertionEvent(Tablet tablet, String deviceId) {
-    this.deviceId = deviceId;
-    this.tablet = tablet;
-    this.tablet.setDeviceId(deviceId);
-  }
-
   public String deviceId;
   protected Tablet tablet;
   private boolean isAligned;
+
+  public PipeRawTabletInsertionEvent(final Tablet tablet, final String deviceId) {
+    this.deviceId = deviceId;
+    this.tablet = tablet;
+
+    this.tablet.setDeviceId(deviceId);
+  }
 
   @Override
   public Iterable<TabletInsertionEvent> processRowByRow(
@@ -49,7 +51,9 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
   @Override
   public Iterable<TabletInsertionEvent> processTablet(
       final BiConsumer<Tablet, RowCollector> consumer) {
-    throw new UnsupportedOperationException();
+    final PipeRowCollector rowCollector = new PipeRowCollector();
+    consumer.accept(convertToTablet(), rowCollector);
+    return rowCollector.convertToTabletInsertionEvents();
   }
 
   public Tablet getTablet() {

@@ -20,6 +20,7 @@
 package org.apache.iotdb.collector.plugin.builtin;
 
 import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
+import org.apache.iotdb.collector.plugin.builtin.processor.KafkaProcessor;
 import org.apache.iotdb.collector.plugin.builtin.processor.SubscriptionProcessor;
 import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
 import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSyncConnector;
@@ -33,14 +34,15 @@ public enum BuiltinPlugin {
   // Push Sources
   HTTP_PUSH_SOURCE("http-push-source", HttpPushSource.class),
   KAFKA_SOURCE("kafka-source", KafkaSource.class),
-
-  // Pull Sources
-  HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),
   SUBSCRIPTION_SOURCE("subscription-source", IoTDBPushSource.class),
+
+  // Pull Sources,
+  HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),
 
   // Processors
   DO_NOTHING_PROCESSOR("do-nothing-processor", DoNothingProcessor.class),
   SUBSCRIPTION_PROCESSOR("subscription-processor", SubscriptionProcessor.class),
+  KAFKA_PROCESSOR("kafka-processor", KafkaProcessor.class),
 
   // Sinks
   IOTDB_DEMO_SINK("iotdb-demo-sink", DemoSink.class),
