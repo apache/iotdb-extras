@@ -25,8 +25,8 @@ import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
 import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSyncConnector;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
-import org.apache.iotdb.collector.plugin.builtin.source.IoTDBPushSource;
-import org.apache.iotdb.collector.plugin.builtin.source.KafkaSource;
+import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSource;
 
 public enum BuiltinPlugin {
 

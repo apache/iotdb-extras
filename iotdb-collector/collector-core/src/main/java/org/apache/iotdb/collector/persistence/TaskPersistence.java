@@ -40,6 +40,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -221,5 +224,35 @@ public class TaskPersistence extends Persistence {
     }
 
     return Optional.empty();
+  }
+
+  public List<Map<String, Object>> showTasks() {
+    final List<Map<String, Object>> result = new ArrayList<>();
+    final String queryAllTaskSQL =
+        "SELECT task_id, task_state, source_attribute, processor_attribute, sink_attribute, create_time FROM task";
+
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(queryAllTaskSQL);
+        final ResultSet taskResultSet = statement.executeQuery()) {
+      while (taskResultSet.next()) {
+        final Map<String, Object> taskInfo = new LinkedHashMap<>();
+
+        taskInfo.put("taskId", taskResultSet.getString(1));
+        taskInfo.put("taskState", TaskStateEnum.values()[taskResultSet.getInt(2)].name());
+        taskInfo.put("sourceAttribute", SerializationUtil.deserialize(taskResultSet.getBytes(3)));
+        taskInfo.put(
+            "processorAttribute", SerializationUtil.deserialize(taskResultSet.getBytes(4)));
+        taskInfo.put("sinkAttribute", SerializationUtil.deserialize(taskResultSet.getBytes(5)));
+        taskInfo.put("createTime", taskResultSet.getTimestamp(6));
+
+        result.add(taskInfo);
+      }
+
+      return result;
+    } catch (final SQLException e) {
+      LOGGER.warn("Failed to show tasks because {}", e.getMessage());
+    }
+
+    return result;
   }
 }

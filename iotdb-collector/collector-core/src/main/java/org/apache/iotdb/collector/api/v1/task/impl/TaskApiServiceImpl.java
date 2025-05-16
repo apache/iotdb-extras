@@ -86,4 +86,11 @@ public class TaskApiServiceImpl extends TaskApiService {
         ? RuntimeService.task().get().dropTask(dropTaskRequest.getTaskId())
         : Response.serverError().entity("Task runtime is down").build();
   }
+
+  @Override
+  public Response showTask(final SecurityContext securityContext) {
+    return RuntimeService.task().isPresent()
+        ? RuntimeService.task().get().showTask()
+        : Response.serverError().entity("Task runtime is down").build();
+  }
 }

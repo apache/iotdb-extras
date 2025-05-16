@@ -17,11 +17,9 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.source;
+package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
 import org.apache.iotdb.collector.plugin.api.PushSource;
-import org.apache.iotdb.collector.plugin.builtin.source.constant.IoTDBPushSourceConstant;
-import org.apache.iotdb.collector.plugin.builtin.source.event.SubDemoEvent;
 import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
