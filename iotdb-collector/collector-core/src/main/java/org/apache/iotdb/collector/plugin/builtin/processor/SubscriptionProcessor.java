@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.processor;
 
-import org.apache.iotdb.collector.plugin.builtin.source.iotdb.SubDemoEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeProcessorRuntimeConfiguration;
@@ -46,8 +46,8 @@ public class SubscriptionProcessor implements PipeProcessor {
 
   @Override
   public void process(Event event, EventCollector eventCollector) throws Exception {
-    if (event instanceof SubDemoEvent) {
-      process((SubDemoEvent) event, eventCollector);
+    if (event instanceof PipeRawTabletInsertionEvent) {
+      process((PipeRawTabletInsertionEvent) event, eventCollector);
     }
   }
 

@@ -44,7 +44,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.REPORT_TIME_INTERVAL_KEY;
+import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_REPORT_TIME_INTERVAL_KEY;
 
 public class PullSourceTask extends SourceTask {
 
@@ -152,7 +152,7 @@ public class PullSourceTask extends SourceTask {
                               .get()
                               .getProgressInfo()
                               .getOrDefault(
-                                  REPORT_TIME_INTERVAL_KEY,
+                                  SOURCE_REPORT_TIME_INTERVAL_KEY,
                                   String.valueOf(
                                       TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value())))
                       : TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value());

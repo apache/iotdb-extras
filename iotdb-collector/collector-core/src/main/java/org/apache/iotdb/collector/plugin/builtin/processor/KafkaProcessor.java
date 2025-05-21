@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.processor;
 
-import org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeProcessorRuntimeConfiguration;
@@ -46,8 +46,8 @@ public class KafkaProcessor implements PipeProcessor {
 
   @Override
   public void process(Event event, EventCollector eventCollector) throws Exception {
-    if (event instanceof KafkaEvent) {
-      process((KafkaEvent) event, eventCollector);
+    if (event instanceof PipeRawTabletInsertionEvent) {
+      process((PipeRawTabletInsertionEvent) event, eventCollector);
     }
   }
 

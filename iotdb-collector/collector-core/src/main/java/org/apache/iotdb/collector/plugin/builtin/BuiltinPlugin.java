@@ -26,7 +26,10 @@ import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
 import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSyncConnector;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
-import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTablePullSource;
+import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTablePushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTreePullSource;
+import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTreePushSource;
 import org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSource;
 
 public enum BuiltinPlugin {
@@ -34,7 +37,14 @@ public enum BuiltinPlugin {
   // Push Sources
   HTTP_PUSH_SOURCE("http-push-source", HttpPushSource.class),
   KAFKA_SOURCE("kafka-source", KafkaSource.class),
-  SUBSCRIPTION_SOURCE("subscription-source", IoTDBPushSource.class),
+  IOTDB_SUBSCRIPTION_TREE_PUSH_SOURCE(
+      "iotdb-subscription-tree-push-source", IoTDBSubscriptionTreePushSource.class),
+  IOTDB_SUBSCRIPTION_TREE_PULL_SOURCE(
+      "iotdb-subscription-tree-pull-source", IoTDBSubscriptionTreePullSource.class),
+  IOTDB_SUBSCRIPTION_TABLE_PUSH_SOURCE(
+      "iotdb-subscription-table-push-source", IoTDBSubscriptionTablePushSource.class),
+  IOTDB_SUBSCRIPTION_TABLE_PULL_SOURCE(
+      "iotdb-subscription-table-pull-source", IoTDBSubscriptionTablePullSource.class),
 
   // Pull Sources,
   HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),
