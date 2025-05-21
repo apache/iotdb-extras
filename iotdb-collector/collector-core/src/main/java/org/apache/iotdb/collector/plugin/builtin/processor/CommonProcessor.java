@@ -28,24 +28,25 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 
-public class KafkaProcessor implements PipeProcessor {
+public class CommonProcessor implements PipeProcessor {
   @Override
   public void validate(PipeParameterValidator pipeParameterValidator) throws Exception {}
 
   @Override
   public void customize(
-      PipeParameters pipeParameters,
-      PipeProcessorRuntimeConfiguration pipeProcessorRuntimeConfiguration)
+      final PipeParameters pipeParameters,
+      final PipeProcessorRuntimeConfiguration pipeProcessorRuntimeConfiguration)
       throws Exception {}
 
   @Override
-  public void process(TabletInsertionEvent tabletInsertionEvent, EventCollector eventCollector)
+  public void process(
+      final TabletInsertionEvent tabletInsertionEvent, final EventCollector eventCollector)
       throws Exception {
     eventCollector.collect(tabletInsertionEvent);
   }
 
   @Override
-  public void process(Event event, EventCollector eventCollector) throws Exception {
+  public void process(final Event event, final EventCollector eventCollector) throws Exception {
     if (event instanceof PipeRawTabletInsertionEvent) {
       process((PipeRawTabletInsertionEvent) event, eventCollector);
     }
