@@ -19,11 +19,8 @@
 
 package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
-import org.apache.iotdb.session.subscription.consumer.ConsumeResult;
 import org.apache.iotdb.session.subscription.consumer.ISubscriptionTablePushConsumer;
-import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,58 +32,19 @@ public class IoTDBSubscriptionTablePushSource extends IoTDBSubscriptionPushSourc
   private static final Logger LOGGER =
       LoggerFactory.getLogger(IoTDBSubscriptionTablePushSource.class);
 
-  @Override
-  public void start() throws Exception {
-    if (workerThread == null || !workerThread.isAlive()) {
-      isStarted = true;
-
-      workerThread = new Thread(this::doWork);
-      workerThread.setName("iotdb-subscription-tree-push-worker");
-      workerThread.start();
-    }
-  }
-
-  private void doWork() {
+  protected void doWork() {
     try (final ISubscriptionTablePushConsumer consumer =
-        getSubscriptionPushConsumerBuilder()
-            .consumeListener(
-                message -> {
-                  for (final SubscriptionSessionDataSet dataSet :
-                      message.getSessionDataSetsHandler()) {
-                    try {
-                      subscription.put(
-                          new PipeRawTabletInsertionEvent(dataSet.getTablet(), isStarted));
-                    } catch (final InterruptedException e) {
-                      LOGGER.warn(
-                          "iotdb subscription tree model push consumer thread interrupted", e);
-                      Thread.currentThread().interrupt();
-
-                      return ConsumeResult.FAILURE;
-                    }
-                  }
-
-                  return ConsumeResult.SUCCESS;
-                })
-            .buildTablePushConsumer()) {
+        getPushConsumerBuilder().buildTablePushConsumer()) {
       consumer.open();
       consumer.subscribe(subscription.getTopic());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    } catch (final Exception e) {
+      LOGGER.warn("Error occurred while {} thread", getPushConsumerThreadName(), e);
     }
   }
 
   @Override
-  public void close() throws Exception {
-    isStarted = false;
-    if (workerThread != null) {
-      workerThread.interrupt();
-      try {
-        workerThread.join(1000);
-      } catch (final InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-      workerThread = null;
-    }
+  protected String getPushConsumerThreadName() {
+    return "iotdb-subscription-table-push-source";
   }
 
   @Override

@@ -47,9 +47,17 @@ public class KafkaSourceConstant {
       StringDeserializer.class.getName();
 
   public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_KEY = "auto.offset.reset";
+  public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_NONE_VALUE = "none";
+  public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_EARLIEST_VALUE = "earliest";
+  public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_LATEST_VALUE = "latest";
   public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_DEFAULT_VALUE = "none";
   public static final Set<String> KAFKA_SOURCE_AUTO_OFFSET_RESET_VALUE_SET =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("none", "earliest", "latest")));
+      Collections.unmodifiableSet(
+          new HashSet<>(
+              Arrays.asList(
+                  KAFKA_SOURCE_AUTO_OFFSET_RESET_NONE_VALUE,
+                  KAFKA_SOURCE_AUTO_OFFSET_RESET_EARLIEST_VALUE,
+                  KAFKA_SOURCE_AUTO_OFFSET_RESET_LATEST_VALUE)));
 
   public static final String KAFKA_SOURCE_ENABLE_AUTO_COMMIT_KEY = "enable.auto.commit";
   public static final boolean KAFKA_SOURCE_ENABLE_AUTO_COMMIT_DEFAULT_VALUE = false;

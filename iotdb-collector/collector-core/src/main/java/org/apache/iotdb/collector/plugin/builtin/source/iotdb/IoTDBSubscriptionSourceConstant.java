@@ -68,13 +68,15 @@ public class IoTDBSubscriptionSourceConstant {
   public static final long IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_INTERVAL_MS_MIN_VALUE = 500L;
 
   public static final String IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_KEY = "ack-strategy";
+  public static final String IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_BEFORE_VALUE = "before";
+  public static final String IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_AFTER_VALUE = "after";
   public static final String IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_DEFAULT_VALUE = "after";
   public static final Map<String, AckStrategy> IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_VALUE_MAP =
       Collections.unmodifiableMap(
           new HashMap<String, AckStrategy>() {
             {
-              put("before", AckStrategy.BEFORE_CONSUME);
-              put("after", AckStrategy.AFTER_CONSUME);
+              put(IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_BEFORE_VALUE, AckStrategy.BEFORE_CONSUME);
+              put(IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_AFTER_VALUE, AckStrategy.AFTER_CONSUME);
             }
           });
 

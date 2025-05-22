@@ -21,10 +21,19 @@ package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
 import org.apache.iotdb.collector.plugin.api.PullSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.session.subscription.consumer.base.AbstractSubscriptionPullConsumerBuilder;
+import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
+import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_INTERVAL_MS_DEFAULT_VALUE;
@@ -34,10 +43,17 @@ import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscr
 
 public abstract class IoTDBSubscriptionPullSource extends PullSource {
 
-  protected final IoTDBSubscription subscription = new IoTDBSubscription();
+  private static final Logger LOGGER = LoggerFactory.getLogger(IoTDBSubscriptionPullSource.class);
+
+  protected static final Long POLL_TIMEOUT_MS = 10_000L;
+
+  protected final IoTDBSubscriptionCommon subscription = new IoTDBSubscriptionCommon();
 
   private Boolean autoCommit;
   private Long autoCommitIntervalMs;
+
+  protected volatile boolean isStarted;
+  protected Thread workerThread;
 
   @Override
   public void validate(final PipeParameterValidator validator) throws Exception {
@@ -71,6 +87,63 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
         pipeParameters.getLongOrDefault(
             IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_INTERVAL_MS_KEY,
             IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_INTERVAL_MS_DEFAULT_VALUE);
+  }
+
+  @Override
+  public void start() throws Exception {
+    initPullConsumer();
+
+    if (workerThread == null) {
+      isStarted = true;
+
+      workerThread = new Thread(this::doWork);
+      workerThread.setName(getPullConsumerThreadName());
+      workerThread.start();
+    }
+  }
+
+  protected abstract void initPullConsumer();
+
+  protected abstract String getPullConsumerThreadName();
+
+  private void doWork() {
+    while (isStarted && !Thread.currentThread().isInterrupted()) {
+      final List<SubscriptionMessage> messages = poll();
+
+      for (final SubscriptionMessage message : messages) {
+        for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
+          subscription.checkIfNeedPause();
+
+          try {
+            subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
+          } catch (final InterruptedException e) {
+            LOGGER.warn("{} thread interrupted", getPullConsumerThreadName(), e);
+            Thread.currentThread().interrupt();
+          }
+        }
+      }
+    }
+  }
+
+  protected abstract List<SubscriptionMessage> poll();
+
+  @Override
+  public Event supply() throws InterruptedException {
+    return subscription.take();
+  }
+
+  @Override
+  public void close() throws Exception {
+    isStarted = false;
+    if (workerThread != null) {
+      workerThread.interrupt();
+      try {
+        workerThread.join(1000);
+      } catch (final InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      workerThread = null;
+    }
   }
 
   protected AbstractSubscriptionPullConsumerBuilder getSubscriptionPullConsumerBuilder() {

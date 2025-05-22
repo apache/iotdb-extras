@@ -21,11 +21,17 @@ package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
 import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.session.subscription.consumer.AckStrategy;
+import org.apache.iotdb.session.subscription.consumer.ConsumeResult;
 import org.apache.iotdb.session.subscription.consumer.base.AbstractSubscriptionPushConsumerBuilder;
+import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_KEY;
@@ -38,6 +44,8 @@ import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscr
 
 public abstract class IoTDBSubscriptionPushSource extends PushSource {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(IoTDBSubscriptionPushSource.class);
+
   protected volatile boolean isStarted = true;
   protected Thread workerThread;
 
@@ -45,7 +53,7 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
   private Long autoPollTimeoutMs;
   private AckStrategy ackStrategy;
 
-  protected final IoTDBSubscription subscription = new IoTDBSubscription();
+  protected final IoTDBSubscriptionCommon subscription = new IoTDBSubscriptionCommon();
 
   @Override
   public void validate(final PipeParameterValidator validator) throws Exception {
@@ -94,10 +102,57 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
             IOTDB_SUBSCRIPTION_SOURCE_AUTO_POLL_TIMEOUT_MS_DEFAULT_VALUE);
   }
 
+  @Override
+  public void start() throws Exception {
+    if (workerThread == null || !workerThread.isAlive()) {
+      isStarted = true;
+
+      workerThread = new Thread(this::doWork);
+      workerThread.setName(getPushConsumerThreadName());
+      workerThread.start();
+    }
+  }
+
+  protected abstract void doWork();
+
+  protected abstract String getPushConsumerThreadName();
+
+  protected AbstractSubscriptionPushConsumerBuilder getPushConsumerBuilder() {
+    return getSubscriptionPushConsumerBuilder()
+        .consumeListener(
+            message -> {
+              for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
+                try {
+                  subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isStarted));
+                } catch (final InterruptedException e) {
+                  LOGGER.warn("{} thread interrupted", getPushConsumerThreadName(), e);
+                  Thread.currentThread().interrupt();
+
+                  return ConsumeResult.FAILURE;
+                }
+              }
+              return ConsumeResult.SUCCESS;
+            });
+  }
+
   protected AbstractSubscriptionPushConsumerBuilder getSubscriptionPushConsumerBuilder() {
     return ((AbstractSubscriptionPushConsumerBuilder) subscription.getSubscriptionConsumerBuilder())
         .ackStrategy(ackStrategy)
         .autoPollIntervalMs(autoPollIntervalMs)
         .autoPollTimeoutMs(autoPollTimeoutMs);
+  }
+
+  @Override
+  public void close() throws Exception {
+    isStarted = false;
+    if (workerThread != null) {
+      workerThread.interrupt();
+      try {
+        workerThread.join(1000);
+      } catch (final InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      workerThread = null;
+    }
   }
 }

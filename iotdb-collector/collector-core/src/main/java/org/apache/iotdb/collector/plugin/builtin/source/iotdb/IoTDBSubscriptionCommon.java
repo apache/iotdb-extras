@@ -57,7 +57,7 @@ import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscr
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_TOPIC_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_TOPIC_KEY;
 
-public class IoTDBSubscription {
+public class IoTDBSubscriptionCommon {
 
   private String host;
   private Integer port;
@@ -70,10 +70,11 @@ public class IoTDBSubscription {
 
   private String topic;
 
-  protected final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
-  protected final Integer eventQueueCapacity = 1000;
-  protected final Long eventQueuePauseIntervalMs = 100_000_000L;
+  private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
+  private static final Integer EVENT_QUEUE_CAPACITY = 1000;
+  private static final Long EVENT_QUEUE_PAUSE_INTERVAL_MS = 100_000_000L;
 
+  // validate common parameters
   public void validate(final PipeParameterValidator validator) {
     CollectorParameters.validateStringRequiredParam(validator, IOTDB_SUBSCRIPTION_SOURCE_TOPIC_KEY);
     CollectorParameters.validateStringRequiredParam(
@@ -123,6 +124,7 @@ public class IoTDBSubscription {
         SOURCE_SQL_DIALECT_DEFAULT_VALUE);
   }
 
+  // customize common parameters
   public void customize(
       final PipeParameters pipeParameters, final PipeSourceRuntimeConfiguration configuration) {
     host =
@@ -154,6 +156,7 @@ public class IoTDBSubscription {
             IOTDB_SUBSCRIPTION_SOURCE_MAX_POLL_PARALLELISM_DEFAULT_VALUE);
   }
 
+  // common consumer builder
   public AbstractSubscriptionConsumerBuilder getSubscriptionConsumerBuilder() {
     return new AbstractSubscriptionConsumerBuilder()
         .host(host)
@@ -175,8 +178,8 @@ public class IoTDBSubscription {
   }
 
   public void checkIfNeedPause() {
-    while (eventQueue.size() >= eventQueueCapacity) {
-      LockSupport.parkNanos(eventQueuePauseIntervalMs);
+    while (eventQueue.size() >= EVENT_QUEUE_CAPACITY) {
+      LockSupport.parkNanos(EVENT_QUEUE_PAUSE_INTERVAL_MS);
     }
   }
 
