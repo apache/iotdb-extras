@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.protocol;
 
+import org.apache.iotdb.collector.plugin.api.event.PeriodicalEvent;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBDataNodeSyncClientManager;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClient;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClientManager;
@@ -158,7 +159,9 @@ public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
 
   @Override
   public void transfer(final Event event) throws Exception {
-    if (isTabletBatchModeEnabled && !tabletBatchBuilder.isEmpty()) {
+    if (event instanceof PeriodicalEvent) {
+      doTransferWrapper();
+    } else if (isTabletBatchModeEnabled && !tabletBatchBuilder.isEmpty()) {
       doTransferWrapper();
     }
   }

@@ -19,26 +19,36 @@
 
 package org.apache.iotdb.collector.plugin.builtin.source.iotdb;
 
-import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
-import org.apache.iotdb.collector.plugin.builtin.source.event.common.PipeRowCollector;
-import org.apache.iotdb.pipe.api.collector.RowCollector;
-import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
+import org.apache.iotdb.session.subscription.consumer.ISubscriptionTreePullConsumer;
+import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
 
-import org.apache.tsfile.write.record.Tablet;
+import java.util.List;
+import java.util.Optional;
 
-import java.util.function.BiConsumer;
+public class IoTDBSubscriptionTreePullSource extends IoTDBSubscriptionPullSource {
 
-public class SubDemoEvent extends PipeRawTabletInsertionEvent {
+  private ISubscriptionTreePullConsumer consumer;
 
-  public SubDemoEvent(Tablet tablet, String deviceId) {
-    super(tablet, deviceId);
+  @Override
+  protected void initPullConsumer() {
+    consumer = getSubscriptionPullConsumerBuilder().buildPullConsumer();
+    consumer.open();
+    consumer.subscribe(subscription.getTopic());
   }
 
   @Override
-  public Iterable<TabletInsertionEvent> processTablet(
-      final BiConsumer<Tablet, RowCollector> consumer) {
-    final PipeRowCollector collector = new PipeRowCollector();
-    consumer.accept(tablet, collector);
-    return collector.convertToTabletInsertionEvents(false);
+  protected String getPullConsumerThreadName() {
+    return "iotdb-subscription-tree-pull-source";
+  }
+
+  @Override
+  protected List<SubscriptionMessage> poll() {
+    return consumer.poll(POLL_TIMEOUT_MS);
+  }
+
+  @Override
+  public Optional<ProgressIndex> report() {
+    return Optional.empty();
   }
 }

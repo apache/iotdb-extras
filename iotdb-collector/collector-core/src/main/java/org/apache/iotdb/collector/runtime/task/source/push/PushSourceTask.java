@@ -89,29 +89,27 @@ public class PushSourceTask extends SourceTask {
     // register storage progress schedule job
     ScheduleService.reportProgress()
         .ifPresent(
-            reportEvent -> {
-              reportEvent.register(
-                  taskId,
-                  () -> {
-                    if (pushSources != null && pushSources.length > 0) {
-                      Map<Integer, ProgressIndex> progresses = new HashMap<>();
-                      for (int i = 0; i < pushSources.length; i++) {
-                        final int finalI = i;
-                        pushSources[i]
-                            .report()
-                            .ifPresent(progressIndex -> progresses.put(finalI, progressIndex));
-                      }
+            reportEvent ->
+                reportEvent.register(
+                    taskId,
+                    () -> {
+                      if (pushSources != null && pushSources.length > 0) {
+                        Map<Integer, ProgressIndex> progresses = new HashMap<>();
+                        for (int i = 0; i < pushSources.length; i++) {
+                          final int finalI = i;
+                          pushSources[i]
+                              .report()
+                              .ifPresent(progressIndex -> progresses.put(finalI, progressIndex));
+                        }
 
-                      PersistenceService.task()
-                          .ifPresent(
-                              task ->
-                                  task.tryReportTaskProgress(
-                                      new ProgressReportEvent(taskId, progresses)));
-                      LOGGER.info("successfully reported task progress {}", progresses);
-                    }
-                  },
-                  TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value());
-            });
+                        PersistenceService.task()
+                            .ifPresent(
+                                task ->
+                                    task.tryReportTaskProgress(
+                                        new ProgressReportEvent(taskId, progresses)));
+                      }
+                    },
+                    TaskRuntimeOptions.TASK_PROGRESS_REPORT_INTERVAL.value()));
   }
 
   @Override

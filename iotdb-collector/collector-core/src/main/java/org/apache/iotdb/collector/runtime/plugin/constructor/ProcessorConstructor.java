@@ -20,8 +20,8 @@
 package org.apache.iotdb.collector.runtime.plugin.constructor;
 
 import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
+import org.apache.iotdb.collector.plugin.builtin.processor.CommonProcessor;
 import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
-import org.apache.iotdb.collector.plugin.builtin.processor.SubscriptionProcessor;
 import org.apache.iotdb.collector.runtime.plugin.meta.PluginMetaKeeper;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -36,8 +36,7 @@ public class ProcessorConstructor extends PluginConstructor {
   protected void initConstructors() {
     pluginConstructors.put(
         BuiltinPlugin.DO_NOTHING_PROCESSOR.getPluginName(), DoNothingProcessor::new);
-    pluginConstructors.put(
-        BuiltinPlugin.SUBSCRIPTION_PROCESSOR.getPluginName(), SubscriptionProcessor::new);
+    pluginConstructors.put(BuiltinPlugin.COMMON_PROCESSOR.getPluginName(), CommonProcessor::new);
   }
 
   @Override
