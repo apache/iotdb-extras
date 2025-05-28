@@ -265,10 +265,42 @@ public class PipeRuntimeOptions extends Options {
         }
       };
 
-  public static volatile Option<Integer> DATA_NODE_ID =
+  public static final Option<Integer> DATA_NODE_ID =
       new Option<Integer>("data_node_id", -1) {
         @Override
         public void setValue(final String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Boolean> PIPE_MEMORY_MANAGEMENT_ENABLED =
+      new Option<Boolean>("pipe_memory_management_enabled", true) {
+        @Override
+        public void setValue(String valueString) {
+          value = Boolean.parseBoolean(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MEMORY_ALLOCATE_MIN_SIZE_IN_BYTES =
+      new Option<Integer>("pipe_memory_allocate_min_size_in_bytes", 32) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Double> PIPE_TOTAL_FLOATING_MEMORY_PROPORTION =
+      new Option<Double>("pipe_total_floating_memory_proportion", 0.2) {
+        @Override
+        public void setValue(String valueString) {
+          value = Double.parseDouble(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MAX_ALLOWED_EVENT_COUNT_IN_TABLET_BATCH =
+      new Option<Integer>("pipe_max_allowed_event_count_in_tablet_batch", 100) {
+        @Override
+        public void setValue(String valueString) {
           value = Integer.parseInt(valueString);
         }
       };

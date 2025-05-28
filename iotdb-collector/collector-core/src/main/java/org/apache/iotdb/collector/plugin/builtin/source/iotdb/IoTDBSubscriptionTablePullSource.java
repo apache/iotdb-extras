@@ -32,7 +32,7 @@ public class IoTDBSubscriptionTablePullSource extends IoTDBSubscriptionPullSourc
 
   @Override
   protected void initPullConsumer() {
-    consumer = getSubscriptionPullConsumerBuilder().buildTablePullConsumer();
+    consumer = getSubscriptionTablePullConsumerBuilder().buildTablePullConsumer();
     consumer.open();
     consumer.subscribe(subscription.getTopic());
   }

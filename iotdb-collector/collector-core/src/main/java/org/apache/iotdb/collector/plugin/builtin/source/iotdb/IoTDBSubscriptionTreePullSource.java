@@ -23,8 +23,12 @@ import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.session.subscription.consumer.ISubscriptionTreePullConsumer;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+
+import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_REPORT_TIME_INTERVAL_KEY;
 
 public class IoTDBSubscriptionTreePullSource extends IoTDBSubscriptionPullSource {
 
@@ -32,7 +36,7 @@ public class IoTDBSubscriptionTreePullSource extends IoTDBSubscriptionPullSource
 
   @Override
   protected void initPullConsumer() {
-    consumer = getSubscriptionPullConsumerBuilder().buildPullConsumer();
+    consumer = getSubscriptionTreePullConsumerBuilder().buildPullConsumer();
     consumer.open();
     consumer.subscribe(subscription.getTopic());
   }
@@ -44,11 +48,19 @@ public class IoTDBSubscriptionTreePullSource extends IoTDBSubscriptionPullSource
 
   @Override
   protected List<SubscriptionMessage> poll() {
-    return consumer.poll(POLL_TIMEOUT_MS);
+    return consumer.poll(Collections.singleton(subscription.getTopic()), POLL_TIMEOUT_MS);
   }
 
   @Override
   public Optional<ProgressIndex> report() {
-    return Optional.empty();
+    final ProgressIndex progress =
+        new ProgressIndex(
+            instanceIndex,
+            new HashMap<String, String>() {
+              {
+                put(SOURCE_REPORT_TIME_INTERVAL_KEY, String.valueOf(reportTimeInterval));
+              }
+            });
+    return Optional.of(progress);
   }
 }

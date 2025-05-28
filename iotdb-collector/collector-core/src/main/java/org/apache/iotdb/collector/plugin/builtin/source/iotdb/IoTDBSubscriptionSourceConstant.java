@@ -60,7 +60,7 @@ public class IoTDBSubscriptionSourceConstant {
   public static final int IOTDB_SUBSCRIPTION_SOURCE_MAX_POLL_PARALLELISM_DEFAULT_VALUE = 1;
 
   public static final String IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_KEY = "auto-commit";
-  public static final boolean IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_DEFAULT_VALUE = true;
+  public static final boolean IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_DEFAULT_VALUE = false;
 
   public static final String IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_INTERVAL_MS_KEY =
       "auto-commit-interval-ms";

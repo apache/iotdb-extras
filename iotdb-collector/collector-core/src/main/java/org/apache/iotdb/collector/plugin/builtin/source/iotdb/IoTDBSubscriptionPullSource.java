@@ -26,7 +26,8 @@ import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfi
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
-import org.apache.iotdb.session.subscription.consumer.base.AbstractSubscriptionPullConsumerBuilder;
+import org.apache.iotdb.session.subscription.consumer.table.SubscriptionTablePullConsumerBuilder;
+import org.apache.iotdb.session.subscription.consumer.tree.SubscriptionTreePullConsumerBuilder;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
 import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 
@@ -112,8 +113,6 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
 
       for (final SubscriptionMessage message : messages) {
         for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
-          subscription.checkIfNeedPause();
-
           try {
             subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
           } catch (final InterruptedException e) {
@@ -146,8 +145,30 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
     }
   }
 
-  protected AbstractSubscriptionPullConsumerBuilder getSubscriptionPullConsumerBuilder() {
-    return ((AbstractSubscriptionPullConsumerBuilder) subscription.getSubscriptionConsumerBuilder())
+  protected SubscriptionTreePullConsumerBuilder getSubscriptionTreePullConsumerBuilder() {
+    return new SubscriptionTreePullConsumerBuilder()
+        .host(subscription.getHost())
+        .port(subscription.getPort())
+        .consumerId(subscription.getConsumerId())
+        .consumerGroupId(subscription.getGroupId())
+        .heartbeatIntervalMs(subscription.getHeartbeatIntervalMs())
+        .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
+        .thriftMaxFrameSize(subscription.getThriftMaxFrameSize())
+        .maxPollParallelism(subscription.getMaxPollParallelism())
+        .autoCommit(autoCommit)
+        .autoCommitIntervalMs(autoCommitIntervalMs);
+  }
+
+  protected SubscriptionTablePullConsumerBuilder getSubscriptionTablePullConsumerBuilder() {
+    return new SubscriptionTablePullConsumerBuilder()
+        .host(subscription.getHost())
+        .port(subscription.getPort())
+        .consumerId(subscription.getConsumerId())
+        .consumerGroupId(subscription.getGroupId())
+        .heartbeatIntervalMs(subscription.getHeartbeatIntervalMs())
+        .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
+        .thriftMaxFrameSize(subscription.getThriftMaxFrameSize())
+        .maxPollParallelism(subscription.getMaxPollParallelism())
         .autoCommit(autoCommit)
         .autoCommitIntervalMs(autoCommitIntervalMs);
   }

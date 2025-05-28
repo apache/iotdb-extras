@@ -24,11 +24,9 @@ import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfi
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
-import org.apache.iotdb.session.subscription.consumer.base.AbstractSubscriptionConsumerBuilder;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.locks.LockSupport;
 
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_IS_ALIGNED_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_IS_ALIGNED_KEY;
@@ -70,9 +68,8 @@ public class IoTDBSubscriptionCommon {
 
   private String topic;
 
-  private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
   private static final Integer EVENT_QUEUE_CAPACITY = 1000;
-  private static final Long EVENT_QUEUE_PAUSE_INTERVAL_MS = 100_000_000L;
+  private final BlockingQueue<Event> eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_CAPACITY);
 
   // validate common parameters
   public void validate(final PipeParameterValidator validator) {
@@ -156,19 +153,6 @@ public class IoTDBSubscriptionCommon {
             IOTDB_SUBSCRIPTION_SOURCE_MAX_POLL_PARALLELISM_DEFAULT_VALUE);
   }
 
-  // common consumer builder
-  public AbstractSubscriptionConsumerBuilder getSubscriptionConsumerBuilder() {
-    return new AbstractSubscriptionConsumerBuilder()
-        .host(host)
-        .port(port)
-        .consumerId(consumerId)
-        .consumerGroupId(groupId)
-        .heartbeatIntervalMs(heartbeatIntervalMs)
-        .endpointsSyncIntervalMs(endpointsSyncIntervalMs)
-        .thriftMaxFrameSize(thriftMaxFrameSize)
-        .maxPollParallelism(maxPollParallelism);
-  }
-
   public Event take() throws InterruptedException {
     return eventQueue.take();
   }
@@ -177,10 +161,36 @@ public class IoTDBSubscriptionCommon {
     eventQueue.put(event);
   }
 
-  public void checkIfNeedPause() {
-    while (eventQueue.size() >= EVENT_QUEUE_CAPACITY) {
-      LockSupport.parkNanos(EVENT_QUEUE_PAUSE_INTERVAL_MS);
-    }
+  public String getHost() {
+    return host;
+  }
+
+  public Integer getPort() {
+    return port;
+  }
+
+  public String getConsumerId() {
+    return consumerId;
+  }
+
+  public String getGroupId() {
+    return groupId;
+  }
+
+  public Long getHeartbeatIntervalMs() {
+    return heartbeatIntervalMs;
+  }
+
+  public Long getEndpointsSyncIntervalMs() {
+    return endpointsSyncIntervalMs;
+  }
+
+  public Integer getThriftMaxFrameSize() {
+    return thriftMaxFrameSize;
+  }
+
+  public Integer getMaxPollParallelism() {
+    return maxPollParallelism;
   }
 
   public String getTopic() {

@@ -27,7 +27,7 @@ import java.util.Set;
 public class SourceConstant {
 
   public static final String SOURCE_REPORT_TIME_INTERVAL_KEY = "report-time-interval";
-  public static final int SOURCE_REPORT_TIME_INTERVAL_DEFAULT_VALUE = 60;
+  public static final int SOURCE_REPORT_TIME_INTERVAL_DEFAULT_VALUE = 5;
 
   public static final String SOURCE_IS_ALIGNED_KEY = "is-aligned";
   public static final boolean SOURCE_IS_ALIGNED_DEFAULT_VALUE = false;

@@ -50,7 +50,7 @@ public class KafkaSourceConstant {
   public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_NONE_VALUE = "none";
   public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_EARLIEST_VALUE = "earliest";
   public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_LATEST_VALUE = "latest";
-  public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_DEFAULT_VALUE = "none";
+  public static final String KAFKA_SOURCE_AUTO_OFFSET_RESET_DEFAULT_VALUE = "earliest";
   public static final Set<String> KAFKA_SOURCE_AUTO_OFFSET_RESET_VALUE_SET =
       Collections.unmodifiableSet(
           new HashSet<>(

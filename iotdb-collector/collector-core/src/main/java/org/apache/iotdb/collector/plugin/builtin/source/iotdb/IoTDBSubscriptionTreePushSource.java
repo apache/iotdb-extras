@@ -34,7 +34,7 @@ public class IoTDBSubscriptionTreePushSource extends IoTDBSubscriptionPushSource
 
   protected void doWork() {
     try (final ISubscriptionTreePushConsumer consumer =
-        getPushConsumerBuilder().buildPushConsumer()) {
+        getSubscriptionTreePushConsumerBuilder().buildPushConsumer()) {
       consumer.open();
       consumer.subscribe(subscription.getTopic());
     } catch (final Exception e) {

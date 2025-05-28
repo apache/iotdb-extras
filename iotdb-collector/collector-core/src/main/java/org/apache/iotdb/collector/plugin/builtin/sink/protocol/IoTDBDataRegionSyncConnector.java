@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.protocol;
 
-import org.apache.iotdb.collector.plugin.api.event.PeriodicalEvent;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBDataNodeSyncClientManager;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClient;
 import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBSyncClientManager;
@@ -59,7 +58,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
@@ -159,9 +157,7 @@ public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
 
   @Override
   public void transfer(final Event event) throws Exception {
-    if (event instanceof PeriodicalEvent) {
-      doTransferWrapper();
-    } else if (isTabletBatchModeEnabled && !tabletBatchBuilder.isEmpty()) {
+    if (isTabletBatchModeEnabled && !tabletBatchBuilder.isEmpty()) {
       doTransferWrapper();
     }
   }
@@ -222,7 +218,6 @@ public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
   private void doTransfer(final PipeTabletEventTsFileBatch batchToTransfer)
       throws IOException, WriteProcessException {
     final List<Pair<String, File>> dbTsFilePairs = batchToTransfer.sealTsFiles();
-    final Map<Pair<String, Long>, Double> pipe2WeightMap = batchToTransfer.deepCopyPipe2WeightMap();
 
     for (final Pair<String, File> dbTsFile : dbTsFilePairs) {
       doTransfer(dbTsFile.right, null, dbTsFile.left);

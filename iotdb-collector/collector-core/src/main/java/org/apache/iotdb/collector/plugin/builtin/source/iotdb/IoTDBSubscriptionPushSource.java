@@ -26,12 +26,16 @@ import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfi
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.session.subscription.consumer.AckStrategy;
+import org.apache.iotdb.session.subscription.consumer.ConsumeListener;
 import org.apache.iotdb.session.subscription.consumer.ConsumeResult;
-import org.apache.iotdb.session.subscription.consumer.base.AbstractSubscriptionPushConsumerBuilder;
+import org.apache.iotdb.session.subscription.consumer.table.SubscriptionTablePushConsumerBuilder;
+import org.apache.iotdb.session.subscription.consumer.tree.SubscriptionTreePushConsumerBuilder;
 import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.LockSupport;
 
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_KEY;
@@ -117,26 +121,56 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
 
   protected abstract String getPushConsumerThreadName();
 
-  protected AbstractSubscriptionPushConsumerBuilder getPushConsumerBuilder() {
-    return getSubscriptionPushConsumerBuilder()
-        .consumeListener(
-            message -> {
-              for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
-                try {
-                  subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isStarted));
-                } catch (final InterruptedException e) {
-                  LOGGER.warn("{} thread interrupted", getPushConsumerThreadName(), e);
-                  Thread.currentThread().interrupt();
+  protected ConsumeListener getConsumeListener() {
+    return message -> {
+      for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
+        try {
+          markPausePosition();
 
-                  return ConsumeResult.FAILURE;
-                }
-              }
-              return ConsumeResult.SUCCESS;
-            });
+          subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
+        } catch (final InterruptedException e) {
+          LOGGER.warn("{} thread interrupted", getPushConsumerThreadName(), e);
+          Thread.currentThread().interrupt();
+
+          return ConsumeResult.FAILURE;
+        }
+      }
+
+      while (isStarted && !Thread.currentThread().isInterrupted()) {
+        LockSupport.park();
+      }
+
+      return ConsumeResult.SUCCESS;
+    };
   }
 
-  protected AbstractSubscriptionPushConsumerBuilder getSubscriptionPushConsumerBuilder() {
-    return ((AbstractSubscriptionPushConsumerBuilder) subscription.getSubscriptionConsumerBuilder())
+  protected SubscriptionTreePushConsumerBuilder getSubscriptionTreePushConsumerBuilder() {
+    return new SubscriptionTreePushConsumerBuilder()
+        .host(subscription.getHost())
+        .port(subscription.getPort())
+        .consumerId(subscription.getConsumerId() + instanceIndex)
+        .consumerGroupId(subscription.getGroupId())
+        .heartbeatIntervalMs(subscription.getHeartbeatIntervalMs())
+        .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
+        .thriftMaxFrameSize(subscription.getThriftMaxFrameSize())
+        .maxPollParallelism(subscription.getMaxPollParallelism())
+        .consumeListener(getConsumeListener())
+        .ackStrategy(ackStrategy)
+        .autoPollIntervalMs(autoPollIntervalMs)
+        .autoPollTimeoutMs(autoPollTimeoutMs);
+  }
+
+  protected SubscriptionTablePushConsumerBuilder getSubscriptionTablePushConsumer() {
+    return new SubscriptionTablePushConsumerBuilder()
+        .host(subscription.getHost())
+        .port(subscription.getPort())
+        .consumerId(subscription.getConsumerId() + instanceIndex)
+        .consumerGroupId(subscription.getGroupId())
+        .heartbeatIntervalMs(subscription.getHeartbeatIntervalMs())
+        .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
+        .thriftMaxFrameSize(subscription.getThriftMaxFrameSize())
+        .maxPollParallelism(subscription.getMaxPollParallelism())
+        .consumeListener(getConsumeListener())
         .ackStrategy(ackStrategy)
         .autoPollIntervalMs(autoPollIntervalMs)
         .autoPollTimeoutMs(autoPollTimeoutMs);

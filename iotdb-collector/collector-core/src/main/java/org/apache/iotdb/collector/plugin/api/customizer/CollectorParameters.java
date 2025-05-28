@@ -21,9 +21,6 @@ package org.apache.iotdb.collector.plugin.api.customizer;
 
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -31,12 +28,6 @@ import java.util.function.Predicate;
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.BOOLEAN_SET;
 
 public class CollectorParameters {
-  private static final Set<String> PARAM_SET =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList("source", "processor", "sink")));
-
-  public static boolean matchAnyParam(final String param) {
-    return PARAM_SET.contains(param);
-  }
 
   public static void validateStringRequiredParam(
       final PipeParameterValidator validator, final String paramKey) {
