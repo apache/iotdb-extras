@@ -41,6 +41,16 @@ public abstract class IMemoryBlock implements AutoCloseable {
   protected long totalMemorySizeInBytes;
 
   /**
+   * Try to release memory managed by this memory block
+   *
+   * @param sizeInByte the size of memory to be released, should be positive
+   */
+  public abstract void release(final long sizeInByte);
+
+  /** Get the free memory in byte of this memory block */
+  public abstract long getFreeMemoryInBytes();
+
+  /**
    * Forcibly allocate memory without the limit of totalMemorySizeInBytes
    *
    * @param sizeInByte the size of memory to be allocated, should be positive

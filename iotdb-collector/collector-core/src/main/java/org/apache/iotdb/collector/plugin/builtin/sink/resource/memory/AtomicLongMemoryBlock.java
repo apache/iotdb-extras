@@ -19,9 +19,15 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.resource.memory;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.atomic.AtomicLong;
 
 public class AtomicLongMemoryBlock extends IMemoryBlock {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(AtomicLongMemoryBlock.class);
+
   /** The memory usage in byte of this memory block */
   protected final AtomicLong usedMemoryInBytes = new AtomicLong(0);
 
@@ -34,6 +40,26 @@ public class AtomicLongMemoryBlock extends IMemoryBlock {
     this.memoryManager = memoryManager;
     this.totalMemorySizeInBytes = maxMemorySizeInByte;
     this.memoryBlockType = memoryBlockType;
+  }
+
+  @Override
+  public void release(long sizeInByte) {
+    usedMemoryInBytes.updateAndGet(
+        memCost -> {
+          if (sizeInByte > memCost) {
+            LOGGER.warn(
+                "The memory cost to be released is larger than the memory cost of memory block {}",
+                this);
+            return 0;
+          }
+          return memCost - sizeInByte;
+        });
+  }
+
+  /** Get the free memory in byte of this memory block */
+  @Override
+  public long getFreeMemoryInBytes() {
+    return totalMemorySizeInBytes - usedMemoryInBytes.get();
   }
 
   @Override

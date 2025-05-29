@@ -304,4 +304,40 @@ public class PipeRuntimeOptions extends Options {
           value = Integer.parseInt(valueString);
         }
       };
+
+  public static final Option<Integer> PIPE_MEMORY_ALLOCATE_MAX_RETRIES =
+      new Option<Integer>("pipe_memory_allocate_max_retries", 10) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MEMORY_ALLOCATE_RETRY_INTERVAL_MS =
+      new Option<Integer>("pipe_memory_allocate_retry_interval_ms", 50) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Double>
+      PIPE_DATA_STRUCTURE_TABLET_MEMORY_BLOCK_ALLOCATION_REJECT_THRESHOLD =
+          new Option<Double>(
+              "pipe_data_structure_tablet_memory_block_allocation_reject_threshold", 0.4) {
+            @Override
+            public void setValue(String valueString) {
+              value = Double.parseDouble(valueString);
+            }
+          };
+
+  public static final Option<Double>
+      PIPE_DATA_STRUCTURE_TS_FILE_MEMORY_BLOCK_ALLOCATION_REJECT_THRESHOLD =
+          new Option<Double>(
+              "pipe_data_structure_ts_file_memory_block_allocation_reject_threshold", 0.4) {
+            @Override
+            public void setValue(String valueString) {
+              value = Double.parseDouble(valueString);
+            }
+          };
 }

@@ -33,6 +33,8 @@ public class PipeMemoryBlock implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PipeMemoryBlock.class);
 
+  private final PipeMemoryManager pipeMemoryManager = PipeMemoryManager.getInstance();
+
   private final ReentrantLock lock = new ReentrantLock();
 
   private final AtomicLong memoryUsageInBytes = new AtomicLong(0);
@@ -41,6 +43,8 @@ public class PipeMemoryBlock implements AutoCloseable {
   private final AtomicReference<BiConsumer<Long, Long>> shrinkCallback = new AtomicReference<>();
   private final AtomicReference<LongUnaryOperator> expandMethod = new AtomicReference<>();
   private final AtomicReference<BiConsumer<Long, Long>> expandCallback = new AtomicReference<>();
+
+  private volatile boolean isReleased = false;
 
   public PipeMemoryBlock(final long memoryUsageInBytes) {
     this.memoryUsageInBytes.set(memoryUsageInBytes);
@@ -90,7 +94,8 @@ public class PipeMemoryBlock implements AutoCloseable {
     final long newMemorySizeInBytes = shrinkMethod.get().applyAsLong(memoryUsageInBytes.get());
 
     final long memoryInBytesCanBeReleased = oldMemorySizeInBytes - newMemorySizeInBytes;
-    if (memoryInBytesCanBeReleased <= 0) {
+    if (memoryInBytesCanBeReleased <= 0
+        || !pipeMemoryManager.release(this, memoryInBytesCanBeReleased)) {
       return false;
     }
 
@@ -136,6 +141,18 @@ public class PipeMemoryBlock implements AutoCloseable {
       }
     }
     return true;
+  }
+
+  public void setMemoryUsageInBytes(final long memoryUsageInBytes) {
+    this.memoryUsageInBytes.set(memoryUsageInBytes);
+  }
+
+  boolean isReleased() {
+    return isReleased;
+  }
+
+  void markAsReleased() {
+    isReleased = true;
   }
 
   @Override
