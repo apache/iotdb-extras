@@ -17,25 +17,37 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api;
+package org.apache.iotdb.collector.plugin.builtin.sink.resource.memory;
 
-import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+import java.util.Objects;
 
-public abstract class PullSource extends BaseSource implements PipeSource {
+public class MemoryException extends RuntimeException {
 
-  @Override
-  public void validate(final PipeParameterValidator validator) throws Exception {
-    super.validate(validator);
+  private final long timestamp;
+
+  public MemoryException(final String message) {
+    super(message);
+    this.timestamp = System.currentTimeMillis();
+  }
+
+  public long getTimestamp() {
+    return timestamp;
   }
 
   @Override
-  public void customize(
-      final PipeParameters pipeParameters,
-      final PipeSourceRuntimeConfiguration pipeSourceRuntimeConfiguration)
-      throws Exception {
-    super.customize(pipeParameters, pipeSourceRuntimeConfiguration);
+  public boolean equals(Object obj) {
+    return obj instanceof MemoryException
+        && Objects.equals(getMessage(), ((MemoryException) obj).getMessage())
+        && Objects.equals(getTimestamp(), ((MemoryException) obj).getTimestamp());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getMessage(), getTimestamp());
+  }
+
+  @Override
+  public String toString() {
+    return "MemoryException{" + "message='" + getMessage() + "', timestamp=" + getTimestamp() + "}";
   }
 }

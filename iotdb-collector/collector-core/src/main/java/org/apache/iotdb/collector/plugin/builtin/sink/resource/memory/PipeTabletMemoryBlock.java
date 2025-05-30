@@ -17,25 +17,11 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.api;
+package org.apache.iotdb.collector.plugin.builtin.sink.resource.memory;
 
-import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+public class PipeTabletMemoryBlock extends PipeFixedMemoryBlock {
 
-public abstract class PullSource extends BaseSource implements PipeSource {
-
-  @Override
-  public void validate(final PipeParameterValidator validator) throws Exception {
-    super.validate(validator);
-  }
-
-  @Override
-  public void customize(
-      final PipeParameters pipeParameters,
-      final PipeSourceRuntimeConfiguration pipeSourceRuntimeConfiguration)
-      throws Exception {
-    super.customize(pipeParameters, pipeSourceRuntimeConfiguration);
+  public PipeTabletMemoryBlock(long memoryUsageInBytes) {
+    super(memoryUsageInBytes);
   }
 }

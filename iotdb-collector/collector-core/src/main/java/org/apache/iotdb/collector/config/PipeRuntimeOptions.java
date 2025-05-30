@@ -265,11 +265,79 @@ public class PipeRuntimeOptions extends Options {
         }
       };
 
-  public static volatile Option<Integer> DATA_NODE_ID =
+  public static final Option<Integer> DATA_NODE_ID =
       new Option<Integer>("data_node_id", -1) {
         @Override
         public void setValue(final String valueString) {
           value = Integer.parseInt(valueString);
         }
       };
+
+  public static final Option<Boolean> PIPE_MEMORY_MANAGEMENT_ENABLED =
+      new Option<Boolean>("pipe_memory_management_enabled", true) {
+        @Override
+        public void setValue(String valueString) {
+          value = Boolean.parseBoolean(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MEMORY_ALLOCATE_MIN_SIZE_IN_BYTES =
+      new Option<Integer>("pipe_memory_allocate_min_size_in_bytes", 32) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Double> PIPE_TOTAL_FLOATING_MEMORY_PROPORTION =
+      new Option<Double>("pipe_total_floating_memory_proportion", 0.2) {
+        @Override
+        public void setValue(String valueString) {
+          value = Double.parseDouble(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MAX_ALLOWED_EVENT_COUNT_IN_TABLET_BATCH =
+      new Option<Integer>("pipe_max_allowed_event_count_in_tablet_batch", 100) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MEMORY_ALLOCATE_MAX_RETRIES =
+      new Option<Integer>("pipe_memory_allocate_max_retries", 10) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Integer> PIPE_MEMORY_ALLOCATE_RETRY_INTERVAL_MS =
+      new Option<Integer>("pipe_memory_allocate_retry_interval_ms", 50) {
+        @Override
+        public void setValue(String valueString) {
+          value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<Double>
+      PIPE_DATA_STRUCTURE_TABLET_MEMORY_BLOCK_ALLOCATION_REJECT_THRESHOLD =
+          new Option<Double>(
+              "pipe_data_structure_tablet_memory_block_allocation_reject_threshold", 0.4) {
+            @Override
+            public void setValue(String valueString) {
+              value = Double.parseDouble(valueString);
+            }
+          };
+
+  public static final Option<Double>
+      PIPE_DATA_STRUCTURE_TS_FILE_MEMORY_BLOCK_ALLOCATION_REJECT_THRESHOLD =
+          new Option<Double>(
+              "pipe_data_structure_ts_file_memory_block_allocation_reject_threshold", 0.4) {
+            @Override
+            public void setValue(String valueString) {
+              value = Double.parseDouble(valueString);
+            }
+          };
 }
