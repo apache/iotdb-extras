@@ -71,6 +71,8 @@ public class PullSourceTask extends SourceTask {
       throw new IllegalStateException("Plugin runtime is down");
     }
 
+    String pullSourceCreateErrorMsg = "";
+
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
         new ThreadPoolExecutor(
@@ -96,11 +98,24 @@ public class PullSourceTask extends SourceTask {
         consumers[i].consumer().start();
       } catch (final Exception e) {
         try {
+          pullSourceCreateErrorMsg =
+              String.format(
+                  "Error occurred when creating pull-source-task-%s, instance index %s, because %s tying to close it.",
+                  taskId, i, e);
+          LOGGER.warn(pullSourceCreateErrorMsg);
+
           consumers[i].consumer().close();
         } catch (final Exception ex) {
-          LOGGER.warn("Failed to close source on creation failure", ex);
-          throw e;
+          final String pullSourceCloseErrorMsg =
+              String.format(
+                  "Error occurred when closing pull-source-task-%s, instance index %s, because %s",
+                  taskId, i, ex);
+          LOGGER.warn(pullSourceCloseErrorMsg);
+
+          throw new RuntimeException(pullSourceCreateErrorMsg + "\n" + pullSourceCloseErrorMsg);
         }
+
+        throw new RuntimeException(pullSourceCreateErrorMsg);
       }
 
       int finalI = i;

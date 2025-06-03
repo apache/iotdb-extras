@@ -52,6 +52,11 @@ public class IoTDBSubscriptionTreePullSource extends IoTDBSubscriptionPullSource
   }
 
   @Override
+  protected void commitAsync(final List<SubscriptionMessage> messages) {
+    consumer.commitAsync(messages);
+  }
+
+  @Override
   public Optional<ProgressIndex> report() {
     final ProgressIndex progress =
         new ProgressIndex(

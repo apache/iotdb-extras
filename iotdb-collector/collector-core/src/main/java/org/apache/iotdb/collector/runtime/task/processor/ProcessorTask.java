@@ -89,12 +89,14 @@ public class ProcessorTask extends Task {
   }
 
   @Override
-  public void createInternal() throws Exception {
+  public void createInternal() {
     final PluginRuntime pluginRuntime =
         RuntimeService.plugin().isPresent() ? RuntimeService.plugin().get() : null;
     if (pluginRuntime == null) {
       throw new IllegalStateException("Plugin runtime is down");
     }
+
+    String processorCreateErrorMsg = "";
 
     final long creationTime = System.currentTimeMillis();
     processorConsumers = new ProcessorConsumer[parallelism];
@@ -111,11 +113,23 @@ public class ProcessorTask extends Task {
                 new CollectorProcessorRuntimeConfiguration(taskId, creationTime, parallelism, i));
       } catch (final Exception e) {
         try {
+          processorCreateErrorMsg =
+              String.format(
+                  "Error occurred when create processor-task-%s, instance index %s, because %s tying to close it.",
+                  taskId, i, e);
+          LOGGER.warn(processorCreateErrorMsg);
+
           processorConsumers[i].consumer().close();
         } catch (final Exception ex) {
-          LOGGER.warn("Failed to close sink on creation failure", ex);
+          final String processorCloseErrorMsg =
+              String.format(
+                  "Error occurred when closing processor-task-%s, instance index %s, because %s",
+                  taskId, i, ex);
+          LOGGER.warn(processorCloseErrorMsg);
+          throw new RuntimeException(processorCloseErrorMsg + "\n" + processorCreateErrorMsg);
         }
-        throw e;
+
+        throw new RuntimeException(processorCreateErrorMsg);
       }
     }
     disruptor.handleEventsWithWorkerPool(processorConsumers);

@@ -88,6 +88,8 @@ public class SinkTask extends Task {
       throw new IllegalStateException("Plugin runtime is down");
     }
 
+    String sinkCreateErrorMsg = "";
+
     final long creationTime = System.currentTimeMillis();
     consumers = new SinkConsumer[parallelism];
     for (int i = 0; i < parallelism; i++) {
@@ -103,11 +105,23 @@ public class SinkTask extends Task {
         consumers[i].consumer().handshake();
       } catch (final Exception e) {
         try {
+          sinkCreateErrorMsg =
+              String.format(
+                  "Error occurred when create sink-task-%s, instance index %s, because %s tying to close it.",
+                  taskId, i, e);
+          LOGGER.warn(sinkCreateErrorMsg);
+
           consumers[i].consumer().close();
         } catch (final Exception ex) {
-          LOGGER.warn("Failed to close sink on creation failure", ex);
+          final String sinkCloseErrorMsg =
+              String.format(
+                  "Error occurred when closing sink-task-%s, instance index %s, because %s",
+                  taskId, i, ex);
+          LOGGER.warn(sinkCloseErrorMsg);
+          throw new RuntimeException("Create: " + sinkCreateErrorMsg + "\n" + sinkCloseErrorMsg);
         }
-        throw e;
+
+        throw new RuntimeException(sinkCreateErrorMsg);
       }
     }
     disruptor.handleEventsWithWorkerPool(consumers);

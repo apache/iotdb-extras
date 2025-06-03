@@ -61,6 +61,8 @@ public class PushSourceTask extends SourceTask {
       throw new IllegalStateException("Plugin runtime is down");
     }
 
+    String pushSourceCreateErrorMsg = "";
+
     final long creationTime = System.currentTimeMillis();
     pushSources = new PushSource[parallelism];
     for (int i = 0; i < parallelism; i++) {
@@ -78,11 +80,24 @@ public class PushSourceTask extends SourceTask {
         pushSources[i].start();
       } catch (final Exception e) {
         try {
+          pushSourceCreateErrorMsg =
+              String.format(
+                  "Error occurred when create push-source-task-%s, instance index %s, because %s trying to close it.",
+                  taskId, i, e);
+          LOGGER.warn(pushSourceCreateErrorMsg);
+
           pushSources[i].close();
         } catch (final Exception ex) {
-          LOGGER.warn("Failed to close source on creation failure", ex);
-          throw e;
+          final String pushSourceCloseErrorMsg =
+              String.format(
+                  "Error occurred when closing push-source-task-%s, instance index %s, because %s",
+                  taskId, i, ex);
+          LOGGER.warn(pushSourceCloseErrorMsg);
+
+          throw new RuntimeException(pushSourceCreateErrorMsg + "\n" + pushSourceCloseErrorMsg);
         }
+
+        throw new RuntimeException(pushSourceCreateErrorMsg);
       }
     }
 

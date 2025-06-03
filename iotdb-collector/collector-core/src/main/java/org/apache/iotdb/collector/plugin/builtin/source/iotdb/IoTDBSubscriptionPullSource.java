@@ -121,10 +121,16 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
           }
         }
       }
+
+      if (!autoCommit) {
+        commitAsync(messages);
+      }
     }
   }
 
   protected abstract List<SubscriptionMessage> poll();
+
+  protected abstract void commitAsync(List<SubscriptionMessage> messages);
 
   @Override
   public Event supply() throws InterruptedException {
