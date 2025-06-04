@@ -20,7 +20,7 @@
 <generatorConfiguration>
     <classPathEntry location="/apache/iotdb/iotdb-client/jdbc/target/iotdb-jdbc-2.0.2-SNAPSHOT-jar-with-dependencies.jar"/>
     <!-- mvn mybatis-generator:generate hierarchical/flat-->
-    <context id="myBatis3Simple" targetRuntime="MyBatis3Simple" defaultModelType="flat">
+    <context id="mybatis3" targetRuntime="Mybatis3" defaultModelType="flat">
         <!--        <property name="suppressAllComments" value="true"/>-->
         <!--        <property name="useActualColumnNames" value="false"/>-->
         <!--        <property name="javaFormatter" value="org.mybatis.generator.api.dom.DefaultJavaFormatter"/>-->
@@ -51,7 +51,7 @@
         <javaClientGenerator type="XMLMAPPER" targetPackage="org.apache.iotdb.mybatis.plugin.mapper" targetProject="src/main/java">
             <!--            <property name="enableSubPackages" value="true"/>-->
         </javaClientGenerator>
-        <table schema="test" tableName="mix" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true" enableUpdateByPrimaryKey="false">
+        <table schema="test" tableName="mix" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true" enableUpdateByPrimaryKey="false" enableSelectByExample="true">
             <property name="virtualKeyColumns" value="time,device_id,device_name,device_tag"/>
         </table>
     </context>

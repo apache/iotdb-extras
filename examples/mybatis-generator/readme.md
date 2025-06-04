@@ -45,7 +45,7 @@ use test;
 ```
 Then we need to create a database 'table'
 ```
-CREATE TABLE mix3 (
+CREATE TABLE mix (
     time TIMESTAMP TIME,
     region STRING TAG,
     plant_id STRING TAG,
@@ -87,7 +87,13 @@ CREATE TABLE mix3 (
 
 ### 5. put The generatorConfig.xml in your project
 
-The location of the ` configurationFile ` configuration ` generatorConfig.xml ` file can be found in the ` src/main/resources ` template of this project for reference` Copy its content and place it in the corresponding location
+- `src/main/resources/generatorConfig.xml`
+
+each table generates an entity object
+
+- `src/main/resources/generatorConfigByExample.xml`
+
+The generated object will contain many "by Example" methods. If you do not want to generate these, you can configure to cancel them in the subsequent table elements
 
 ### 6. exec 'mvn mybatis-generator:generate'
 
@@ -99,6 +105,7 @@ You can see the target file in your Project
 
 ```
 org/apache/iotdb/mybatis/plugin/model/Mix.java
+org/apache/iotdb/mybatis/plugin/model/MixExample.java
 org/apache/iotdb/mybatis/plugin/mapper/MixMapper.java
 org/apache/iotdb/mybatis/plugin/xml/MixMapper.xml
 ```
