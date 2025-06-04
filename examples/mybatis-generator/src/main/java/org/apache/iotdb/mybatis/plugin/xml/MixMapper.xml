@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+
+       Licensed to the Apache Software Foundation (ASF) under one or more
+
+       contributor license agreements.  See the NOTICE file distributed with
+       this work for additional information regarding copyright ownership.
+       The ASF licenses this file to You under the Apache License, Version 2.0
+
+       (the "License"); you may not use this file except in compliance with
+
+       the License.  You may obtain a copy of the License at
+            http://www.apache.org/licenses/LICENSE-2.0
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+-->
+<mapper namespace="org.apache.iotdb.mybatis.plugin.mapper.MixMapper">
+    <resultMap id="BaseResultMap" type="org.apache.iotdb.mybatis.plugin.model.Mix">
+        <id column="time" jdbcType="TIMESTAMP" property="time"/>
+        <id column="device_id" jdbcType="VARCHAR" property="deviceId"/>
+        <result column="region" jdbcType="VARCHAR" property="region"/>
+        <result column="plant_id" jdbcType="VARCHAR" property="plantId"/>
+        <result column="model_id" jdbcType="VARCHAR" property="modelId"/>
+        <result column="maintenance" jdbcType="VARCHAR" property="maintenance"/>
+        <result column="temperature" jdbcType="FLOAT" property="temperature"/>
+        <result column="humidity" jdbcType="FLOAT" property="humidity"/>
+        <result column="status" jdbcType="BOOLEAN" property="status"/>
+        <result column="arrival_time" jdbcType="TIMESTAMP" property="arrivalTime"/>
+    </resultMap>
+    <delete id="deleteByPrimaryKey" parameterType="map">delete from test.mix where time = #{time,jdbcType=TIMESTAMP} and device_id = #{deviceId,jdbcType=VARCHAR}</delete>
+    <insert id="insert" parameterType="org.apache.iotdb.mybatis.plugin.model.Mix">insert into test.mix (time, device_id, region, plant_id, model_id, maintenance, temperature, humidity, status, arrival_time) values (#{time,jdbcType=TIMESTAMP}, #{deviceId,jdbcType=VARCHAR}, #{region,jdbcType=VARCHAR}, #{plantId,jdbcType=VARCHAR}, #{modelId,jdbcType=VARCHAR}, #{maintenance,jdbcType=VARCHAR}, #{temperature,jdbcType=FLOAT}, #{humidity,jdbcType=FLOAT}, #{status,jdbcType=BOOLEAN}, #{arrivalTime,jdbcType=TIMESTAMP})</insert>
+    <select id="selectByPrimaryKey" parameterType="map" resultMap="BaseResultMap">select time, device_id, region, plant_id, model_id, maintenance, temperature, humidity, status, arrival_time from test.mix where time = #{time,jdbcType=TIMESTAMP} and device_id = #{deviceId,jdbcType=VARCHAR}</select>
+    <select id="selectAll" resultMap="BaseResultMap">select time, device_id, region, plant_id, model_id, maintenance, temperature, humidity, status, arrival_time from test.mix</select>
+    <insert id="batchInsert" parameterType="java.util.List">insert into test.mix ( time, device_id, region, plant_id, model_id, maintenance, temperature, humidity, status, arrival_time ) values
+        <foreach collection="records" index="index" item="item" separator=",">( #{item.time,jdbcType=TIMESTAMP}, #{item.deviceId,jdbcType=VARCHAR}, #{item.region,jdbcType=VARCHAR}, #{item.plantId,jdbcType=VARCHAR}, #{item.modelId,jdbcType=VARCHAR}, #{item.maintenance,jdbcType=VARCHAR}, #{item.temperature,jdbcType=FLOAT}, #{item.humidity,jdbcType=FLOAT}, #{item.status,jdbcType=BOOLEAN}, #{item.arrivalTime,jdbcType=TIMESTAMP} )</foreach>
+    </insert>
+</mapper>

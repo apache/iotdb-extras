@@ -56,12 +56,12 @@ CREATE TABLE mix (
     humidity FLOAT FIELD,
     status Boolean FIELD,
     arrival_time TIMESTAMP FIELD
-) WITH (TTL=31536000000);
+);
 ```
 
 ### 3. Build Dependencies with Maven in your Project
 
-```
+```xml
 <build>
     <plugins>
         <plugin>
@@ -95,14 +95,23 @@ each table generates an entity object
 
 The generated object will contain many "by Example" methods. If you do not want to generate these, you can configure to cancel them in the subsequent table elements
 
-### 6. exec 'mvn mybatis-generator:generate'
+### 6. generate generates corresponding Java classes and mapper files
 
-Execute the command at the location of the 'pom' in the project:` Mvn mybatis generator: generate generates corresponding Java classes and mapper files
+exec `mvn mybatis-generator:generate`
+
+Execute the command at the location of the 'pom' in the project: Mvn mybatis generator: generate generates corresponding Java classes and mapper files
 
 ### 7、the target file location
 
 You can see the target file in your Project  
 
+```
+org/apache/iotdb/mybatis/plugin/model/Mix.java
+org/apache/iotdb/mybatis/plugin/mapper/MixMapper.java
+org/apache/iotdb/mybatis/plugin/xml/MixMapper.xml
+```
+
+if you are using the 'src/main/resources/generatorConfiguraByExample. xml' file`, You can see the target file in your Project  
 ```
 org/apache/iotdb/mybatis/plugin/model/Mix.java
 org/apache/iotdb/mybatis/plugin/model/MixExample.java

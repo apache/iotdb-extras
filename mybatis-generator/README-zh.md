@@ -24,28 +24,28 @@
 
 * 在要生成的项目的 `pom` 文件中添加如下配置：
 
-```java
-    <build>
-		<plugins>
-			<plugin>
-				<groupId>org.mybatis.generator</groupId>
-				<artifactId>mybatis-generator-maven-plugin</artifactId>
-				<version>1.4.2</version>
-				<dependencies>
-					<dependency>
-						<groupId>org.apache.iotdb</groupId>
-						<artifactId>mybatis-generator-plugin</artifactId>
-						<version>2.0.2-SNAPSHOT</version>
-					</dependency>
-				</dependencies>
-				<configuration>
-					<verbose>true</verbose>
-					<overwrite>true</overwrite>
-					<configurationFile>src/main/resources/generatorConfig.xml</configurationFile>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.mybatis.generator</groupId>
+            <artifactId>mybatis-generator-maven-plugin</artifactId>
+            <version>1.4.2</version>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.iotdb</groupId>
+                    <artifactId>mybatis-generator-plugin</artifactId>
+                    <version>2.0.2-SNAPSHOT</version>
+                </dependency>
+            </dependencies>
+            <configuration>
+                <verbose>true</verbose>
+                <overwrite>true</overwrite>
+                <configurationFile>src/main/resources/generatorConfig.xml</configurationFile>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 * `configurationFile` 配置 `generatorConfig.xml` 文件的位置，其内容在本项目的 `src/main/resources` 有一个模板供参考，`copy` 其内容放到相应的位置
