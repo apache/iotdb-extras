@@ -56,12 +56,12 @@ CREATE TABLE mix3 (
     humidity FLOAT FIELD,
     status Boolean FIELD,
     arrival_time TIMESTAMP FIELD
-) WITH (TTL=31536000000);
+);
 ```
 
 ### 3. Build Dependencies with Maven in your Project
 
-```
+```xml
 <build>
     <plugins>
         <plugin>
@@ -89,9 +89,11 @@ CREATE TABLE mix3 (
 
 The location of the ` configurationFile ` configuration ` generatorConfig.xml ` file can be found in the ` src/main/resources ` template of this project for reference` Copy its content and place it in the corresponding location
 
-### 6. exec 'mvn mybatis-generator:generate'
+### 6. generate generates corresponding Java classes and mapper files
 
-Execute the command at the location of the 'pom' in the project:` Mvn mybatis generator: generate generates corresponding Java classes and mapper files
+exec `mvn mybatis-generator:generate`
+
+Execute the command at the location of the 'pom' in the project: Mvn mybatis generator: generate generates corresponding Java classes and mapper files
 
 ### 7、the target file location
 

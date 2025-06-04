@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+    <environments default="dev">
+        <environment id="dev">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="org.apache.iotdb.jdbc.IoTDBDriver"/>
+                <property name="url" value="jdbc:iotdb://127.0.0.1:6667/test?sql_dialect=table"/>
+                <property name="username" value="root"/>
+                <property name="password" value="root"/>
+            </dataSource>
+        </environment>
+    </environments>
+    <mappers>
+        <mapper resource="org/apache/iotdb/mybatis/plugin/xml/MixMapper.xml"/>
+    </mappers>
+</configuration>
