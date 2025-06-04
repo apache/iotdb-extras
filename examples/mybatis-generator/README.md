@@ -45,7 +45,7 @@ use test;
 ```
 Then we need to create a database 'table'
 ```
-CREATE TABLE mix3 (
+CREATE TABLE mix (
     time TIMESTAMP TIME,
     region STRING TAG,
     plant_id STRING TAG,
