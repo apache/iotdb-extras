@@ -107,6 +107,13 @@ You can see the target file in your Project
 
 ```
 org/apache/iotdb/mybatis/plugin/model/Mix.java
+org/apache/iotdb/mybatis/plugin/mapper/MixMapper.java
+org/apache/iotdb/mybatis/plugin/xml/MixMapper.xml
+```
+
+if you are using the 'src/main/resources/generatorConfiguraByExample. xml' file`, You can see the target file in your Project  
+```
+org/apache/iotdb/mybatis/plugin/model/Mix.java
 org/apache/iotdb/mybatis/plugin/model/MixExample.java
 org/apache/iotdb/mybatis/plugin/mapper/MixMapper.java
 org/apache/iotdb/mybatis/plugin/xml/MixMapper.xml
