@@ -88,9 +88,12 @@ CREATE TABLE mix (
 ### 5. put The generatorConfig.xml in your project
 
 - `src/main/resources/generatorConfig.xml`
+
 each table generates an entity object
+
 - `src/main/resources/generatorConfigByExample.xml`
-  The generated object will contain many "by Example" methods. If you do not want to generate these, you can configure to cancel them in the subsequent table elements
+
+The generated object will contain many "by Example" methods. If you do not want to generate these, you can configure to cancel them in the subsequent table elements
 
 ### 6. exec 'mvn mybatis-generator:generate'
 
