@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch;
 
+import org.apache.iotdb.collector.config.PipeRuntimeOptions;
 import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryBlock;
 import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryManager;
@@ -115,8 +116,8 @@ public abstract class PipeTabletEventBatch implements AutoCloseable {
 
   public boolean shouldEmit() {
     return totalBufferSize >= getMaxBatchSizeInBytes()
-        || System.currentTimeMillis() - firstEventProcessingTime >= maxDelayInMs;
-    // || events.size() > PipeRuntimeOptions.PIPE_MAX_ALLOWED_EVENT_COUNT_IN_TABLET_BATCH.value();
+        || System.currentTimeMillis() - firstEventProcessingTime >= maxDelayInMs
+        || events.size() > PipeRuntimeOptions.PIPE_MAX_ALLOWED_EVENT_COUNT_IN_TABLET_BATCH.value();
   }
 
   private long getMaxBatchSizeInBytes() {

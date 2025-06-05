@@ -23,45 +23,24 @@ import java.io.File;
 
 public class TaskRuntimeOptions extends Options {
 
-  public static final Option<Integer> TASK_SOURCE_PARALLELISM_NUM =
-      new Option<Integer>("task_source_parallelism_num", 4) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  //////////////////////////// Param from rest request ////////////////////////////
 
-  public static final Option<Integer> TASK_PROCESS_PARALLELISM_NUM =
-      new Option<Integer>("task_process_parallelism_num", 4) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  public static final String TASK_SOURCE_PARALLELISM_NUM_KEY = "source-parallelism-num";
+  public static final Integer TASK_SOURCE_PARALLELISM_NUM_DEFAULT_VALUE = 4;
 
-  public static final Option<Integer> TASK_SINK_PARALLELISM_NUM =
-      new Option<Integer>("task_sink_parallelism_num", 4) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  public static final String TASK_PROCESSOR_PARALLELISM_NUM_KEY = "processor-parallelism-num";
+  public static final Integer TASK_PROCESSOR_PARALLELISM_NUM_DEFAULT_VALUE = 4;
 
-  public static final Option<Integer> TASK_PROCESSOR_RING_BUFFER_SIZE =
-      new Option<Integer>("task_processor_ring_buffer_size", 1024) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  public static final String TASK_SINK_PARALLELISM_NUM_KEY = "sink-parallelism-num";
+  public static final Integer TASK_SINK_PARALLELISM_NUM_DEFAULT_VALUE = 4;
 
-  public static final Option<Integer> TASK_SINK_RING_BUFFER_SIZE =
-      new Option<Integer>("task_sink_ring_buffer_size", 1024) {
-        @Override
-        public void setValue(final String valueString) {
-          value = Integer.parseInt(valueString);
-        }
-      };
+  public static final String TASK_PROCESSOR_RING_BUFFER_SIZE_KEY = "processor-ring-buffer-size";
+  public static final Integer TASK_PROCESSOR_RING_BUFFER_SIZE_DEFAULT_VALUE = 1024;
+
+  public static final String TASK_SINK_RING_BUFFER_SIZE_KEY = "sink-ring-buffer-size";
+  public static final Integer TASK_SINK_RING_BUFFER_SIZE_DEFAULT_VALUE = 1024;
+
+  //////////////////////////// Param from application.properties ////////////////////////////
 
   public static final Option<String> TASK_DATABASE_FILE_PATH =
       new Option<String>(
@@ -74,7 +53,7 @@ public class TaskRuntimeOptions extends Options {
       };
 
   public static final Option<Long> EXECUTOR_CRON_HEARTBEAT_EVENT_INTERVAL_SECONDS =
-      new Option<Long>("executor_cron_heartbeat_event_interval_seconds", 20L) {
+      new Option<Long>("executor_cron_heartbeat_event_interval_seconds", 5L) {
         @Override
         public void setValue(final String valueString) {
           value = Long.parseLong(valueString);

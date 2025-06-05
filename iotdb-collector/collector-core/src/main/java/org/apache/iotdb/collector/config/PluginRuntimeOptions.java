@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.config;
 import java.io.File;
 
 public class PluginRuntimeOptions extends Options {
+
   public static final Option<String> PLUGIN_LIB_DIR =
       new Option<String>("plugin_lib_dir", "system" + File.separator + "plugin") {
         @Override
