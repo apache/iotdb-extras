@@ -35,6 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_AUTO_COMMIT_INTERVAL_MS_DEFAULT_VALUE;
@@ -55,6 +57,9 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
 
   protected volatile boolean isStarted;
   protected Thread workerThread;
+
+  private static final Integer EVENT_QUEUE_CAPACITY = 1000;
+  private final BlockingQueue<Event> eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_CAPACITY);
 
   @Override
   public void validate(final PipeParameterValidator validator) throws Exception {
@@ -114,7 +119,7 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
       for (final SubscriptionMessage message : messages) {
         for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
           try {
-            subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
+            eventQueue.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
           } catch (final InterruptedException e) {
             LOGGER.warn("{} thread interrupted", getPullConsumerThreadName(), e);
             Thread.currentThread().interrupt();
@@ -134,7 +139,7 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
 
   @Override
   public Event supply() throws InterruptedException {
-    return subscription.take();
+    return eventQueue.take();
   }
 
   @Override
@@ -155,7 +160,7 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
     return new SubscriptionTreePullConsumerBuilder()
         .host(subscription.getHost())
         .port(subscription.getPort())
-        .consumerId(subscription.getConsumerId())
+        .consumerId(subscription.getConsumerId() + instanceIndex)
         .consumerGroupId(subscription.getGroupId())
         .heartbeatIntervalMs(subscription.getHeartbeatIntervalMs())
         .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
@@ -169,7 +174,7 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
     return new SubscriptionTablePullConsumerBuilder()
         .host(subscription.getHost())
         .port(subscription.getPort())
-        .consumerId(subscription.getConsumerId())
+        .consumerId(subscription.getConsumerId() + instanceIndex)
         .consumerGroupId(subscription.getGroupId())
         .heartbeatIntervalMs(subscription.getHeartbeatIntervalMs())
         .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())

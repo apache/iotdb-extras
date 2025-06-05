@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
+import java.util.concurrent.locks.LockSupport;
 
 public class IoTDBSubscriptionTreePushSource extends IoTDBSubscriptionPushSource {
 
@@ -37,6 +38,10 @@ public class IoTDBSubscriptionTreePushSource extends IoTDBSubscriptionPushSource
         getSubscriptionTreePushConsumerBuilder().buildPushConsumer()) {
       consumer.open();
       consumer.subscribe(subscription.getTopic());
+
+      while (!Thread.currentThread().isInterrupted()) {
+        LockSupport.park();
+      }
     } catch (final Exception e) {
       LOGGER.warn("Error occurred while {} thread", getPushConsumerThreadName(), e);
     }

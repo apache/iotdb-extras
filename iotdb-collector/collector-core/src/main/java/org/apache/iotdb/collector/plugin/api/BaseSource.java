@@ -20,6 +20,7 @@
 package org.apache.iotdb.collector.plugin.api;
 
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
+import org.apache.iotdb.collector.plugin.api.customizer.CollectorRuntimeEnvironment;
 import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
@@ -81,6 +82,9 @@ public abstract class BaseSource implements PipeSource {
     reportTimeInterval =
         pipeParameters.getIntOrDefault(
             SOURCE_REPORT_TIME_INTERVAL_KEY, SOURCE_REPORT_TIME_INTERVAL_DEFAULT_VALUE);
+    instanceIndex =
+        ((CollectorRuntimeEnvironment) pipeSourceRuntimeConfiguration.getRuntimeEnvironment())
+            .getInstanceIndex();
   }
 
   @Override

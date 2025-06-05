@@ -35,8 +35,6 @@ import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.locks.LockSupport;
-
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_VALUE_MAP;
@@ -127,17 +125,11 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
         try {
           markPausePosition();
 
-          subscription.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
-        } catch (final InterruptedException e) {
-          LOGGER.warn("{} thread interrupted", getPushConsumerThreadName(), e);
-          Thread.currentThread().interrupt();
-
+          supply(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
+        } catch (final Exception e) {
+          LOGGER.warn("Error occurred when supply event, because {}", e.getMessage());
           return ConsumeResult.FAILURE;
         }
-      }
-
-      while (isStarted && !Thread.currentThread().isInterrupted()) {
-        LockSupport.park();
       }
 
       return ConsumeResult.SUCCESS;
@@ -154,8 +146,8 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
         .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
         .thriftMaxFrameSize(subscription.getThriftMaxFrameSize())
         .maxPollParallelism(subscription.getMaxPollParallelism())
-        .consumeListener(getConsumeListener())
         .ackStrategy(ackStrategy)
+        .consumeListener(getConsumeListener())
         .autoPollIntervalMs(autoPollIntervalMs)
         .autoPollTimeoutMs(autoPollTimeoutMs);
   }
@@ -170,8 +162,8 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
         .endpointsSyncIntervalMs(subscription.getEndpointsSyncIntervalMs())
         .thriftMaxFrameSize(subscription.getThriftMaxFrameSize())
         .maxPollParallelism(subscription.getMaxPollParallelism())
-        .consumeListener(getConsumeListener())
         .ackStrategy(ackStrategy)
+        .consumeListener(getConsumeListener())
         .autoPollIntervalMs(autoPollIntervalMs)
         .autoPollTimeoutMs(autoPollTimeoutMs);
   }

@@ -23,10 +23,6 @@ import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
-import org.apache.iotdb.pipe.api.event.Event;
-
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_IS_ALIGNED_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_IS_ALIGNED_KEY;
@@ -67,9 +63,6 @@ public class IoTDBSubscriptionCommon {
   private Integer maxPollParallelism;
 
   private String topic;
-
-  private static final Integer EVENT_QUEUE_CAPACITY = 1000;
-  private final BlockingQueue<Event> eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_CAPACITY);
 
   // validate common parameters
   public void validate(final PipeParameterValidator validator) {
@@ -151,14 +144,6 @@ public class IoTDBSubscriptionCommon {
         pipeParameters.getIntOrDefault(
             IOTDB_SUBSCRIPTION_SOURCE_MAX_POLL_PARALLELISM_KEY,
             IOTDB_SUBSCRIPTION_SOURCE_MAX_POLL_PARALLELISM_DEFAULT_VALUE);
-  }
-
-  public Event take() throws InterruptedException {
-    return eventQueue.take();
-  }
-
-  public void put(final Event event) throws InterruptedException {
-    eventQueue.put(event);
   }
 
   public String getHost() {

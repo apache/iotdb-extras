@@ -138,9 +138,8 @@ public class KafkaSource extends PushSource {
       throws Exception {
     final CollectorRuntimeEnvironment environment =
         (CollectorRuntimeEnvironment) pipeSourceRuntimeConfiguration.getRuntimeEnvironment();
-
     final String taskId = environment.getPipeName();
-    instanceIndex = environment.getInstanceIndex();
+
     startIndex =
         RuntimeService.progress().isPresent()
             ? RuntimeService.progress().get().getInstanceProgressIndex(taskId, instanceIndex)
