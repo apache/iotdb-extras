@@ -35,6 +35,8 @@ import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CountDownLatch;
+
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionSourceConstant.IOTDB_SUBSCRIPTION_SOURCE_ACK_STRATEGY_VALUE_MAP;
@@ -48,7 +50,6 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IoTDBSubscriptionPushSource.class);
 
-  protected volatile boolean isStarted = true;
   protected Thread workerThread;
 
   private Long autoPollIntervalMs;
@@ -56,6 +57,8 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
   private AckStrategy ackStrategy;
 
   protected final IoTDBSubscriptionCommon subscription = new IoTDBSubscriptionCommon();
+
+  protected final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
   @Override
   public void validate(final PipeParameterValidator validator) throws Exception {
@@ -107,7 +110,6 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
   @Override
   public void start() throws Exception {
     if (workerThread == null || !workerThread.isAlive()) {
-      isStarted = true;
 
       workerThread = new Thread(this::doWork);
       workerThread.setName(getPushConsumerThreadName());
@@ -170,7 +172,8 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
 
   @Override
   public void close() throws Exception {
-    isStarted = false;
+    shutdownLatch.countDown();
+
     if (workerThread != null) {
       workerThread.interrupt();
       try {
