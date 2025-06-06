@@ -31,6 +31,9 @@ public class IoTDBJavaTypeResolver extends JavaTypeResolverDefaultImpl {
   public IoTDBJavaTypeResolver() {
     super();
     typeExtMap = new HashMap<>();
+    super.typeMap.put(
+        Types.TIMESTAMP,
+        new JdbcTypeInformation("TIMESTAMP", new FullyQualifiedJavaType(Long.class.getName())));
     initTypeSet();
   }
 
