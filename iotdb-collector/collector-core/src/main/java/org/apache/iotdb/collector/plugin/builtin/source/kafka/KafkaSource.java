@@ -20,7 +20,9 @@
 package org.apache.iotdb.collector.plugin.builtin.source.kafka;
 
 import org.apache.iotdb.collector.plugin.api.PushSource;
+import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorRuntimeEnvironment;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.collector.service.RuntimeService;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
@@ -32,23 +34,27 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.utils.Binary;
+import org.apache.tsfile.write.record.Tablet;
+import org.apache.tsfile.write.schema.IMeasurementSchema;
+import org.apache.tsfile.write.schema.MeasurementSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.function.Predicate;
 
-import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.REPORT_TIME_INTERVAL_DEFAULT_VALUE;
-import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.REPORT_TIME_INTERVAL_KEY;
-import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.AUTO_OFFSET_RESET_SET;
-import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.BOOLEAN_SET;
+import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_REPORT_TIME_INTERVAL_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.KAFKA_SOURCE_AUTO_OFFSET_RESET_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.KAFKA_SOURCE_AUTO_OFFSET_RESET_KEY;
+import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.KAFKA_SOURCE_AUTO_OFFSET_RESET_VALUE_SET;
 import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.KAFKA_SOURCE_BOOTSTRAP_SERVERS_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.KAFKA_SOURCE_BOOTSTRAP_SERVERS_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSourceConstant.KAFKA_SOURCE_ENABLE_AUTO_COMMIT_DEFAULT_VALUE;
@@ -74,9 +80,6 @@ public class KafkaSource extends PushSource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSource.class);
 
-  private ProgressIndex startIndex;
-  private int instanceIndex;
-
   private Thread workerThread;
   private volatile boolean isStarted = false;
   private volatile KafkaConsumer<String, String> consumer;
@@ -96,60 +99,37 @@ public class KafkaSource extends PushSource {
 
   private long offset;
 
-  private int reportTimeInterval;
-
   @Override
   public void validate(PipeParameterValidator validator) throws Exception {
-    validateRequiredParam(validator, KAFKA_SOURCE_TOPIC_KEY);
-    validateRequiredParam(validator, KAFKA_SOURCE_GROUP_ID_KEY);
+    CollectorParameters.validateStringRequiredParam(validator, KAFKA_SOURCE_TOPIC_KEY);
+    CollectorParameters.validateStringRequiredParam(validator, KAFKA_SOURCE_GROUP_ID_KEY);
 
-    validateParam(
+    CollectorParameters.validateSetParam(
         validator,
         KAFKA_SOURCE_AUTO_OFFSET_RESET_KEY,
-        autoOffsetReset -> AUTO_OFFSET_RESET_SET.contains(String.valueOf(autoOffsetReset)),
+        KAFKA_SOURCE_AUTO_OFFSET_RESET_VALUE_SET,
         KAFKA_SOURCE_AUTO_OFFSET_RESET_DEFAULT_VALUE);
 
-    validateParam(
+    CollectorParameters.validateBooleanParam(
         validator,
         KAFKA_SOURCE_ENABLE_AUTO_COMMIT_KEY,
-        enableAutoCommit -> BOOLEAN_SET.contains(String.valueOf(enableAutoCommit)),
         KAFKA_SOURCE_ENABLE_AUTO_COMMIT_DEFAULT_VALUE);
 
-    validateIntegerParam(validator, KAFKA_SOURCE_SESSION_TIMEOUT_MS_KEY, value -> value > 0);
-    validateIntegerParam(validator, KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_KEY, value -> value > 0);
-    validateIntegerParam(validator, KAFKA_SOURCE_MAX_POLL_RECORDS_KEY, value -> value > 0);
-    validateIntegerParam(validator, REPORT_TIME_INTERVAL_KEY, value -> value > 0);
-  }
-
-  private void validateParam(
-      final PipeParameterValidator validator,
-      final String paramKey,
-      final Predicate<Object> validationCondition,
-      final String defaultValue) {
-    final String paramValue = validator.getParameters().getStringOrDefault(paramKey, defaultValue);
-
-    validator.validate(
-        validationCondition::test,
-        String.format("%s must be one of %s, but got %s", paramKey, BOOLEAN_SET, paramValue),
-        paramValue);
-  }
-
-  private void validateRequiredParam(
-      final PipeParameterValidator validator, final String paramKey) {
-    validator.validate(Objects::nonNull, String.format("%s is required", paramKey));
-  }
-
-  private void validateIntegerParam(
-      final PipeParameterValidator validator,
-      final String paramKey,
-      final Predicate<Integer> validationCondition) {
-    final int paramValue =
-        validator.getParameters().getIntOrDefault(paramKey, Integer.parseInt(paramKey));
-
-    validator.validate(
-        value -> validationCondition.test((Integer) value),
-        String.format("%s must be > 0, but got %d", paramKey, paramValue),
-        paramValue);
+    CollectorParameters.validateIntegerParam(
+        validator,
+        KAFKA_SOURCE_SESSION_TIMEOUT_MS_KEY,
+        KAFKA_SOURCE_SESSION_TIMEOUT_MS_DEFAULT_VALUE,
+        value -> value > 0);
+    CollectorParameters.validateIntegerParam(
+        validator,
+        KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_KEY,
+        KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_DEFAULT_VALUE,
+        value -> value > 0);
+    CollectorParameters.validateIntegerParam(
+        validator,
+        KAFKA_SOURCE_MAX_POLL_RECORDS_KEY,
+        KAFKA_SOURCE_MAX_POLL_RECORDS_DEFAULT_VALUE,
+        value -> value > 0);
   }
 
   @Override
@@ -158,9 +138,8 @@ public class KafkaSource extends PushSource {
       throws Exception {
     final CollectorRuntimeEnvironment environment =
         (CollectorRuntimeEnvironment) pipeSourceRuntimeConfiguration.getRuntimeEnvironment();
-
     final String taskId = environment.getPipeName();
-    instanceIndex = environment.getInstanceIndex();
+
     startIndex =
         RuntimeService.progress().isPresent()
             ? RuntimeService.progress().get().getInstanceProgressIndex(taskId, instanceIndex)
@@ -190,23 +169,17 @@ public class KafkaSource extends PushSource {
         pipeParameters.getBooleanOrDefault(KAFKA_SOURCE_ENABLE_AUTO_COMMIT_KEY, false);
     sessionTimeoutMs =
         pipeParameters.getIntOrDefault(
-            KAFKA_SOURCE_SESSION_TIMEOUT_MS_KEY,
-            Integer.parseInt(KAFKA_SOURCE_SESSION_TIMEOUT_MS_DEFAULT_VALUE));
+            KAFKA_SOURCE_SESSION_TIMEOUT_MS_KEY, KAFKA_SOURCE_SESSION_TIMEOUT_MS_DEFAULT_VALUE);
     maxPollRecords =
         pipeParameters.getIntOrDefault(
-            KAFKA_SOURCE_MAX_POLL_RECORDS_KEY,
-            Integer.parseInt(KAFKA_SOURCE_MAX_POLL_RECORDS_DEFAULT_VALUE));
+            KAFKA_SOURCE_MAX_POLL_RECORDS_KEY, KAFKA_SOURCE_MAX_POLL_RECORDS_DEFAULT_VALUE);
     maxPollIntervalMs =
         pipeParameters.getIntOrDefault(
-            KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_KEY,
-            Integer.parseInt(KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_DEFAULT_VALUE));
+            KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_KEY, KAFKA_SOURCE_MAX_POLL_INTERVAL_MS_DEFAULT_VALUE);
     partitionAssignmentStrategy =
         pipeParameters.getStringOrDefault(
             KAFKA_SOURCE_PARTITION_ASSIGN_STRATEGY_KEY,
             KAFKA_SOURCE_PARTITION_ASSIGN_STRATEGY_DEFAULT_VALUE);
-    reportTimeInterval =
-        pipeParameters.getIntOrDefault(
-            REPORT_TIME_INTERVAL_KEY, Integer.parseInt(REPORT_TIME_INTERVAL_DEFAULT_VALUE));
   }
 
   @Override
@@ -243,7 +216,7 @@ public class KafkaSource extends PushSource {
       while (isStarted && !Thread.currentThread().isInterrupted()) {
         markPausePosition();
 
-        processRecords(consumer.poll(Duration.ofMillis(100)));
+        process(consumer.poll(Duration.ofMillis(100)));
 
         if (enableAutoCommit) {
           consumer.commitSync();
@@ -278,26 +251,64 @@ public class KafkaSource extends PushSource {
     consumer = new KafkaConsumer<>(props);
   }
 
-  private void processRecords(final ConsumerRecords<String, String> records) {
-    records.forEach(
-        record -> {
-          try {
-            supplyRecord(record);
-          } catch (final Exception e) {
-            LOGGER.warn("Failed to process record at offset {}", record.offset(), e);
+  private void process(final ConsumerRecords<String, String> records) {
+    if (!records.isEmpty()) {
+      for (final ConsumerRecord<String, String> record : records) {
+        final List<IMeasurementSchema> schemaList = new ArrayList<>();
+        final String[] dataArray = record.value().trim().split(",");
+        final String deviceId = dataArray[0];
+        long timestamp = Long.parseLong(dataArray[1]);
+        final String[] measurements = dataArray[2].trim().split(":");
+        final String[] typeStrings = dataArray[3].trim().split(":");
+        final TSDataType[] types = new TSDataType[measurements.length];
+        final String[] valueStrings = dataArray[4].trim().split(":");
+        final Object[] values = new Object[measurements.length];
+
+        for (int i = 0; i < typeStrings.length; i++) {
+          types[i] = TSDataType.valueOf(typeStrings[i]);
+        }
+
+        for (int i = 0; i < measurements.length; i++) {
+          schemaList.add(new MeasurementSchema(measurements[i], types[i]));
+        }
+
+        for (int i = 0; i < valueStrings.length; i++) {
+          switch (types[i]) {
+            case INT64:
+              values[i] = new long[] {Long.parseLong(valueStrings[i])};
+              break;
+            case DOUBLE:
+              values[i] = new double[] {Double.parseDouble(valueStrings[i])};
+              break;
+            case INT32:
+              values[i] = new int[] {Integer.parseInt(valueStrings[i])};
+              break;
+            case TEXT:
+              values[i] =
+                  new Binary[] {new Binary(valueStrings[i].getBytes(StandardCharsets.UTF_8))};
+              break;
+            case FLOAT:
+              values[i] = new float[] {Float.parseFloat(valueStrings[i])};
+              break;
+            case BOOLEAN:
+              values[i] = new boolean[] {Boolean.parseBoolean(valueStrings[i])};
+              break;
+            default:
           }
-        });
-  }
+        }
+        final Tablet tablet = new Tablet(deviceId, schemaList, values.length);
+        tablet.setTimestamps(new long[] {timestamp});
+        tablet.setRowSize(values.length);
+        tablet.setValues(values);
 
-  private void supplyRecord(final ConsumerRecord<String, String> record) {
-    offset = record.offset();
-
-    LOGGER.debug(
-        "Consumed record: partition={}, offset={}, key={}, value={}",
-        instanceIndex,
-        record.offset(),
-        record.key(),
-        record.value());
+        final PipeRawTabletInsertionEvent event = new PipeRawTabletInsertionEvent(tablet, false);
+        try {
+          supply(event);
+        } catch (final Exception e) {
+          LOGGER.warn("failed to supply KafkaEvent {}", event, e);
+        }
+      }
+    }
   }
 
   @Override
@@ -322,7 +333,7 @@ public class KafkaSource extends PushSource {
   public Optional<ProgressIndex> report() {
     final HashMap<String, String> progressInfo = new HashMap<>();
     progressInfo.put("offset", String.valueOf(offset));
-    progressInfo.put(REPORT_TIME_INTERVAL_KEY, String.valueOf(reportTimeInterval));
+    progressInfo.put(SOURCE_REPORT_TIME_INTERVAL_KEY, String.valueOf(reportTimeInterval));
 
     return Optional.of(new ProgressIndex(instanceIndex, progressInfo));
   }

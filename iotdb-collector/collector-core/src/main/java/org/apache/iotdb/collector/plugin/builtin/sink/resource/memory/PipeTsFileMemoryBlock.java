@@ -17,6 +17,11 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.utils;
+package org.apache.iotdb.collector.plugin.builtin.sink.resource.memory;
 
-public class PathUtil {}
+public class PipeTsFileMemoryBlock extends PipeFixedMemoryBlock {
+
+  public PipeTsFileMemoryBlock(long memoryUsageInBytes) {
+    super(memoryUsageInBytes);
+  }
+}

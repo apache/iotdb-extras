@@ -177,9 +177,9 @@ public abstract class IoTDBSyncClientManager extends IoTDBClientManager implemen
           new IoTDBSyncClient(
               new ThriftClientProperty.Builder()
                   .setConnectionTimeoutMs(
-                      PipeRuntimeOptions.PIPE_CONNECTOR_TRANSFER_TIMEOUT_MS.value())
+                      PipeRuntimeOptions.PIPE_CONNECTOR_HANDSHAKE_TIMEOUT_MS.value())
                   .setRpcThriftCompressionEnabled(
-                      PipeRuntimeOptions.IS_PIPE_CONNECTOR_RPC_THRIFT_COMPRESSION_ENABLED.value())
+                      PipeRuntimeOptions.PIPE_CONNECTOR_RPC_THRIFT_COMPRESSION_ENABLED.value())
                   .build(),
               endPoint.getIp(),
               endPoint.getPort(),

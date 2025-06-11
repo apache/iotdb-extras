@@ -17,36 +17,37 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.config;
+package org.apache.iotdb.collector.plugin.builtin.sink.resource.memory;
 
-import java.util.Optional;
-import java.util.Properties;
+import java.util.Objects;
 
-public class TrimProperties extends Properties {
+public class MemoryException extends RuntimeException {
 
-  @Override
-  public synchronized Object get(Object key) {
-    Object value = super.get(key);
-    if (value instanceof String) {
-      return ((String) value).trim();
-    }
-    return value;
+  private final long timestamp;
+
+  public MemoryException(final String message) {
+    super(message);
+    this.timestamp = System.currentTimeMillis();
+  }
+
+  public long getTimestamp() {
+    return timestamp;
   }
 
   @Override
-  public synchronized Object put(Object key, Object value) {
-    if (value instanceof String) {
-      value = ((String) value).trim();
-    }
-    return super.put(key, value);
+  public boolean equals(Object obj) {
+    return obj instanceof MemoryException
+        && Objects.equals(getMessage(), ((MemoryException) obj).getMessage())
+        && Objects.equals(getTimestamp(), ((MemoryException) obj).getTimestamp());
   }
 
   @Override
-  public synchronized String getProperty(String key, String defaultValue) {
-    String val = getProperty(key);
-    if (defaultValue != null) {
-      defaultValue = defaultValue.trim();
-    }
-    return Optional.ofNullable(val).map(String::trim).orElse(defaultValue);
+  public int hashCode() {
+    return Objects.hash(getMessage(), getTimestamp());
+  }
+
+  @Override
+  public String toString() {
+    return "MemoryException{" + "message='" + getMessage() + "', timestamp=" + getTimestamp() + "}";
   }
 }
