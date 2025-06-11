@@ -121,16 +121,8 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
     return tablet;
   }
 
-  public boolean isTableModelEvent() {
-    return false;
-  }
-
   public String getDeviceId() {
     return tablet.getDeviceId();
-  }
-
-  public String getTableModelDatabaseName() {
-    return null;
   }
 
   @Override

@@ -56,4 +56,14 @@ public class IoTDBSubscriptionTablePullSource extends IoTDBSubscriptionPullSourc
   public Optional<ProgressIndex> report() {
     return Optional.empty();
   }
+
+  @Override
+  public void close() throws Exception {
+    super.close();
+
+    if (consumer != null) {
+      consumer.unsubscribe(subscription.getTopic());
+      consumer.close();
+    }
+  }
 }

@@ -19,4 +19,15 @@
 
 package org.apache.iotdb.collector.utils;
 
-public class PathUtil {}
+public class PathUtils {
+  public static boolean isTableModelDatabase(final String databaseName) {
+    return !databaseName.startsWith("root.");
+  }
+
+  public static String unQualifyDatabaseName(String databaseName) {
+    if (databaseName != null && databaseName.startsWith("root.")) {
+      databaseName = databaseName.substring(5).toLowerCase();
+    }
+    return databaseName;
+  }
+}

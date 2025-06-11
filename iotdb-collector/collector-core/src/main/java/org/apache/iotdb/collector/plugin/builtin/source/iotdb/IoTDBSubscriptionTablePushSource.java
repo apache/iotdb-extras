@@ -39,6 +39,8 @@ public class IoTDBSubscriptionTablePushSource extends IoTDBSubscriptionPushSourc
       consumer.subscribe(subscription.getTopic());
 
       shutdownLatch.await();
+
+      consumer.unsubscribe(subscription.getTopic());
     } catch (final Exception e) {
       LOGGER.warn("Error occurred while {} thread", getPushConsumerThreadName(), e);
     }
