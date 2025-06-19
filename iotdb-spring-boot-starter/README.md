@@ -18,11 +18,12 @@
     under the License.
 
 -->
+
 # iotdb-spring-boot-starter
 
-* After 'clone' the project, execute 'mvn clean install'. This step is not necessary as it has already been uploaded to the Maven central repository
+- After 'clone' the project, execute 'mvn clean install'. This step is not necessary as it has already been uploaded to the Maven central repository
 
-* Add the following configuration to the 'pom' file of the project to be generated:
+- Add the following configuration to the 'pom' file of the project to be generated:
 
 ```
     <dependencies>
@@ -38,12 +39,13 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>iotdb-spring-boot-starter</artifactId>
-            <version>2.0.2-SNAPSHOT</version>
+            <version>2.0.3</version>
         </dependency>
     </dependencies>
 ```
 
-* Use The target Bean with @Autowired like:
+- Use The target Bean with @Autowired like:
+
 ```java
         @Autowired
         private ITableSessionPool ioTDBSessionPool;

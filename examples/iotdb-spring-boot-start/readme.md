@@ -18,15 +18,17 @@
     under the License.
 
 -->
+
 # IoTDB-Spring-Boot-Starter Demo
+
 ## Introduction
 
     This demo shows how to use iotdb-spring-boot-starter
 
 ### Version usage
 
-    IoTDB: 2.0.1-beta
-    iotdb-spring-boot-starter: 2.0.2-SNAPSHOT
+    IoTDB: 2.0.3
+    iotdb-spring-boot-starter: 2.0.3
 
 ### 1. Install IoTDB
 
@@ -35,7 +37,7 @@
 ### 2. Startup IoTDB
 
     please refer to [Quick Start](http://iotdb.apache.org/UserGuide/Master/Get%20Started/QuickStart.html)
-    
+
     Then we need to create a database 'wind' by cli in table model
     ```
     create database wind;
@@ -65,7 +67,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter</artifactId>
             </dependency>
-    
+
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-test</artifactId>
@@ -74,13 +76,13 @@
             <dependency>
                 <groupId>org.apache.iotdb</groupId>
                 <artifactId>iotdb-spring-boot-starter</artifactId>
-                <version>2.0.2-SNAPSHOT</version>
+                <version>2.0.3</version>
             </dependency>
         </dependencies>
     ```
 
 ### 4、Use The target Bean with @Autowired
-    
+
     You can use the target Bean in your Project,like:
     ```
         @Autowired

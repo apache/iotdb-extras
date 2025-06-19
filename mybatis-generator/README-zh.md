@@ -18,11 +18,12 @@
     under the License.
 
 -->
+
 # mybatis-generator-plugin
 
-* 把该项目 `clone` 下来之后，在本地执行 `mvn clean install` 或者 `mvn clean deploy` (`deploy` 需要修改 `pom` 中的 `distributionManagement`)【已经上传 `Maven` 中央仓库，所以此步骤不在需要】
+- 把该项目 `clone` 下来之后，在本地执行 `mvn clean install` 或者 `mvn clean deploy` (`deploy` 需要修改 `pom` 中的 `distributionManagement`)【已经上传 `Maven` 中央仓库，所以此步骤不在需要】
 
-* 在要生成的项目的 `pom` 文件中添加如下配置：
+- 在要生成的项目的 `pom` 文件中添加如下配置：
 
 ```xml
 <build>
@@ -35,7 +36,7 @@
                 <dependency>
                     <groupId>org.apache.iotdb</groupId>
                     <artifactId>mybatis-generator-plugin</artifactId>
-                    <version>2.0.2-SNAPSHOT</version>
+                    <version>2.0.3</version>
                 </dependency>
             </dependencies>
             <configuration>
@@ -48,8 +49,8 @@
 </build>
 ```
 
-* `configurationFile` 配置 `generatorConfig.xml` 文件的位置，其内容在本项目的 `src/main/resources` 有一个模板供参考，`copy` 其内容放到相应的位置
+- `configurationFile` 配置 `generatorConfig.xml` 文件的位置，其内容在本项目的 `src/main/resources` 有一个模板供参考，`copy` 其内容放到相应的位置
 
-* 修改 `generatorConfig.xml` 中 想用的内容，主要是：`jdbcConnection`、`javaModelGenerator`、`sqlMapGenerator`、`javaClientGenerator`、`table`
+- 修改 `generatorConfig.xml` 中 想用的内容，主要是：`jdbcConnection`、`javaModelGenerator`、`sqlMapGenerator`、`javaClientGenerator`、`table`
 
-* 在项目的 `pom` 所在的地方执行命令：`mvn mybatis-generator:generate` 生成相应的 `Java` 类和 `mapper` 文件
+- 在项目的 `pom` 所在的地方执行命令：`mvn mybatis-generator:generate` 生成相应的 `Java` 类和 `mapper` 文件

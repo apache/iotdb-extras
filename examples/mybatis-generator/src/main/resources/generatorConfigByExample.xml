@@ -18,13 +18,15 @@
 
 -->
 <generatorConfiguration>
-    <classPathEntry location="/apache/iotdb/iotdb-client/jdbc/target/iotdb-jdbc-2.0.2-SNAPSHOT-jar-with-dependencies.jar"/>
+    <classPathEntry location="/apache/iotdb/iotdb-client/jdbc/target/iotdb-jdbc-2.0.3-jar-with-dependencies.jar"/>
     <!-- mvn mybatis-generator:generate hierarchical/flat-->
     <context id="mybatis3" targetRuntime="Mybatis3" defaultModelType="flat">
         <!--        <property name="suppressAllComments" value="true"/>-->
         <!--        <property name="useActualColumnNames" value="false"/>-->
-        <!--        <property name="javaFormatter" value="org.mybatis.generator.api.dom.DefaultJavaFormatter"/>-->
-        <!--        <property name="xmlFormatter" value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
+        <!--        <property name="javaFormatter"
+    value="org.mybatis.generator.api.dom.DefaultJavaFormatter"/>-->
+        <!--        <property name="xmlFormatter"
+    value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
         <plugin type="org.apache.iotdb.mybatis.plugin.LombokPlugin"/>
         <plugin type="org.apache.iotdb.mybatis.plugin.BatchInsertPlugin"/>
         <!--        <plugin type="org.apache.iotdb.mybatis.plugin.SerializablePlugin"/>-->
