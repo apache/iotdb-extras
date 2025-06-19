@@ -103,6 +103,12 @@
             <modules>
                 <module>spark-iotdb-connector</module>
                 <module>spark-iotdb-table-connector</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>with-spark-tsfile</id>
+            <modules>
+                <module>hadoop</module>
                 <module>spark-tsfile</module>
             </modules>
         </profile>
