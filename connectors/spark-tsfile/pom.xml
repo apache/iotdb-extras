@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.iotdb</groupId>
         <artifactId>connectors</artifactId>
-        <version>2.0.3</version>
+        <version>2.0.3-SNAPSHOT</version>
     </parent>
     <artifactId>spark-tsfile</artifactId>
     <name>IoTDB: Connector: Apache Spark TSFile</name>
@@ -42,7 +42,7 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>hadoop-tsfile</artifactId>
-            <version>2.0.3</version>
+            <version>2.0.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
