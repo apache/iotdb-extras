@@ -1,4 +1,3 @@
-
 <!--
 
     Licensed to the Apache Software Foundation (ASF) under one
@@ -22,9 +21,9 @@
 
 # mybatis-generator-plugin
 
-* After 'clone' the project, execute 'mvn clean install' or 'mvn clean deploy' locally ('deploy' needs to modify 'distributionManagement' in 'pom'). This step is not necessary as it has already been uploaded to the Maven central repository
+- After 'clone' the project, execute 'mvn clean install' or 'mvn clean deploy' locally ('deploy' needs to modify 'distributionManagement' in 'pom'). This step is not necessary as it has already been uploaded to the Maven central repository
 
-* Add the following configuration to the 'pom' file of the project to be generated:
+- Add the following configuration to the 'pom' file of the project to be generated:
 
 ```xml
 <build>
@@ -37,7 +36,7 @@
                 <dependency>
                     <groupId>org.apache.iotdb</groupId>
                     <artifactId>mybatis-generator-plugin</artifactId>
-                    <version>2.0.2-SNAPSHOT</version>
+                    <version>2.0.3</version>
                 </dependency>
             </dependencies>
             <configuration>
@@ -49,8 +48,9 @@
     </plugins>
 </build>
 ```
-* The location of the ` configurationFile ` configuration ` generatorConfig. xml ` file can be found in the ` src/main/resources ` template of this project for reference` Copy its content and place it in the corresponding location
 
-* Modify the content you want to use in 'generatorConfig. xml', mainly by:` jdbcConnection`、`javaModelGenerator`、`sqlMapGenerator`、`javaClientGenerator`、`table`
+- The location of the `configurationFile` configuration `generatorConfig. xml` file can be found in the `src/main/resources` template of this project for reference` Copy its content and place it in the corresponding location
 
-* Execute the command at the location of the 'pom' in the project:` Mvn mybatis generator: generate generates corresponding Java classes and mapper files
+- Modify the content you want to use in 'generatorConfig. xml', mainly by:` jdbcConnection`、`javaModelGenerator`、`sqlMapGenerator`、`javaClientGenerator`、`table`
+
+- Execute the command at the location of the 'pom' in the project:` Mvn mybatis generator: generate generates corresponding Java classes and mapper files
