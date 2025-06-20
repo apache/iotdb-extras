@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.payload.evolvable.batch;
 
-import org.apache.iotdb.collector.config.PipeRuntimeOptions;
+import org.apache.iotdb.collector.plugin.builtin.sink.client.IoTDBDataNodeCacheLeaderClientManager;
 import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
@@ -142,7 +142,11 @@ public class PipeTransferBatchReqBuilder implements AutoCloseable {
     }
 
     final TEndPoint endPoint =
-        new TEndPoint(PipeRuntimeOptions.RPC_ADDRESS.value(), PipeRuntimeOptions.RPC_PORT.value());
+        IoTDBDataNodeCacheLeaderClientManager.LEADER_CACHE_MANAGER.getLeaderEndPoint(deviceId);
+
+    if (Objects.isNull(endPoint)) {
+      return defaultBatch.onEvent(event) ? new Pair<>(null, defaultBatch) : null;
+    }
 
     final PipeTabletEventPlainBatch batch =
         endPointToBatch.computeIfAbsent(
