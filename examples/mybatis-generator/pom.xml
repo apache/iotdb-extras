@@ -29,7 +29,7 @@
     </parent>
     <artifactId>mybatis-generator-example</artifactId>
     <name>IoTDB: Example: Mybatis Generator</name>
-    <version>2.0.2-SNAPHOT</version>
+    <version>2.0.4-SNAPHOT</version>
     <dependencies>
         <dependency>
             <groupId>org.mybatis</groupId>
