@@ -1,0 +1,6 @@
+spring:
+  datasource:
+    url: jdbc:iotdb://127.0.0.1:6667/database1?sql_dialect=table
+    username: root
+    password: root
+    driver-class-name: org.apache.iotdb.jdbc.IoTDBDriver
