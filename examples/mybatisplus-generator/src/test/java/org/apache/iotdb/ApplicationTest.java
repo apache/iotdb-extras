@@ -1,7 +1,7 @@
 package org.apache.iotdb;
 
-import com.example.service.Table1Service;
-import com.example.service.Table2Service;
+import org.apache.iotdb.service.Table1Service;
+import org.apache.iotdb.service.Table2Service;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
