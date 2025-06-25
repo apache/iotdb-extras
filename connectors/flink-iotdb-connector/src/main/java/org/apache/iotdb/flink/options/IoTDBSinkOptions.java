@@ -42,6 +42,15 @@ public class IoTDBSinkOptions extends IoTDBOptions {
     this.timeseriesOptionList = timeseriesOptionList;
   }
 
+  public IoTDBSinkOptions(
+          List<String> nodeUrls,
+          String user,
+          String password,
+          List<TimeseriesOption> timeseriesOptionList) {
+    super(nodeUrls, user, password);
+    this.timeseriesOptionList = timeseriesOptionList;
+  }
+
   public List<TimeseriesOption> getTimeseriesOptionList() {
     return timeseriesOptionList;
   }

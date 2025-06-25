@@ -25,10 +25,12 @@ import com.google.common.collect.Lists;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -112,5 +114,14 @@ public class IoTDBSinkBatchInsertTest {
         .insertRecords(
             any(List.class), any(List.class), any(List.class), any(List.class), any(List.class));
     verify(pool).close();
+  }
+
+  @Test
+  public void testInitUrlNodes() {
+    List<String> nodeUrls = new ArrayList<>();
+    nodeUrls.add("127.0.0.1:6667");
+    nodeUrls.add("127.0.0.2:6667");
+    IoTDBSinkOptions sinkOptions = new IoTDBSinkOptions(nodeUrls, null, null, null);
+    assertEquals(sinkOptions.getNodeUrls(), nodeUrls);
   }
 }

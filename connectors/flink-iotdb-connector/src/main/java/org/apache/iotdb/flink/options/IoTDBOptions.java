@@ -19,6 +19,7 @@
 package org.apache.iotdb.flink.options;
 
 import java.io.Serializable;
+import java.util.List;
 
 public class IoTDBOptions implements Serializable {
 
@@ -26,10 +27,17 @@ public class IoTDBOptions implements Serializable {
   protected int port;
   protected String user;
   protected String password;
+  protected List<String> nodeUrls;
 
   public IoTDBOptions(String host, int port, String user, String password) {
     this.host = host;
     this.port = port;
+    this.user = user;
+    this.password = password;
+  }
+
+  public IoTDBOptions(List<String> nodeUrls, String user, String password) {
+    this.nodeUrls = nodeUrls;
     this.user = user;
     this.password = password;
   }
@@ -66,5 +74,13 @@ public class IoTDBOptions implements Serializable {
 
   public void setPassword(String password) {
     this.password = password;
+  }
+
+  public List<String> getNodeUrls() {
+    return nodeUrls;
+  }
+
+  public void setNodeUrls(List<String> nodeUrls) {
+    this.nodeUrls = nodeUrls;
   }
 }
