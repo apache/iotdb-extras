@@ -304,7 +304,7 @@ For detailed usage instructions, please refer to the README files in the specifi
 - [Flink Examples](/examples/flink/README.md)
 - [Spark Table Examples](/examples/spark-table/README.md)
 - [MyBatis Generator Examples](/examples/mybatis-generator/README.md)
-- [IoTDB Spring Boot Starter Examples](/examples/iotdb-spring-boot-start/README)
+- [IoTDB Spring Boot Starter Examples](/examples/iotdb-spring-boot-start/README.md)
 - [Kafka Examples](/examples/kafka/readme.md)
 
 You can also refer to module-specific documentation:
