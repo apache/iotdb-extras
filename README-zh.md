@@ -302,7 +302,7 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 - [Flink 示例](/examples/flink/README.md)
 - [Spark 表示例](/examples/spark-table/README.md)
 - [MyBatis 生成器示例](/examples/mybatis-generator/README.md)
-- [IoTDB Spring Boot Starter 示例](/examples/iotdb-spring-boot-start/readme.md)
+- [IoTDB Spring Boot Starter 示例](/examples/iotdb-spring-boot-start/README.md)
 - [Kafka 示例](/examples/kafka/readme.md)
 
 您还可以参考模块特定的文档：

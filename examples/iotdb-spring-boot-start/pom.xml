@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.3</version>
+        <version>3.5.1</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -35,8 +35,7 @@
     <description>iotdb-spring-boot-start</description>
     <properties>
         <java.version>17</java.version>
-        <spring-boot.version>3.4.5</spring-boot.version>
-        <spring.version>6.2.6</spring.version>
+        <version>3.5.1</version>
         <google.java.format.version>1.22.0</google.java.format.version>
         <spotless.version>2.43.0</spotless.version>
     </properties>
@@ -53,6 +52,11 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>iotdb-spring-boot-starter</artifactId>
+            <version>2.0.4-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>isession</artifactId>
             <version>2.0.4-SNAPSHOT</version>
         </dependency>
     </dependencies>
