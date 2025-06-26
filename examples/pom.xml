@@ -30,14 +30,6 @@
     <packaging>pom</packaging>
     <name>IoTDB Extras: Examples</name>
     <modules>
-        <module>flink</module>
-        <module>flink-sql</module>
-        <module>hadoop</module>
-        <module>kafka</module>
-        <module>pulsar</module>
-        <module>rabbitmq</module>
-        <module>rocketmq</module>
-        <module>spark-table</module>
         <module>mybatis-generator</module>
     </modules>
     <profiles>
