@@ -17,6 +17,10 @@
 # under the License.
 #
 
+notifications:
+  issues: reviews@iotdb.apache.org
+  pullrequests: reviews@iotdb.apache.org
+
 github:
   description: "Apache IoTDB Extras"
   homepage: https://iotdb.apache.org/
