@@ -77,8 +77,15 @@ public class IoTDBSink<IN> extends RichSinkFunction<IN> {
   }
 
   void initSession() {
-    pool =
-        new SessionPool(
+    if (options.getNodeUrls() != null) {
+      pool = new SessionPool(
+              options.getNodeUrls(),
+              options.getUser(),
+              options.getPassword(),
+              sessionPoolSize);
+      return;
+    }
+    pool = new SessionPool(
             options.getHost(),
             options.getPort(),
             options.getUser(),
