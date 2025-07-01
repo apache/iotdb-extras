@@ -19,17 +19,15 @@
 
 package org.apache.iotdb.collector.plugin.api;
 
-import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.collector.runtime.task.TaskDispatch;
 import org.apache.iotdb.pipe.api.PipeSource;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 
-import java.util.Optional;
-
-public abstract class PushSource implements PipeSource {
+public abstract class PushSource extends BaseSource implements PipeSource {
 
   private TaskDispatch dispatch;
 
@@ -40,11 +38,16 @@ public abstract class PushSource implements PipeSource {
   }
 
   @Override
-  public final void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration)
+  public void validate(final PipeParameterValidator validator) throws Exception {
+    super.validate(validator);
+  }
+
+  @Override
+  public void customize(
+      final PipeParameters pipeParameters,
+      final PipeSourceRuntimeConfiguration pipeSourceRuntimeConfiguration)
       throws Exception {
-    throw new UnsupportedOperationException();
+    super.customize(pipeParameters, pipeSourceRuntimeConfiguration);
   }
 
   public final void setCollector(final EventCollector collector) {
@@ -75,6 +78,4 @@ public abstract class PushSource implements PipeSource {
   public final void setDispatch(final TaskDispatch dispatch) {
     this.dispatch = dispatch;
   }
-
-  public abstract Optional<ProgressIndex> report();
 }
