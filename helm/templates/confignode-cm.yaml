@@ -30,6 +30,3 @@ data:
     schema_region_consensus_protocol_class={{ .Values.confignode.schemaRegionConsensusProtocolClass }}
     data_replication_factor={{ .Values.confignode.dataReplicationFactor }}
     data_region_consensus_protocol_class={{ .Values.confignode.dataRegionConsensusProtocolClass }}
-    enable_last_cache={{ .Values.confignode.enableLastCache }}
-    data_region_group_extension_policy={{ .Values.confignode.dataRegionGroupExtensionPolicy }}
-    default_data_region_group_num_per_database={{ .Values.confignode.dataRegionGroupNumPerDatabase }}
