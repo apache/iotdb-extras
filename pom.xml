@@ -185,7 +185,7 @@
         <tomcat.version>9.0.86</tomcat.version>
         <tsfile.version>2.0.2</tsfile.version>
         <xz.version>1.9</xz.version>
-        <zeppelin.version>0.11.1</zeppelin.version>
+        <zeppelin.version>0.12.0</zeppelin.version>
         <zstd-jni.version>1.5.5-5</zstd-jni.version>
     </properties>
     <!--
