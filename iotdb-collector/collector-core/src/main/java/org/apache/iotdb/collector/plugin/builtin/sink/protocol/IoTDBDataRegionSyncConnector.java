@@ -58,7 +58,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
@@ -219,7 +218,6 @@ public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
   private void doTransfer(final PipeTabletEventTsFileBatch batchToTransfer)
       throws IOException, WriteProcessException {
     final List<Pair<String, File>> dbTsFilePairs = batchToTransfer.sealTsFiles();
-    final Map<Pair<String, Long>, Double> pipe2WeightMap = batchToTransfer.deepCopyPipe2WeightMap();
 
     for (final Pair<String, File> dbTsFile : dbTsFilePairs) {
       doTransfer(dbTsFile.right, null, dbTsFile.left);

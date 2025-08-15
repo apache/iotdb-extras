@@ -17,29 +17,10 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.event;
+package org.apache.iotdb.collector.plugin.builtin.sink.resource.memory;
 
-import org.apache.iotdb.collector.utils.PathUtils;
-
-public abstract class PipeInsertionEvent {
-
-  protected Boolean isTableModelEvent;
-
-  protected String sourceDatabaseNameFromDataRegion;
-  protected String treeModelDatabaseName;
-  protected String tableModelDatabaseName;
-
-  public boolean isTableModelEvent() {
-    return isTableModelEvent;
-  }
-
-  public String getTreeModelDatabaseName() {
-    return treeModelDatabaseName;
-  }
-
-  public String getTableModelDatabaseName() {
-    return tableModelDatabaseName == null
-        ? tableModelDatabaseName = PathUtils.unQualifyDatabaseName(sourceDatabaseNameFromDataRegion)
-        : tableModelDatabaseName;
-  }
+public enum PipeMemoryBlockType {
+  NORMAL,
+  TABLET,
+  TS_FILE,
 }

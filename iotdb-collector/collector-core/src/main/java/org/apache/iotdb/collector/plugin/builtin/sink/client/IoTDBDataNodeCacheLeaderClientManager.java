@@ -19,12 +19,17 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.client;
 
+import org.apache.iotdb.collector.config.PipeRuntimeOptions;
+import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryBlock;
+import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryManager;
 import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Weigher;
 import com.google.common.util.concurrent.AtomicDouble;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,7 +37,9 @@ public interface IoTDBDataNodeCacheLeaderClientManager {
 
   LeaderCacheManager LEADER_CACHE_MANAGER = new LeaderCacheManager();
 
-  class LeaderCacheManager {
+  class LeaderCacheManager implements AutoCloseable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LeaderCacheManager.class);
 
     private final AtomicDouble memoryUsageCheatFactor = new AtomicDouble(1);
 
@@ -41,9 +48,45 @@ public interface IoTDBDataNodeCacheLeaderClientManager {
     // a hashmap to reuse the created endpoint
     private final ConcurrentHashMap<TEndPoint, TEndPoint> endPoints = new ConcurrentHashMap<>();
 
+    private final PipeMemoryBlock allocatedMemoryBlock;
+
     public LeaderCacheManager() {
+      final long initMemorySizeInBytes =
+          PipeMemoryManager.getInstance().getTotalNonFloatingMemorySizeInBytes() / 10;
+      final long maxMemorySizeInBytes =
+          (long)
+              (PipeMemoryManager.getInstance().getTotalNonFloatingMemorySizeInBytes()
+                  * PipeRuntimeOptions.PIPE_LEADER_CACHE_MEMORY_USAGE_PERCENTAGE.value());
+
+      // properties required by pipe memory control framework
+      allocatedMemoryBlock =
+          PipeMemoryManager.getInstance()
+              .tryAllocate(initMemorySizeInBytes)
+              .setShrinkMethod(oldMemory -> Math.max(oldMemory / 2, 1))
+              .setShrinkCallback(
+                  (oldMemory, newMemory) -> {
+                    memoryUsageCheatFactor.updateAndGet(
+                        factor -> factor * ((double) oldMemory / newMemory));
+                    LOGGER.info(
+                        "LeaderCacheManager.allocatedMemoryBlock has shrunk from {} to {}.",
+                        oldMemory,
+                        newMemory);
+                  })
+              .setExpandMethod(
+                  oldMemory -> Math.min(Math.max(oldMemory, 1) * 2, maxMemorySizeInBytes))
+              .setExpandCallback(
+                  (oldMemory, newMemory) -> {
+                    memoryUsageCheatFactor.updateAndGet(
+                        factor -> factor / ((double) newMemory / oldMemory));
+                    LOGGER.info(
+                        "LeaderCacheManager.allocatedMemoryBlock has expanded from {} to {}.",
+                        oldMemory,
+                        newMemory);
+                  });
+
       device2endpoint =
           Caffeine.newBuilder()
+              .maximumWeight(allocatedMemoryBlock.getMemoryUsageInBytes())
               .weigher(
                   (Weigher<String, TEndPoint>)
                       (device, endPoint) -> {
@@ -73,6 +116,13 @@ public interface IoTDBDataNodeCacheLeaderClientManager {
         device2endpoint.put(deviceId, endPointFromMap);
       } else {
         device2endpoint.put(deviceId, endPoint);
+      }
+    }
+
+    @Override
+    public void close() throws Exception {
+      if (allocatedMemoryBlock != null) {
+        allocatedMemoryBlock.close();
       }
     }
   }

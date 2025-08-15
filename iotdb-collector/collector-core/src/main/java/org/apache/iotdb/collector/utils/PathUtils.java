@@ -17,29 +17,17 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.plugin.builtin.sink.event;
+package org.apache.iotdb.collector.utils;
 
-import org.apache.iotdb.collector.utils.PathUtils;
-
-public abstract class PipeInsertionEvent {
-
-  protected Boolean isTableModelEvent;
-
-  protected String sourceDatabaseNameFromDataRegion;
-  protected String treeModelDatabaseName;
-  protected String tableModelDatabaseName;
-
-  public boolean isTableModelEvent() {
-    return isTableModelEvent;
+public class PathUtils {
+  public static boolean isTableModelDatabase(final String databaseName) {
+    return !databaseName.startsWith("root.");
   }
 
-  public String getTreeModelDatabaseName() {
-    return treeModelDatabaseName;
-  }
-
-  public String getTableModelDatabaseName() {
-    return tableModelDatabaseName == null
-        ? tableModelDatabaseName = PathUtils.unQualifyDatabaseName(sourceDatabaseNameFromDataRegion)
-        : tableModelDatabaseName;
+  public static String unQualifyDatabaseName(String databaseName) {
+    if (databaseName != null && databaseName.startsWith("root.")) {
+      databaseName = databaseName.substring(5).toLowerCase();
+    }
+    return databaseName;
   }
 }

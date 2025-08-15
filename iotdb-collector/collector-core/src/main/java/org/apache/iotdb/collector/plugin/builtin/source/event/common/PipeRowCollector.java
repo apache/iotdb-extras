@@ -90,12 +90,12 @@ public class PipeRowCollector implements RowCollector {
   private void collectTabletInsertionEvent() {
     if (tablet != null) {
       // TODO: non-PipeInsertionEvent sourceEvent is not supported?
-      tabletInsertionEventList.add(new PipeRawTabletInsertionEvent(tablet, tablet.getDeviceId()));
+      tabletInsertionEventList.add(new PipeRawTabletInsertionEvent(tablet, false));
     }
     this.tablet = null;
   }
 
-  public List<TabletInsertionEvent> convertToTabletInsertionEvents(final boolean shouldReport) {
+  public List<TabletInsertionEvent> convertToTabletInsertionEvents() {
     collectTabletInsertionEvent();
 
     return tabletInsertionEventList;
