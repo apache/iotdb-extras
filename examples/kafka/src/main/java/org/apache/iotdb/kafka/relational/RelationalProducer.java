@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.example.relational;
+package org.apache.iotdb.kafka.relational;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;

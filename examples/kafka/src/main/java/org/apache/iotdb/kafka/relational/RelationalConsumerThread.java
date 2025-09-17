@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.example.relational;
+package org.apache.iotdb.kafka.relational;
 
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.pool.ITableSessionPool;

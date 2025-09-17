@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.example.relational;
+package org.apache.iotdb.rocketmq.relational;
 
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;

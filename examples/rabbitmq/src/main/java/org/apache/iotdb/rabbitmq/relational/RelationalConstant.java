@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.example.relational;
+package org.apache.iotdb.rabbitmq.relational;
 
 public class RelationalConstant {
 

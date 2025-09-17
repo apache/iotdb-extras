@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.example.relational;
+package org.apache.iotdb.rabbitmq.relational;
 
 import com.rabbitmq.client.*;
 import org.example.RabbitMQChannelUtils;
