@@ -22,6 +22,11 @@ package org.apache.iotdb.rabbitmq;
 public class Constant {
   private Constant() {}
 
+  public static final String SERVER_HOST = "localhost";
+  public static final int SERVER_PORT = 5672;
+  public static final String RABBITMQ_VHOST = "/";
+  public static final String RABBITMQ_USERNAME = "guest";
+  public static final String RABBITMQ_PASSWORD = "guest";
   public static final String CONNECTION_NAME = "RabbitMQ-Connection";
   public static final String RABBITMQ_CONSUMER_QUEUE = "IoTDB_Topic_Queue";
   public static final String RABBITMQ_CONSUMER_TAG = "IoTDB_CONSUMER_TAG";
