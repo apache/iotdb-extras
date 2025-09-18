@@ -57,7 +57,7 @@ please refer to [https://iotdb.apache.org/#/Download](https://iotdb.apache.org/#
 please refer to [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads)
 
 #### 3. Startup IoTDB
-please refer to [Quick Start](http://iotdb.apache.org/UserGuide/Master/Get%20Started/QuickStart.html)
+please refer to [Quick Start](https://iotdb.apache.org/UserGuide/latest/QuickStart/QuickStart_apache.html)
 
 #### 4. Startup Kafka
 please refer to [https://kafka.apache.org/quickstart](https://kafka.apache.org/quickstart)

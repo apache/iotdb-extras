@@ -57,7 +57,7 @@ please refer to [https://iotdb.apache.org/#/Download](https://iotdb.apache.org/#
 please refer to [https://www.rabbitmq.com/download.html](https://www.rabbitmq.com/download.html)
 
 #### 3. Startup IoTDB
-please refer to [Quick Start](http://iotdb.apache.org/UserGuide/Master/Get%20Started/QuickStart.html)
+please refer to [Quick Start](https://iotdb.apache.org/UserGuide/latest/QuickStart/QuickStart_apache.html)
 
 #### 4. Startup RocketMQ
 please refer to [https://www.rabbitmq.com/download.html](https://www.rabbitmq.com/download.html)
