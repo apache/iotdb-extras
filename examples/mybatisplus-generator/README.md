@@ -67,7 +67,7 @@ CREATE TABLE mix (
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <spring-boot.version>3.4.5</spring-boot.version>
     <spring.version>6.2.6</spring.version>
-    <iotdb-jdbc.version>2.0.4-SNAPSHOT</iotdb-jdbc.version>
+    <iotdb-jdbc.version>2.0.5</iotdb-jdbc.version>
     <io-springfox.version>3.0.0</io-springfox.version>
 </properties>
 
