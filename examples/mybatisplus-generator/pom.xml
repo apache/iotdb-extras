@@ -38,7 +38,7 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.1</spring-boot.version>
-        <iotdb-jdbc.version>2.0.4-SNAPSHOT</iotdb-jdbc.version>
+        <iotdb-jdbc.version>2.0.5</iotdb-jdbc.version>
         <io-springfox.version>3.0.0</io-springfox.version>
     </properties>
     <dependencies>
@@ -125,6 +125,11 @@
                     <overwrite>true</overwrite>
                     <configurationFile>src/main/resources/generatorConfig.xml</configurationFile>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.43.0</version>
             </plugin>
         </plugins>
     </build>

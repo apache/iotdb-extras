@@ -28,7 +28,7 @@ import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
 import org.apache.spark.sql.types.{NullType, StructType}
 import org.apache.tsfile.enums.TSDataType
 import org.apache.tsfile.write.record.Tablet
-import org.apache.tsfile.write.record.Tablet.ColumnCategory
+import org.apache.tsfile.enums.ColumnCategory
 
 class IoTDBDataWriter(options: IoTDBOptions, writeSchema: StructType, tableSchema: StructType) extends DataWriter[InternalRow] with Logging {
 

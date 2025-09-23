@@ -22,6 +22,7 @@ package org.apache.iotdb.rabbitmq;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,13 +48,13 @@ public class RabbitMQProducer {
       channel.basicPublish(
           Constant.TOPIC, key, false, basicProperties, Constant.ALL_DATA[i].getBytes());
       try {
-          if (channel.waitForConfirms()) {
-              LOGGER.info(" [x] Sent : {}", Constant.ALL_DATA[i]);
-          } else {
-              LOGGER.error(" [x] Timed out waiting for confirmation");
-          }
+        if (channel.waitForConfirms()) {
+          LOGGER.info(" [x] Sent : {}", Constant.ALL_DATA[i]);
+        } else {
+          LOGGER.error(" [x] Timed out waiting for confirmation");
+        }
       } catch (InterruptedException e) {
-          LOGGER.error(" [x] Interrupted while waiting for confirmation");
+        LOGGER.error(" [x] Interrupted while waiting for confirmation");
       }
     }
   }

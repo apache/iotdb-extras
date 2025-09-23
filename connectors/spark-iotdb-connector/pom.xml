@@ -55,6 +55,11 @@
         </dependency>
         <dependency>
             <groupId>org.apache.tsfile</groupId>
+            <artifactId>tsfile</artifactId>
+            <version>${tsfile.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tsfile</groupId>
             <artifactId>common</artifactId>
             <version>${tsfile.version}</version>
         </dependency>
@@ -90,6 +95,16 @@
         -->
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <configuration>
+                        <usedDependencies>
+                            <!-- For some reason the plugin complains if this artifact is included -->
+                            <usedDependency>org.apache.tsfile:common</usedDependency>
+                        </usedDependencies>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.scala-tools</groupId>
                     <artifactId>maven-scala-plugin</artifactId>

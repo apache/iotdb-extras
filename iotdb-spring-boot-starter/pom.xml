@@ -36,7 +36,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.1</spring-boot.version>
         <spring.version>6.2.7</spring.version>
-        <iotdb-version>2.0.4-SNAPSHOT</iotdb-version>
+        <iotdb-version>2.0.5</iotdb-version>
     </properties>
     <dependencyManagement>
         <dependencies>

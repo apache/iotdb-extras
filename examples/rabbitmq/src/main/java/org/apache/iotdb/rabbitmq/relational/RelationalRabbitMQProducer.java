@@ -19,8 +19,12 @@
 
 package org.apache.iotdb.rabbitmq.relational;
 
-import com.rabbitmq.client.*;
-import org.example.RabbitMQChannelUtils;
+import org.apache.iotdb.rabbitmq.RabbitMQChannelUtils;
+
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.BuiltinExchangeType;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,30 +32,36 @@ import java.util.Objects;
 
 public class RelationalRabbitMQProducer {
 
-    private static final Logger LOGGER =  LoggerFactory.getLogger(RelationalRabbitMQProducer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RelationalRabbitMQProducer.class);
 
-    public static void main(String[] args) {
-        try (Connection connection = RabbitMQChannelUtils.getRelationalConnection()) {
-            Channel channel = connection.createChannel();
-            channel.exchangeDeclare(RelationalConstant.TOPIC, BuiltinExchangeType.TOPIC);
-            channel.confirmSelect();
-            AMQP.BasicProperties basicProperties = new AMQP.BasicProperties().builder().deliveryMode(2).contentType("UTF-8").build();
-            for (int i = 0; i < RelationalConstant.ALL_DATA.length; i++) {
-                String key = String.format("%s.%s", "IoTDB", Objects.toString(i));
-                channel.queueDeclare(key, true, false, false, null);
-                channel.basicPublish(RelationalConstant.TOPIC, key, false, basicProperties, RelationalConstant.ALL_DATA[i].getBytes());
-                try {
-                    if (channel.waitForConfirms()) {
-                        LOGGER.info(" [x] Sent : {}", RelationalConstant.ALL_DATA[i]);
-                    } else {
-                        LOGGER.error(" [x] Timed out waiting for confirmation");
-                    }
-                } catch (InterruptedException e) {
-                    LOGGER.error(" [x] Interrupted while waiting for confirmation");
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage());
+  public static void main(String[] args) {
+    try (Connection connection = RabbitMQChannelUtils.getRelationalConnection()) {
+      Channel channel = connection.createChannel();
+      channel.exchangeDeclare(RelationalConstant.TOPIC, BuiltinExchangeType.TOPIC);
+      channel.confirmSelect();
+      AMQP.BasicProperties basicProperties =
+          new AMQP.BasicProperties().builder().deliveryMode(2).contentType("UTF-8").build();
+      for (int i = 0; i < RelationalConstant.ALL_DATA.length; i++) {
+        String key = String.format("%s.%s", "IoTDB", Objects.toString(i));
+        channel.queueDeclare(key, true, false, false, null);
+        channel.basicPublish(
+            RelationalConstant.TOPIC,
+            key,
+            false,
+            basicProperties,
+            RelationalConstant.ALL_DATA[i].getBytes());
+        try {
+          if (channel.waitForConfirms()) {
+            LOGGER.info(" [x] Sent : {}", RelationalConstant.ALL_DATA[i]);
+          } else {
+            LOGGER.error(" [x] Timed out waiting for confirmation");
+          }
+        } catch (InterruptedException e) {
+          LOGGER.error(" [x] Interrupted while waiting for confirmation");
         }
+      }
+    } catch (Exception e) {
+      LOGGER.error(e.getMessage());
     }
+  }
 }

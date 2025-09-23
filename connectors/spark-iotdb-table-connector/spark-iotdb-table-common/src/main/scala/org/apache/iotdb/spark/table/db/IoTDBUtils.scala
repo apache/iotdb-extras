@@ -28,7 +28,7 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.apache.tsfile.enums.TSDataType
 import org.apache.tsfile.read.common.RowRecord
 import org.apache.tsfile.utils.{Binary, DateUtils}
-import org.apache.tsfile.write.record.Tablet.ColumnCategory
+import org.apache.tsfile.enums.ColumnCategory
 
 import java.util
 

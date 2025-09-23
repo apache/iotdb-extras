@@ -38,6 +38,7 @@
         <version>3.5.1</version>
         <google.java.format.version>1.22.0</google.java.format.version>
         <spotless.version>2.43.0</spotless.version>
+        <iotdb.version>2.0.5</iotdb.version>
     </properties>
     <dependencies>
         <dependency>
@@ -57,7 +58,7 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>isession</artifactId>
-            <version>2.0.4-SNAPSHOT</version>
+            <version>${iotdb.version}</version>
         </dependency>
     </dependencies>
     <build>

@@ -19,9 +19,10 @@
 
 package org.apache.iotdb.rabbitmq;
 
+import org.apache.iotdb.rabbitmq.relational.RelationalConstant;
+
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import org.apache.iotdb.rabbitmq.relational.RelationalConstant;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -30,8 +31,7 @@ public class RabbitMQChannelUtils {
 
   private RabbitMQChannelUtils() {}
 
-  public static Connection getConnection()
-      throws IOException, TimeoutException {
+  public static Connection getConnection() throws IOException, TimeoutException {
     ConnectionFactory connectionFactory = new ConnectionFactory();
     connectionFactory.setHost(Constant.SERVER_HOST);
     connectionFactory.setPort(Constant.SERVER_PORT);
@@ -43,8 +43,7 @@ public class RabbitMQChannelUtils {
     return connectionFactory.newConnection(Constant.CONNECTION_NAME);
   }
 
-  public static Connection getRelationalConnection()
-      throws IOException, TimeoutException {
+  public static Connection getRelationalConnection() throws IOException, TimeoutException {
     ConnectionFactory connectionFactory = new ConnectionFactory();
     connectionFactory.setHost(RelationalConstant.SERVER_HOST);
     connectionFactory.setPort(RelationalConstant.SERVER_PORT);

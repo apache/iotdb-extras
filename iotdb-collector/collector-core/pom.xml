@@ -185,6 +185,7 @@
                         <usedDependency>org.eclipse.jetty:jetty-util</usedDependency>
                         <usedDependency>org.glassfish.jersey.inject:jersey-hk2</usedDependency>
                         <usedDependency>org.xerial:sqlite-jdbc</usedDependency>
+                        <usedDependency>org.apache.tsfile:common</usedDependency>
                     </usedDependencies>
                 </configuration>
             </plugin>
