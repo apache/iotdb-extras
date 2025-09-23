@@ -92,6 +92,14 @@ public class TSFileConfigUtilCompletenessTest {
       "setBooleanEncoding",
       "setInt32Encoding",
       "setTextEncoding",
+      "setLz4UseJni",
+      "setTextCompression",
+      "setBooleanCompression",
+      "setInt64Compression",
+      "setDoubleCompression",
+      "setInt32Compression",
+      "setFloatCompression",
+      "setEncryptKeyFromToken"
     };
     Set<String> addedSetters = new HashSet<>();
     Collections.addAll(addedSetters, setters);
