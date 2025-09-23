@@ -19,9 +19,9 @@
 
 package org.apache.iotdb.rabbitmq;
 
-import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import org.apache.iotdb.rabbitmq.relational.RelationalConstant;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -30,23 +30,29 @@ public class RabbitMQChannelUtils {
 
   private RabbitMQChannelUtils() {}
 
-  @SuppressWarnings("squid:S2095")
-  public static Channel getChannelInstance(String connectionDescription)
+  public static Connection getConnection()
       throws IOException, TimeoutException {
-    ConnectionFactory connectionFactory = getConnectionFactory();
-    Connection connection = connectionFactory.newConnection(connectionDescription);
-    return connection.createChannel();
-  }
-
-  private static ConnectionFactory getConnectionFactory() {
     ConnectionFactory connectionFactory = new ConnectionFactory();
-    connectionFactory.setHost("127.0.0.1");
-    connectionFactory.setPort(5672);
-    connectionFactory.setVirtualHost("/");
-    connectionFactory.setUsername("guest");
-    connectionFactory.setPassword("guest");
+    connectionFactory.setHost(Constant.SERVER_HOST);
+    connectionFactory.setPort(Constant.SERVER_PORT);
+    connectionFactory.setVirtualHost(Constant.RABBITMQ_VHOST);
+    connectionFactory.setUsername(Constant.RABBITMQ_USERNAME);
+    connectionFactory.setPassword(Constant.RABBITMQ_PASSWORD);
     connectionFactory.setAutomaticRecoveryEnabled(true);
     connectionFactory.setNetworkRecoveryInterval(10000);
-    return connectionFactory;
+    return connectionFactory.newConnection(Constant.CONNECTION_NAME);
+  }
+
+  public static Connection getRelationalConnection()
+      throws IOException, TimeoutException {
+    ConnectionFactory connectionFactory = new ConnectionFactory();
+    connectionFactory.setHost(RelationalConstant.SERVER_HOST);
+    connectionFactory.setPort(RelationalConstant.SERVER_PORT);
+    connectionFactory.setVirtualHost(RelationalConstant.RABBITMQ_VHOST);
+    connectionFactory.setUsername(RelationalConstant.RABBITMQ_USERNAME);
+    connectionFactory.setPassword(RelationalConstant.RABBITMQ_PASSWORD);
+    connectionFactory.setAutomaticRecoveryEnabled(true);
+    connectionFactory.setNetworkRecoveryInterval(10000);
+    return connectionFactory.newConnection(RelationalConstant.CONNECTION_NAME);
   }
 }

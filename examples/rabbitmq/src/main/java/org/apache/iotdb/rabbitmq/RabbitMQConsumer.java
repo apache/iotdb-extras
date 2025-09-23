@@ -99,6 +99,11 @@ public class RabbitMQConsumer {
 
   private void insert(Session session, String data)
       throws IoTDBConnectionException, StatementExecutionException {
+    try {
+        session.open();
+    } catch (Exception e) {
+        LOGGER.error(e.getMessage());
+    }
     String[] dataArray = data.split(",");
     String device = dataArray[0];
     long time = Long.parseLong(dataArray[1]);

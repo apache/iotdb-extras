@@ -35,15 +35,26 @@ public class RabbitMQProducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(RabbitMQProducer.class);
 
   public static void main(String[] args) throws IOException, TimeoutException {
-    Channel channel = RabbitMQChannelUtils.getChannelInstance(Constant.CONNECTION_NAME);
+    Connection connection = RabbitMQChannelUtils.getConnection();
+    Channel channel = connection.createChannel();
     channel.exchangeDeclare(Constant.TOPIC, BuiltinExchangeType.TOPIC);
+    channel.confirmSelect();
     AMQP.BasicProperties basicProperties =
         new AMQP.BasicProperties().builder().deliveryMode(2).contentType("UTF-8").build();
     for (int i = 0; i < Constant.ALL_DATA.length; i++) {
       String key = String.format("%s.%s", "IoTDB", Objects.toString(i));
+      channel.queueDeclare(key, true, false, false, null);
       channel.basicPublish(
           Constant.TOPIC, key, false, basicProperties, Constant.ALL_DATA[i].getBytes());
-      LOGGER.info(Constant.ALL_DATA[i]);
+      try {
+          if (channel.waitForConfirms()) {
+              LOGGER.info(" [x] Sent : {}", Constant.ALL_DATA[i]);
+          } else {
+              LOGGER.error(" [x] Timed out waiting for confirmation");
+          }
+      } catch (InterruptedException e) {
+          LOGGER.error(" [x] Interrupted while waiting for confirmation");
+      }
     }
   }
 }

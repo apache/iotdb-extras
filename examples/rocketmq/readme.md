@@ -46,38 +46,108 @@ Producers insert IoTDB insert statements into partitions according to devices, e
 
 ## Usage
 ### Version usage
-IoTDB: 1.0.0  
-RocketMQ: 4.4.0
+
+|          | Version |
+|----------|---------|
+| IoTDB    | 2.0.5   |  
+| RocketMQ | 5.3.3   |
+
 ### Dependencies with Maven
 
 ```
 <dependencies>
     <dependency>
-      <groupId>org.apache.iotdb</groupId>
-      <artifactId>iotdb-session</artifactId>
-      <version>1.0.0</version>
+        <groupId>org.apache.iotdb</groupId>
+        <artifactId>iotdb-session</artifactId>
+        <version>2.0.5</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.rocketmq</groupId>
-      <artifactId>rocketmq-client</artifactId>
-      <version>4.4.0</version>
+        <groupId>org.apache.rocketmq</groupId>
+        <artifactId>rocketmq-client</artifactId>
+        <version>5.3.3</version>
     </dependency>
   </dependencies>
 ```
 Note: The maven dependencies of io.netty in IoTDB are in conflicts with those dependencies in RocketMQ-Client.
 
-### 1. Install IoTDB
+### Prerequisite Steps
+
+#### 1. Install IoTDB
 please refer to [https://iotdb.apache.org/#/Download](https://iotdb.apache.org/#/Download)
 
-### 2. Install RocketMQ
+#### 2. Install RocketMQ
 please refer to [http://rocketmq.apache.org/docs/quick-start/](http://rocketmq.apache.org/docs/quick-start/)
 
-### 3. Startup IoTDB
-please refer to [Quick Start](http://iotdb.apache.org/UserGuide/Master/Get%20Started/QuickStart.html)
+#### 3. Startup IoTDB
+please refer to [Quick Start](https://iotdb.apache.org/UserGuide/latest/QuickStart/QuickStart_apache.html)
 
-### 4. Startup RocketMQ
+#### 4. Startup RocketMQ
 please refer to [http://rocketmq.apache.org/docs/quick-start/](http://rocketmq.apache.org/docs/quick-start/)
 
-### 5. Start the consumer client:RocketMQConsumer
+### Case 1: Send data from localhost to IoTDB-tree 
 
-### 6. Start the producer client:RocketMQProducer
+Files related:
+1. `Constant.java` : configuration of IoTDB and RocketMQ
+2. `RocketMQProducer.java` : send data from localhost to RocketMQ
+3. `RocketMQConsumer.java` : consume data from RocketMQ
+4. `Utils.java` : utils 
+
+Step 0: Set parameter in `Constant.java`
+
+> Change the parameters according to your situation.
+
+| Parameter                 | Data Type | Description                                                                                                                                                                                                                                          |
+|---------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| TOPIC                     | String    | The topic to store data in RocketMQ                                                                                                                                                                                                                  |
+| SERVER_ADDRESS            | String    | The server address of RocketMQ, e.g. `"127.0.0.1:9876"`                                                                                                                                                                                              |
+| PRODUCER_GROUP            | String    | The producer group name in RocketMQ                                                                                                                                                                                                                  |       
+| CONSUMER_GROUP            | String    | The consumer group name in RocketMQ                                                                                                                                                                                                                  |
+| IOTDB_CONNECTION_HOST     | String    | IoTDB host, e.g. `"localhost"`                                                                                                                                                                                                                       |                                  
+| IOTDB_CONNECTION_PORT     | int       | IoTDB port, e.g. `6667`                                                                                                                                                                                                                              |
+| IOTDB_CONNECTION_USER     | String    | IoTDB username, e.g. `"root"`                                                                                                                                                                                                                        |
+| IOTDB_CONNECTION_PASSWORD | String    | IoTDB password, e.g. `"root"`                                                                                                                                                                                                                        |
+| STORAGE_GROUP             | Array     | The storage groups to create                                                                                                                                                                                                                         |
+| CREATE_TIMESERIES         | Array     | The timeseries to create <br/> Format of a single timeseries: {"timeseries", "dataType", "encodingType", "compressionType"} <br/> e.g. `{"root.vehicle.d0.s0", "INT32", "PLAIN", "SNAPPY"}`                                                          |
+| ALL_DATA                  | Array     | The data to create <br/> Format of a single data: "device,timestamp,fieldName\[:fieldName\]\*,dataType\[:dataType\]\*,value\[:value\]\*" <br/> e.g. `"root.vehicle.d0,10,s0,INT32,100"`, `"root.vehicle.d0,12,s0:s1,INT32:TEXT,101:'employeeId102'"` |
+
+Step 1: Run `RocketMQProducer.java`
+
+> This class sends data from localhost to RocketMQ. <br/>
+
+Step 2: Run `RocketMQConsumer.java`
+
+> This class consumes data from RocketMQ and sends the data to IoTDB-tree.
+
+### Case 2: Send data from localhost to IoTDB-table
+
+Files related:
+1. `RelationalConstant.java` : configuration of IoTDB and RocketMQ
+2. `RelationalRocketMQProducer.java` : send data from localhost to RocketMQ
+3. `RelationalRocketMQConsumer.java` : consume data from RocketMQ
+4. `RelationalUtils.java` : utils
+
+Step 0: Set parameter in `RelationalConstant.java`
+
+> Change the parameters according to your situation.
+
+| Parameter      | Data Type | Description                                                                                                                                                                                                                               |
+|----------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| TOPIC          | String    | The topic to store data in RocketMQ                                                                                                                                                                                                       |
+| SERVER_ADDRESS | String    | The server address of RocketMQ, e.g. `"127.0.0.1:9876"`                                                                                                                                                                                   |
+| PRODUCER_GROUP | String    | The producer group name in RocketMQ                                                                                                                                                                                                       |       
+| CONSUMER_GROUP | String    | The consumer group name in RocketMQ                                                                                                                                                                                                       |
+| IOTDB_URLS     | Array     | IoTDB urls, e.g. `{"localhost:6667"}`                                                                                                                                                                                                     |                                  
+| IOTDB_USERNAME | String    | IoTDB username, e.g. `"root"`                                                                                                                                                                                                             |
+| IOTDB_PASSWORD | String    | IoTDB password, e.g. `"root"`                                                                                                                                                                                                             |
+| DATABASES      | Array     | The databases to create                                                                                                                                                                                                                   |
+| TABLES         | Array     | The tables to create <br/> Format of a single table: {"database", "tableName", "columnNames", "columnTypes", "columnCategories"} <br/> e.g. `{"rocketmq_db1", "tb1", "time,region,status", "TIMESTAMP,STRING,BOOLEAN", "TIME,TAG,FIELD"}` |
+| ALL_DATA       | Array     | The data to create <br/> Format of a single data: "database;tableName;columnName\[,columnName\]\*;value\[,value\]\*\[;value\[,value\]\*\]\*" <br/> e.g. `"rocketmq_db1;tb1;time,status;17,true;18,false;19,true"`                         |
+
+
+Step 1: Run `RelationalRocketMQProducer.java`
+
+> This class sends data from localhost to RocketMQ.
+
+Step 2: Run `RelationalRocketMQConsumer.java`
+
+> This class consumes data from RocketMQ and sends the data to IoTDB-table.
