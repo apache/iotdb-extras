@@ -32,47 +32,53 @@ import java.nio.charset.StandardCharsets;
 
 public class RelationalRocketMQProducer {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RelationalRocketMQProducer.class);
-    private DefaultMQProducer producer;
-    private String producerGroup;
-    private String serverAddresses;
+  private static final Logger LOGGER = LoggerFactory.getLogger(RelationalRocketMQProducer.class);
+  private DefaultMQProducer producer;
+  private String producerGroup;
+  private String serverAddresses;
 
-    public RelationalRocketMQProducer(String producerGroup, String serverAddresses) {
-        this.producerGroup = producerGroup;
-        this.serverAddresses = serverAddresses;
-        producer = new DefaultMQProducer(producerGroup);
-        producer.setNamesrvAddr(serverAddresses);
-    }
+  public RelationalRocketMQProducer(String producerGroup, String serverAddresses) {
+    this.producerGroup = producerGroup;
+    this.serverAddresses = serverAddresses;
+    producer = new DefaultMQProducer(producerGroup);
+    producer.setNamesrvAddr(serverAddresses);
+  }
 
-    public static void main(String[] args) throws MQClientException, MQBrokerException, RemotingException, InterruptedException {
-        RelationalRocketMQProducer producer = new RelationalRocketMQProducer(RelationalConstant.PRODUCER_GROUP, RelationalConstant.SERVER_ADDRESS);
-        producer.start();
-        producer.sendMessage();
-        producer.shutdown();
-    }
+  public static void main(String[] args)
+      throws MQClientException, MQBrokerException, RemotingException, InterruptedException {
+    RelationalRocketMQProducer producer =
+        new RelationalRocketMQProducer(
+            RelationalConstant.PRODUCER_GROUP, RelationalConstant.SERVER_ADDRESS);
+    producer.start();
+    producer.sendMessage();
+    producer.shutdown();
+  }
 
-    public void start() throws MQClientException {
-        producer.start();
-    }
+  public void start() throws MQClientException {
+    producer.start();
+  }
 
-    public void sendMessage() throws MQBrokerException, RemotingException, InterruptedException, MQClientException {
-        for (String data : RelationalConstant.ALL_DATA) {
-            Message msg = new Message(RelationalConstant.TOPIC, null, null, (data).getBytes(StandardCharsets.UTF_8));
-            SendResult sendResult =
-                    producer.send(
-                            msg,
-                            (mqs, msg1, arg) -> {
-                                Integer id = (Integer) arg;
-                                int index = id % mqs.size();
-                                return mqs.get(index);
-                            },
-                            RelationalUtils.convertStringToInteger(RelationalUtils.getDatabaseNTable(data)));
-            String result = sendResult.toString();
-            LOGGER.info(result);
-        }
+  public void sendMessage()
+      throws MQBrokerException, RemotingException, InterruptedException, MQClientException {
+    for (String data : RelationalConstant.ALL_DATA) {
+      Message msg =
+          new Message(
+              RelationalConstant.TOPIC, null, null, (data).getBytes(StandardCharsets.UTF_8));
+      SendResult sendResult =
+          producer.send(
+              msg,
+              (mqs, msg1, arg) -> {
+                Integer id = (Integer) arg;
+                int index = id % mqs.size();
+                return mqs.get(index);
+              },
+              RelationalUtils.convertStringToInteger(RelationalUtils.getDatabaseNTable(data)));
+      String result = sendResult.toString();
+      LOGGER.info(result);
     }
+  }
 
-    public void shutdown() {
-        producer.shutdown();
-    }
+  public void shutdown() {
+    producer.shutdown();
+  }
 }

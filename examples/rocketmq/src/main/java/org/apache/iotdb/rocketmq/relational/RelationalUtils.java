@@ -21,20 +21,20 @@ package org.apache.iotdb.rocketmq.relational;
 
 public class RelationalUtils {
 
-    private RelationalUtils() {
-        throw new IllegalStateException("Utility class");
-    }
+  private RelationalUtils() {
+    throw new IllegalStateException("Utility class");
+  }
 
-    public static int convertStringToInteger(String fullTable) {
-        int sum = 0;
-        for (char c : fullTable.toCharArray()) {
-            sum += c;
-        }
-        return sum;
+  public static int convertStringToInteger(String fullTable) {
+    int sum = 0;
+    for (char c : fullTable.toCharArray()) {
+      sum += c;
     }
+    return sum;
+  }
 
-    public static String getDatabaseNTable(String data) {
-        String[] info = data.split(";");
-        return info[0] + "." + info[1];
-    }
+  public static String getDatabaseNTable(String data) {
+    String[] info = data.split(";");
+    return info[0] + "." + info[1];
+  }
 }

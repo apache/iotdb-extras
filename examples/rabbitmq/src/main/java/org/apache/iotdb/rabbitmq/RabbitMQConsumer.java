@@ -59,7 +59,8 @@ public class RabbitMQConsumer {
         createTimeseries(session, timeseries);
       }
       RabbitMQConsumer consumer = new RabbitMQConsumer();
-      Channel channel = RabbitMQChannelUtils.getChannelInstance(Constant.CONNECTION_NAME);
+      Channel channel = RabbitMQChannelUtils.getConnection().createChannel();
+      ;
       AMQP.Queue.DeclareOk declareOk =
           channel.queueDeclare(
               Constant.RABBITMQ_CONSUMER_QUEUE, true, false, false, new HashMap<>());
@@ -100,9 +101,9 @@ public class RabbitMQConsumer {
   private void insert(Session session, String data)
       throws IoTDBConnectionException, StatementExecutionException {
     try {
-        session.open();
+      session.open();
     } catch (Exception e) {
-        LOGGER.error(e.getMessage());
+      LOGGER.error(e.getMessage());
     }
     String[] dataArray = data.split(",");
     String device = dataArray[0];
