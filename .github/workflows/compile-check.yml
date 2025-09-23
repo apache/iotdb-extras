@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.java }}" -ge 17 ]; then
-            mvn clean verify -P with-springboot -P with-all-connector -P with-examples -ntp
+            mvn clean verify -P with-springboot -P with-all-connectors -P with-examples -ntp
           else
-            mvn clean verify -P with-all-connector -P with-examples -ntp
+            mvn clean verify -P with-all-connectors -P with-examples -ntp
           fi
