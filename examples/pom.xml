@@ -73,6 +73,12 @@
                 <module>spark-table</module>
             </modules>
         </profile>
+        <profile>
+          <id>with-mqtt</id>
+          <modules>
+            <module>mqtt-example</module>
+          </modules>
+        </profile>
     </profiles>
     <build>
         <pluginManagement>

@@ -37,6 +37,7 @@
         <module>distributions</module>
         <module>iotdb-collector</module>
         <module>mybatis-generator</module>
+        <module>mqtt-service</module>
     </modules>
     <properties>
         <!-- Explicitly set a variable used by all dependencies to the IoTDB dependencies, as the
@@ -183,7 +184,7 @@
         <thrift.version>0.14.1</thrift.version>
         <!-- This was the last version to support Java 8 -->
         <tomcat.version>9.0.86</tomcat.version>
-        <tsfile.version>2.1.1</tsfile.version>
+        <tsfile.version>2.2.0-251027-SNAPSHOT</tsfile.version>
         <xz.version>1.9</xz.version>
         <zeppelin.version>0.11.1</zeppelin.version>
         <zstd-jni.version>1.5.5-5</zstd-jni.version>
@@ -978,6 +979,11 @@
                 <groupId>org.apache.iotdb</groupId>
                 <artifactId>iotdb-session</artifactId>
                 <version>${iotdb.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>org.apache.iotdb</groupId>
+              <artifactId>iotdb-server</artifactId>
+              <version>${iotdb.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
