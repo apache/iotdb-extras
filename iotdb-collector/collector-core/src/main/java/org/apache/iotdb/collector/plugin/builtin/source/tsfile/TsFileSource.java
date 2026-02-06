@@ -19,7 +19,17 @@
 
 package org.apache.iotdb.collector.plugin.builtin.source.tsfile;
 
-import static org.apache.iotdb.collector.plugin.builtin.source.tsfile.TsFileSourceConstant.TS_FILE_SOURCE_DIR;
+import org.apache.iotdb.collector.plugin.api.PullSource;
+import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
+import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeTsFileInsertionEvent;
+import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
+import org.apache.iotdb.pipe.api.event.Event;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.HashSet;
@@ -29,16 +39,8 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.locks.LockSupport;
-import org.apache.iotdb.collector.plugin.api.PullSource;
-import org.apache.iotdb.collector.plugin.api.customizer.CollectorParameters;
-import org.apache.iotdb.collector.plugin.builtin.sink.event.PipeTsFileInsertionEvent;
-import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
-import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
-import org.apache.iotdb.pipe.api.event.Event;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.apache.iotdb.collector.plugin.builtin.source.tsfile.TsFileSourceConstant.TS_FILE_SOURCE_DIR;
 
 public class TsFileSource extends PullSource {
 

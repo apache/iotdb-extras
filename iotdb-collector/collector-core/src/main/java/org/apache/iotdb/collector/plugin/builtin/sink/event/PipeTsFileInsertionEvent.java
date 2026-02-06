@@ -19,13 +19,15 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.event;
 
-import java.io.File;
-import org.apache.commons.io.FileUtils;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 import org.apache.iotdb.pipe.api.exception.PipeException;
+
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
 
 public class PipeTsFileInsertionEvent extends PipeInsertionEvent implements TsFileInsertionEvent {
 
