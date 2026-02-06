@@ -21,15 +21,19 @@ package org.apache.iotdb.collector.plugin.builtin;
 
 import org.apache.iotdb.collector.plugin.builtin.processor.CommonProcessor;
 import org.apache.iotdb.collector.plugin.builtin.processor.DoNothingProcessor;
+import org.apache.iotdb.collector.plugin.builtin.processor.ReliableProcessor;
+import org.apache.iotdb.collector.plugin.builtin.processor.TsFileProcessor;
 import org.apache.iotdb.collector.plugin.builtin.sink.DemoSink;
 import org.apache.iotdb.collector.plugin.builtin.sink.protocol.IoTDBDataRegionSyncConnector;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.influxdb.InfluxDBSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTablePullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTablePushSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTreePullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTreePushSource;
 import org.apache.iotdb.collector.plugin.builtin.source.kafka.KafkaSource;
+import org.apache.iotdb.collector.plugin.builtin.source.tsfile.TsFileSource;
 
 public enum BuiltinPlugin {
 
@@ -38,19 +42,23 @@ public enum BuiltinPlugin {
   KAFKA_SOURCE("kafka-source", KafkaSource.class),
   IOTDB_SUBSCRIPTION_TREE_PUSH_SOURCE(
       "iotdb-subscription-tree-push-source", IoTDBSubscriptionTreePushSource.class),
-  IOTDB_SUBSCRIPTION_TREE_PULL_SOURCE(
-      "iotdb-subscription-tree-pull-source", IoTDBSubscriptionTreePullSource.class),
   IOTDB_SUBSCRIPTION_TABLE_PUSH_SOURCE(
       "iotdb-subscription-table-push-source", IoTDBSubscriptionTablePushSource.class),
-  IOTDB_SUBSCRIPTION_TABLE_PULL_SOURCE(
-      "iotdb-subscription-table-pull-source", IoTDBSubscriptionTablePullSource.class),
 
   // Pull Sources,
   HTTP_PULL_SOURCE("http-pull-source", HttpPullSource.class),
+  IOTDB_SUBSCRIPTION_TREE_PULL_SOURCE(
+      "iotdb-subscription-tree-pull-source", IoTDBSubscriptionTreePullSource.class),
+  IOTDB_SUBSCRIPTION_TABLE_PULL_SOURCE(
+      "iotdb-subscription-table-pull-source", IoTDBSubscriptionTablePullSource.class),
+  INFLUXDB_PULL_SOURCE("influxdb-pull-source", InfluxDBSource.class),
+  TS_FILE_SOURCE("ts-file-source", TsFileSource.class),
 
   // Processors
   DO_NOTHING_PROCESSOR("do-nothing-processor", DoNothingProcessor.class),
   COMMON_PROCESSOR("common-processor", CommonProcessor.class),
+  RELIABLE_PROCESSOR("reliable-processor", ReliableProcessor.class),
+  TS_FILE_PROCESSOR("ts-file-processor", TsFileProcessor.class),
 
   // Sinks
   IOTDB_DEMO_SINK("iotdb-demo-sink", DemoSink.class),

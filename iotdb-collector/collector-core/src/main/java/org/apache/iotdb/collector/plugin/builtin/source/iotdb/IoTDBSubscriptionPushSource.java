@@ -127,7 +127,11 @@ public abstract class IoTDBSubscriptionPushSource extends PushSource {
         try {
           markPausePosition();
 
-          supply(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
+          supply(
+              new PipeRawTabletInsertionEvent(
+                  dataSet.getTablet(),
+                  isAligned,
+                  tableModelDatabaseName != null ? tableModelDatabaseName : deviceId));
         } catch (final Exception e) {
           LOGGER.warn("Error occurred when supply event, because {}", e.getMessage());
           return ConsumeResult.FAILURE;

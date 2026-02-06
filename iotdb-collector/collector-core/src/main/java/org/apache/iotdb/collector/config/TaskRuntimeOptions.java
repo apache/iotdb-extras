@@ -26,19 +26,27 @@ public class TaskRuntimeOptions extends Options {
   //////////////////////////// Param from rest request ////////////////////////////
 
   public static final String TASK_SOURCE_PARALLELISM_NUM_KEY = "source-parallelism-num";
-  public static final Integer TASK_SOURCE_PARALLELISM_NUM_DEFAULT_VALUE = 4;
+  public static final Integer TASK_SOURCE_PARALLELISM_NUM_DEFAULT_VALUE = 1;
 
   public static final String TASK_PROCESSOR_PARALLELISM_NUM_KEY = "processor-parallelism-num";
-  public static final Integer TASK_PROCESSOR_PARALLELISM_NUM_DEFAULT_VALUE = 4;
+  public static final Integer TASK_PROCESSOR_PARALLELISM_NUM_DEFAULT_VALUE = 1;
 
   public static final String TASK_SINK_PARALLELISM_NUM_KEY = "sink-parallelism-num";
-  public static final Integer TASK_SINK_PARALLELISM_NUM_DEFAULT_VALUE = 4;
+  public static final Integer TASK_SINK_PARALLELISM_NUM_DEFAULT_VALUE = 1;
 
   public static final String TASK_PROCESSOR_RING_BUFFER_SIZE_KEY = "processor-ring-buffer-size";
-  public static final Integer TASK_PROCESSOR_RING_BUFFER_SIZE_DEFAULT_VALUE = 1024;
+  public static final Integer TASK_PROCESSOR_RING_BUFFER_SIZE_DEFAULT_VALUE = 4096;
+
+  public static final String TASK_PROCESSOR_RING_BUFFER_ENTRY_SIZE_IN_BYTES_KEY =
+      "processor-ring-buffer-entry-size-in-bytes";
+  public static final Long TASK_PROCESSOR_RING_BUFFER_ENTRY_SIZE_DEFAULT_VALUE = 50L;
 
   public static final String TASK_SINK_RING_BUFFER_SIZE_KEY = "sink-ring-buffer-size";
-  public static final Integer TASK_SINK_RING_BUFFER_SIZE_DEFAULT_VALUE = 1024;
+  public static final Integer TASK_SINK_RING_BUFFER_SIZE_DEFAULT_VALUE = 4096;
+
+  public static final String TASK_SINK_RING_BUFFER_ENTRY_SIZE_IN_BYTES_KEY =
+      "sink-ring-buffer-entry-size-in-bytes";
+  public static final Long TASK_SINK_RING_BUFFER_ENTRY_SIZE_DEFAULT_VALUE = 50L;
 
   //////////////////////////// Param from application.properties ////////////////////////////
 
@@ -65,6 +73,16 @@ public class TaskRuntimeOptions extends Options {
         @Override
         public void setValue(String valueString) {
           value = Integer.parseInt(valueString);
+        }
+      };
+
+  public static final Option<String> RELIABLE_FILE_STORAGE_DIR =
+      new Option<String>(
+          "reliable_file_storage_dir",
+          "system" + File.separator + "pipe" + File.separator + "temp") {
+        @Override
+        public void setValue(String valueString) {
+          value = addHomeDir(valueString);
         }
       };
 }

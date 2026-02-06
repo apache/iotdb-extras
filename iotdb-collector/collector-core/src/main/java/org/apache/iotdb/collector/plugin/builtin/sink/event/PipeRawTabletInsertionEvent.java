@@ -42,19 +42,18 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
   protected Tablet tablet;
   private final boolean isAligned;
 
-  private final boolean isTableMod;
-
-  public PipeRawTabletInsertionEvent(final Tablet tablet, final boolean isAligned) {
+  public PipeRawTabletInsertionEvent(
+      final Tablet tablet, final boolean isAligned, final String tableModeDatabaseName) {
     this.tablet = tablet;
     this.isAligned = isAligned;
 
-    this.isTableMod = tablet.getTableName() != null;
+    this.sourceDatabaseNameFromDataRegion = tableModeDatabaseName;
   }
 
   @Override
   public Iterable<TabletInsertionEvent> processRowByRow(
       final BiConsumer<Row, RowCollector> consumer) {
-    if (isTableMod) {
+    if (isTableModelEvent) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.warn("TablePatternParser does not support row by row processing");
       }
@@ -74,7 +73,7 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
       valueColumnTypes[i] = schemas[i].getType();
     }
 
-    final PipeRowCollector rowCollector = new PipeRowCollector();
+    final PipeRowCollector rowCollector = new PipeRowCollector(sourceDatabaseNameFromDataRegion);
     for (int i = 0; i < tablet.getTimestamps().length; i++) {
       consumer.accept(
           new PipeRow(
@@ -96,7 +95,7 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
   @Override
   public Iterable<TabletInsertionEvent> processTablet(
       final BiConsumer<Tablet, RowCollector> consumer) {
-    if (isTableMod) {
+    if (isTableModelEvent) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.warn("TablePatternParser does not support tablet processing");
       }
@@ -104,7 +103,7 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
       return Collections.emptyList();
     }
 
-    final PipeRowCollector rowCollector = new PipeRowCollector();
+    final PipeRowCollector rowCollector = new PipeRowCollector(sourceDatabaseNameFromDataRegion);
     consumer.accept(convertToTablet(), rowCollector);
     return rowCollector.convertToTabletInsertionEvents();
   }

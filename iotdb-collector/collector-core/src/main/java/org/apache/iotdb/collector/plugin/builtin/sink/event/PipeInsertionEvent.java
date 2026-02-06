@@ -30,6 +30,12 @@ public abstract class PipeInsertionEvent {
   protected String tableModelDatabaseName;
 
   public boolean isTableModelEvent() {
+    if (isTableModelEvent == null) {
+      if (sourceDatabaseNameFromDataRegion == null) {
+        throw new IllegalStateException("databaseNameFromDataRegion is null");
+      }
+      return isTableModelEvent = PathUtils.isTableModelDatabase(sourceDatabaseNameFromDataRegion);
+    }
     return isTableModelEvent;
   }
 

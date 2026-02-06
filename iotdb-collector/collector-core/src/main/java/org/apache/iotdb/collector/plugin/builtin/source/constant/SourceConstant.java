@@ -35,6 +35,8 @@ public class SourceConstant {
   public static final String SOURCE_DEVICE_ID_KEY = "device-id";
   public static final String SOURCE_DEVICE_ID_DEFAULT_VALUE = "root.test";
 
+  public static final String SOURCE_TABLE_MODEL_DATABASE_NAME_KEY = "database-name";
+
   public static final String SOURCE_SQL_DIALECT_KEY = "sql-dialect";
   public static final String SOURCE_SQL_DIALECT_TREE_VALUE = "tree";
   public static final String SOURCE_SQL_DIALECT_TABLE_VALUE = "table";

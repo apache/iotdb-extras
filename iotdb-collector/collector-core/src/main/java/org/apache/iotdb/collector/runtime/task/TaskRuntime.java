@@ -81,7 +81,8 @@ public class TaskRuntime implements AutoCloseable {
 
       tasks.put(taskId, taskCombiner);
 
-      // storage task info to sqlite
+      // storage task info to sqlite,
+      // if the task was created after a restart, then this is not necessary.
       if (isRestRequest) {
         PersistenceService.task()
             .ifPresent(

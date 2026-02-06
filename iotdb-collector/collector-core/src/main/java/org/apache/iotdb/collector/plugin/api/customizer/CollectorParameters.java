@@ -33,7 +33,7 @@ public class CollectorParameters {
       final PipeParameterValidator validator, final String paramKey) {
     validator.validate(
         o -> Objects.nonNull(validator.getParameters().getString((String) o)),
-        String.format("%s is required, but git null.", paramKey),
+        String.format("%s is required, but get null.", paramKey),
         paramKey);
   }
 

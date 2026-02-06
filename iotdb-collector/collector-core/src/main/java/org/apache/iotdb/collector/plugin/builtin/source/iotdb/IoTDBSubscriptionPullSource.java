@@ -119,7 +119,11 @@ public abstract class IoTDBSubscriptionPullSource extends PullSource {
       for (final SubscriptionMessage message : messages) {
         for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
           try {
-            eventQueue.put(new PipeRawTabletInsertionEvent(dataSet.getTablet(), isAligned));
+            eventQueue.put(
+                new PipeRawTabletInsertionEvent(
+                    dataSet.getTablet(),
+                    isAligned,
+                    tableModelDatabaseName != null ? tableModelDatabaseName : deviceId));
           } catch (final InterruptedException e) {
             LOGGER.warn("{} thread interrupted", getPullConsumerThreadName(), e);
             Thread.currentThread().interrupt();

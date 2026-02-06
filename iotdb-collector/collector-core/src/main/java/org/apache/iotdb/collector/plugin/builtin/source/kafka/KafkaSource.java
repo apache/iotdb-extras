@@ -301,7 +301,9 @@ public class KafkaSource extends PushSource {
         tablet.setRowSize(values.length);
         tablet.setValues(values);
 
-        final PipeRawTabletInsertionEvent event = new PipeRawTabletInsertionEvent(tablet, false);
+        final PipeRawTabletInsertionEvent event =
+            new PipeRawTabletInsertionEvent(
+                tablet, false, tableModelDatabaseName != null ? tableModelDatabaseName : deviceId);
         try {
           supply(event);
         } catch (final Exception e) {

@@ -20,6 +20,7 @@
 package org.apache.iotdb.collector.runtime.task.sink;
 
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorSinkRuntimeConfiguration;
+import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryManager;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
@@ -42,6 +43,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_PARALLELISM_NUM_KEY;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_RING_BUFFER_ENTRY_SIZE_DEFAULT_VALUE;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_RING_BUFFER_ENTRY_SIZE_IN_BYTES_KEY;
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_RING_BUFFER_SIZE_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SINK_RING_BUFFER_SIZE_KEY;
 
@@ -64,6 +67,21 @@ public class SinkTask extends Task {
             ? Integer.parseInt(attributes.get(TASK_SINK_PARALLELISM_NUM_KEY))
             : TASK_SINK_PARALLELISM_NUM_DEFAULT_VALUE);
 
+    final Integer taskSinkRingBufferSize =
+        attributes.containsKey(TASK_SINK_RING_BUFFER_SIZE_KEY)
+            ? Integer.valueOf(attributes.get(TASK_SINK_RING_BUFFER_SIZE_KEY))
+            : TASK_SINK_RING_BUFFER_SIZE_DEFAULT_VALUE;
+    final Long taskSinkRingBufferEntrySizeInBytes =
+        attributes.containsKey(TASK_SINK_RING_BUFFER_SIZE_KEY)
+            ? Long.valueOf(attributes.get(TASK_SINK_RING_BUFFER_ENTRY_SIZE_IN_BYTES_KEY))
+            : TASK_SINK_RING_BUFFER_ENTRY_SIZE_DEFAULT_VALUE;
+
+    allocateMemoryBlock =
+        PipeMemoryManager.getInstance()
+            .tryAllocate(
+                taskSinkRingBufferSize * taskSinkRingBufferEntrySizeInBytes,
+                currentSize -> currentSize / 2);
+
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
         new ThreadPoolExecutor(
@@ -71,14 +89,16 @@ public class SinkTask extends Task {
             parallelism,
             0L,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(parallelism))); // TODO: thread name
+            new LinkedBlockingQueue<>(TASK_QUEUE_CAPACITY))); // TODO: thread name
 
     disruptor =
         new Disruptor<>(
             EventContainer::new,
-            attributes.containsKey(TASK_SINK_RING_BUFFER_SIZE_KEY)
-                ? Integer.parseInt(attributes.get(TASK_SINK_RING_BUFFER_SIZE_KEY))
-                : TASK_SINK_RING_BUFFER_SIZE_DEFAULT_VALUE,
+            Math.max(
+                32,
+                Math.toIntExact(
+                    allocateMemoryBlock.getMemoryUsageInBytes()
+                        / taskSinkRingBufferEntrySizeInBytes)),
             REGISTERED_EXECUTOR_SERVICES.get(taskId),
             ProducerType.MULTI,
             new BlockingWaitStrategy());

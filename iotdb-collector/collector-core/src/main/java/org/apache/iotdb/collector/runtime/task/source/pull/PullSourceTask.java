@@ -80,7 +80,7 @@ public class PullSourceTask extends SourceTask {
             parallelism,
             0L,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(parallelism))); // TODO: thread name
+            new LinkedBlockingQueue<>(TASK_QUEUE_CAPACITY))); // TODO: thread name
 
     final long creationTime = System.currentTimeMillis();
     consumers = new PullSourceConsumer[parallelism];

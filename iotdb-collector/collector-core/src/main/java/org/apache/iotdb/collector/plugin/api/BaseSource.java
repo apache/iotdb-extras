@@ -38,13 +38,16 @@ import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceCo
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_REPORT_TIME_INTERVAL_KEY;
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_SQL_DIALECT_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_SQL_DIALECT_KEY;
+import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_SQL_DIALECT_TABLE_VALUE;
 import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_SQL_DIALECT_VALUE_SET;
+import static org.apache.iotdb.collector.plugin.builtin.source.constant.SourceConstant.SOURCE_TABLE_MODEL_DATABASE_NAME_KEY;
 
 public abstract class BaseSource implements PipeSource {
 
   protected ProgressIndex startIndex;
   protected int instanceIndex;
 
+  protected String tableModelDatabaseName;
   protected String deviceId;
   protected Boolean isAligned;
   protected String sqlDialect;
@@ -52,6 +55,12 @@ public abstract class BaseSource implements PipeSource {
 
   @Override
   public void validate(final PipeParameterValidator validator) throws Exception {
+    if (SOURCE_SQL_DIALECT_TABLE_VALUE.equals(
+        validator.getParameters().getString(SOURCE_SQL_DIALECT_KEY))) {
+      CollectorParameters.validateStringRequiredParam(
+          validator, SOURCE_TABLE_MODEL_DATABASE_NAME_KEY);
+    }
+
     CollectorParameters.validateBooleanParam(
         validator, SOURCE_IS_ALIGNED_KEY, SOURCE_IS_ALIGNED_DEFAULT_VALUE);
 
@@ -85,6 +94,7 @@ public abstract class BaseSource implements PipeSource {
     instanceIndex =
         ((CollectorRuntimeEnvironment) pipeSourceRuntimeConfiguration.getRuntimeEnvironment())
             .getInstanceIndex();
+    tableModelDatabaseName = pipeParameters.getString(SOURCE_TABLE_MODEL_DATABASE_NAME_KEY);
   }
 
   @Override

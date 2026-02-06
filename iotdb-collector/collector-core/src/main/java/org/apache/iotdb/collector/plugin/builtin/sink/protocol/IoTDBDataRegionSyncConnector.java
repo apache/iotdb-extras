@@ -350,6 +350,7 @@ public class IoTDBDataRegionSyncConnector extends IoTDBSslSyncConnector {
     }
 
     LOGGER.info("Successfully transferred file {}.", tsFile);
+    FileUtils.delete(tsFile);
   }
 
   @Override

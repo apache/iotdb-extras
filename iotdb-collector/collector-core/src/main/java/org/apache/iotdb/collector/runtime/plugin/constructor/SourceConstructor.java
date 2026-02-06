@@ -24,6 +24,7 @@ import org.apache.iotdb.collector.plugin.api.PushSource;
 import org.apache.iotdb.collector.plugin.builtin.BuiltinPlugin;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.HttpPushSource;
+import org.apache.iotdb.collector.plugin.builtin.source.influxdb.InfluxDBSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTablePullSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTablePushSource;
 import org.apache.iotdb.collector.plugin.builtin.source.iotdb.IoTDBSubscriptionTreePullSource;
@@ -56,6 +57,7 @@ public class SourceConstructor extends PluginConstructor {
         BuiltinPlugin.IOTDB_SUBSCRIPTION_TABLE_PUSH_SOURCE.getPluginName(),
         IoTDBSubscriptionTablePullSource::new);
     pluginConstructors.put(BuiltinPlugin.KAFKA_SOURCE.getPluginName(), KafkaSource::new);
+    pluginConstructors.put(BuiltinPlugin.INFLUXDB_PULL_SOURCE.getPluginName(), InfluxDBSource::new);
   }
 
   @Override

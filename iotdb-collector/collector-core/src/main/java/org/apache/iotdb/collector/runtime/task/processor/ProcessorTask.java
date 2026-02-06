@@ -22,6 +22,7 @@ package org.apache.iotdb.collector.runtime.task.processor;
 import org.apache.iotdb.collector.config.TaskRuntimeOptions;
 import org.apache.iotdb.collector.plugin.api.customizer.CollectorProcessorRuntimeConfiguration;
 import org.apache.iotdb.collector.plugin.api.event.PeriodicalEvent;
+import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryManager;
 import org.apache.iotdb.collector.runtime.plugin.PluginRuntime;
 import org.apache.iotdb.collector.runtime.task.Task;
 import org.apache.iotdb.collector.runtime.task.event.EventCollector;
@@ -45,6 +46,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_PARALLELISM_NUM_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_PARALLELISM_NUM_KEY;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_ENTRY_SIZE_DEFAULT_VALUE;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_ENTRY_SIZE_IN_BYTES_KEY;
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE_DEFAULT_VALUE;
 import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_PROCESSOR_RING_BUFFER_SIZE_KEY;
 
@@ -71,6 +74,21 @@ public class ProcessorTask extends Task {
             ? Integer.parseInt(attributes.get(TASK_PROCESSOR_PARALLELISM_NUM_KEY))
             : TASK_PROCESSOR_PARALLELISM_NUM_DEFAULT_VALUE);
 
+    final Integer taskProcessorRingBufferSize =
+        attributes.containsKey(TASK_PROCESSOR_RING_BUFFER_SIZE_KEY)
+            ? Integer.valueOf(attributes.get(TASK_PROCESSOR_RING_BUFFER_SIZE_KEY))
+            : TASK_PROCESSOR_RING_BUFFER_SIZE_DEFAULT_VALUE;
+    final Long taskProcessorRingBufferEntrySizeInBytes =
+        attributes.containsKey(TASK_PROCESSOR_RING_BUFFER_SIZE_KEY)
+            ? Long.valueOf(attributes.get(TASK_PROCESSOR_RING_BUFFER_ENTRY_SIZE_IN_BYTES_KEY))
+            : TASK_PROCESSOR_RING_BUFFER_ENTRY_SIZE_DEFAULT_VALUE;
+
+    allocateMemoryBlock =
+        PipeMemoryManager.getInstance()
+            .tryAllocate(
+                taskProcessorRingBufferSize * taskProcessorRingBufferEntrySizeInBytes,
+                currentSize -> currentSize / 2);
+
     REGISTERED_EXECUTOR_SERVICES.putIfAbsent(
         taskId,
         new ThreadPoolExecutor(
@@ -78,14 +96,16 @@ public class ProcessorTask extends Task {
             parallelism,
             0L,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(parallelism))); // TODO: thread name
+            new LinkedBlockingQueue<>(TASK_QUEUE_CAPACITY))); // TODO: thread name
 
     disruptor =
         new Disruptor<>(
             EventContainer::new,
-            attributes.containsKey(TASK_PROCESSOR_RING_BUFFER_SIZE_KEY)
-                ? Integer.parseInt(attributes.get(TASK_PROCESSOR_RING_BUFFER_SIZE_KEY))
-                : TASK_PROCESSOR_RING_BUFFER_SIZE_DEFAULT_VALUE,
+            Math.max(
+                32,
+                Math.toIntExact(
+                    allocateMemoryBlock.getMemoryUsageInBytes()
+                        / taskProcessorRingBufferEntrySizeInBytes)),
             REGISTERED_EXECUTOR_SERVICES.get(taskId),
             ProducerType.MULTI,
             new BlockingWaitStrategy());
