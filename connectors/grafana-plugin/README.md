@@ -123,6 +123,27 @@ Select a time series in the TIME-SERIES selection box, select a function in the 
 
 Both SQL: Full Customized and SQL: Drop-down List input methods support the variable and template functions of grafana. In the following example, raw input method is used, and aggregation is similar.
 
+##### Multi-value variable expansion in FROM (prefixPath)
+
+When a multi-value template variable is used in the FROM input box (prefixPath), the plugin automatically expands it into multiple paths. This enables the common "global variable filter" pattern where a single dashboard dropdown controls all panels.
+
+For example, define a multi-select variable `device` with values `device1`, `device2`, ..., `device8`. Then in the FROM input box, enter:
+
+```
+root.application.${device}
+```
+
+When the user selects `device1` and `device2`, the plugin internally expands this to:
+
+```
+root.application.device1
+root.application.device2
+```
+
+Only the selected devices are queried from IoTDB — no client-side filtering or transformations needed.
+
+This works with any number of prefixPath entries. Literal paths (without variables) and single-value variables behave the same as before.
+
 After creating a new Panel, click the Settings button in the upper right corner:
 
 <img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/setconf.png?raw=true">

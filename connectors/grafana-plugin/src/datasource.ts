@@ -30,16 +30,70 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
     this.username = instanceSettings.jsonData.username;
   }
   applyTemplateVariables(query: IoTDBQuery, scopedVars: ScopedVars) {
-    if (query.sqlType === 'SQL: Full Customized') {
+    if (!query.sqlType || query.sqlType === 'SQL: Full Customized') {
       if (query.expression) {
         query.expression.map(
           (_, index) => (query.expression[index] = getTemplateSrv().replace(query.expression[index], scopedVars))
         );
       }
       if (query.prefixPath) {
-        query.prefixPath.map(
-          (_, index) => (query.prefixPath[index] = getTemplateSrv().replace(query.prefixPath[index], scopedVars))
-        );
+        const expanded: string[] = [];
+        const templateSrv = getTemplateSrv();
+        const varPattern = /\$\{(\w+)(?::[^}]*)?\}|\$(\w+)\b/;
+        for (const path of query.prefixPath) {
+          if (varPattern.test(path)) {
+            const varMatch = path.match(/\$\{(\w+)(?::[^}]*)?\}|\$(\w+)\b/);
+            if (varMatch) {
+              const varName = varMatch[1] || varMatch[2];
+              const idx = varMatch.index!;
+              const prefix = path.substring(0, idx);
+              const suffix = path.substring(idx + varMatch[0].length);
+              let values: string[] = [];
+              if (scopedVars && scopedVars[varName]) {
+                const val = scopedVars[varName].value;
+                values = Array.isArray(val) ? val : [String(val)];
+              } else {
+                const allVars = templateSrv.getVariables() as any[];
+                const found = allVars.find((v: any) => v.name === varName);
+                if (found) {
+                  const current = found.current;
+                  if (current) {
+                    if (Array.isArray(current.value)) {
+                      values = current.value.filter((v: string) => v !== '$__all');
+                      if (values.length === 0 && found.options) {
+                        values = found.options
+                          .filter((o: any) => o.value !== '$__all')
+                          .map((o: any) => o.value);
+                      }
+                    } else if (current.value === '$__all') {
+                      if (found.options) {
+                        values = found.options
+                          .filter((o: any) => o.value !== '$__all')
+                          .map((o: any) => o.value);
+                      }
+                    } else {
+                      values = [current.value];
+                    }
+                  }
+                }
+                if (values.length === 0) {
+                  values = [templateSrv.replace(varMatch[0], scopedVars)];
+                }
+              }
+              const resolvedSuffix = suffix && varPattern.test(suffix)
+                ? templateSrv.replace(suffix, scopedVars)
+                : suffix;
+              for (const val of values) {
+                expanded.push(prefix + val + resolvedSuffix);
+              }
+            } else {
+              expanded.push(templateSrv.replace(path, scopedVars));
+            }
+          } else {
+            expanded.push(path);
+          }
+        }
+        query.prefixPath = expanded;
       }
      
       if (query.condition) {
