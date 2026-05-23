@@ -51,7 +51,17 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
               let values: string[] = [];
               if (scopedVars && scopedVars[varName]) {
                 const val = scopedVars[varName].value;
-                values = Array.isArray(val) ? val : [String(val)];
+                if (val === '$__all') {
+                  const allVars = templateSrv.getVariables() as any[];
+                  const found = allVars.find((v: any) => v.name === varName);
+                  if (found && found.options) {
+                    values = found.options
+                      .filter((o: any) => o.value !== '$__all')
+                      .map((o: any) => o.value);
+                  }
+                } else {
+                  values = Array.isArray(val) ? val : [String(val)];
+                }
               } else {
                 const allVars = templateSrv.getVariables() as any[];
                 const found = allVars.find((v: any) => v.name === varName);
@@ -77,7 +87,8 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
                   }
                 }
                 if (values.length === 0) {
-                  values = [templateSrv.replace(varMatch[0], scopedVars)];
+                  expanded.push(templateSrv.replace(path, scopedVars));
+                  continue;
                 }
               }
               const resolvedSuffix = suffix && varPattern.test(suffix)

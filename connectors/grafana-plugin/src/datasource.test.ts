@@ -176,6 +176,35 @@ describe('DataSource', () => {
       expect(result.prefixPath).toEqual(['root.app.dev1', 'root.app.dev2']);
     });
 
+    it('should expand $__all from scopedVars using options list', () => {
+      mockContainsTemplate.mockReturnValue(true);
+      mockGetVariables.mockReturnValue([
+        {
+          name: 'device',
+          current: { value: '$__all' },
+          options: [{ value: '$__all' }, { value: 'device1' }, { value: 'device2' }, { value: 'device3' }],
+        },
+      ]);
+      const scoped: ScopedVars = { device: { text: 'All', value: '$__all' } } as any;
+      const query = { ...baseQuery, prefixPath: ['root.app.${device}'] } as IoTDBQuery;
+
+      const result = ds.applyTemplateVariables(query, scoped);
+
+      expect(result.prefixPath).toEqual(['root.app.device1', 'root.app.device2', 'root.app.device3']);
+    });
+
+    it('should fallback to replace whole path when variable cannot be resolved', () => {
+      mockContainsTemplate.mockReturnValue(true);
+      mockGetVariables.mockReturnValue([]);
+      mockReplace.mockReturnValue('root.app.unknown');
+      const query = { ...baseQuery, prefixPath: ['root.app.${missing}'] } as IoTDBQuery;
+
+      const result = ds.applyTemplateVariables(query, scopedVars);
+
+      expect(result.prefixPath).toEqual(['root.app.unknown']);
+      expect(mockReplace).toHaveBeenCalledWith('root.app.${missing}', scopedVars);
+    });
+
     it('should still replace condition and control fields', () => {
       mockContainsTemplate.mockReturnValue(false);
       mockReplace.mockImplementation((v: string) => v.replace('${threshold}', '100'));
