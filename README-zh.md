@@ -61,7 +61,9 @@ IoTDB (物联网数据库) 是一个专为物联网 (IoT) 场景设计的时序�
 
 5. **MyBatis 生成器**：数据库访问代码生成工具
 
-6. **示例**：展示 IoTDB 与各种技术结合使用的示例应用程序和代码示例
+6. **Metric Scrape**：用于 IoTDB 表模型的独立 Prometheus 文本格式指标抓取工具
+
+7. **示例**：展示 IoTDB 与各种技术结合使用的示例应用程序和代码示例
 
 ## 环境要求
 
@@ -83,7 +85,7 @@ IoTDB (物联网数据库) 是一个专为物联网 (IoT) 场景设计的时序�
 2. 使用 Maven 构建项目：
 
    ```bash
-   # 构建整个项目（包括 distributions、iotdb-collector、mybatis-generator）
+   # 构建整个项目（包括 distributions、iotdb-collector、metric-scrape、mybatis-generator）
    mvn clean package -DskipTests
 
    # 或者构建所有组件
@@ -310,6 +312,7 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 - [Flink IoTDB 连接器](/connectors/flink-iotdb-connector/README.md)
 - [Grafana 插件](/connectors/grafana-plugin/README.md)
 - [IoTDB Spring Boot Starter](/iotdb-spring-boot-starter/README.md)
+- [Metric Scrape](/metric-scrape/README.md)
 - [Kubernetes Helm Charts](/helm/README.md)
 - [IoTDB Operator](/iotdb-operator/README.md)
 

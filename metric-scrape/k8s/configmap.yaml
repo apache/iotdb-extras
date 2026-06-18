@@ -1,0 +1,60 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metric-scrape-config
+  namespace: default
+  labels:
+    app.kubernetes.io/name: metric-scrape
+    app.kubernetes.io/part-of: iotdb-monitoring
+data:
+  metric-scrape.yml: |
+    global:
+      scrape_interval: 30s
+      scrape_timeout: 10s
+      iotdb_database: 'metrics'
+      iotdb_username: 'root'
+      iotdb_password: 'root'
+      iotdb_urls: ['iotdb-service.default.svc.cluster.local:6667']
+
+    scrape_configs:
+      - job_name: 'iotdbModel'
+        metrics_path: /metrics
+        static_configs:
+          - targets: ['model-service.default.svc.cluster.local:9090']
+        relabel_configs:
+          - target_label: k8s_cluster
+            replacement: example-cluster
+          - target_label: k8s_namespace
+            replacement: default
+          - target_label: instance_id
+            replacement: model-service
+
+      - job_name: 'iotdbWeb'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['web-service.default.svc.cluster.local:8080']
+            labels: {env: example, instance_id: web-service}
+        relabel_configs:
+          - target_label: k8s_cluster
+            replacement: example-cluster
+          - target_label: k8s_namespace
+            replacement: default

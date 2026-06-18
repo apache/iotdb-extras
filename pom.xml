@@ -36,6 +36,7 @@
         <module>connectors</module>
         <module>distributions</module>
         <module>iotdb-collector</module>
+        <module>metric-scrape</module>
         <module>mybatis-generator</module>
     </modules>
     <properties>
