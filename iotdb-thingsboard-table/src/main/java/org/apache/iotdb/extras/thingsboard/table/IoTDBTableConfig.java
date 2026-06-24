@@ -113,8 +113,18 @@ public class IoTDBTableConfig {
     @Min(1)
     private long shutdownDrainTimeoutMs = 5000L;
 
+    /**
+     * Number of dedicated flush workers. The writer uses a single drain/flush worker by design, so
+     * this is fixed at 1. It is surfaced as validated config (constrained to exactly 1) so an
+     * operator who tries to raise it gets a clear, fail-fast binding error rather than a silently
+     * ignored setting.
+     */
     @Min(1)
-    @Max(1)
+    @Max(
+        value = 1,
+        message =
+            "iotdb.ts.save.flush-threads is fixed at 1 (the writer uses a single dedicated flush"
+                + " worker)")
     private int flushThreads = 1;
 
     @Min(1)

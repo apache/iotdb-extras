@@ -440,7 +440,10 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
             ? defaultTtlSeconds
             : (defaultTtlSeconds > 0L ? Math.min(defaultTtlSeconds, ttl) : ttl);
     long ttlDays = Math.max(1L, effectiveTtlSeconds / SECONDS_PER_DAY);
-    return Math.toIntExact((long) tsKvEntry.getDataPoints() * ttlDays);
+    // Saturate at Integer.MAX_VALUE rather than throwing: a data-point-day accounting overflow must
+    // never fail an otherwise-valid telemetry write. dataPoints and ttlDays are both >= 0 here.
+    long dataPointDays = (long) tsKvEntry.getDataPoints() * ttlDays;
+    return dataPointDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) dataPointDays;
   }
 
   private Object typedValue(TsKvEntry tsKvEntry) {

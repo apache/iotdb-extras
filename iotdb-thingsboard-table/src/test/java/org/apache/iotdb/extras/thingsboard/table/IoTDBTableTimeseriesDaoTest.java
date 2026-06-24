@@ -18,11 +18,13 @@
 
 package org.apache.iotdb.extras.thingsboard.table;
 
+import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.rpc.IoTDBConnectionException;
 import org.apache.iotdb.rpc.StatementExecutionException;
+import org.apache.iotdb.rpc.TSStatusCode;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.tsfile.enums.ColumnCategory;
@@ -367,6 +369,55 @@ class IoTDBTableTimeseriesDaoTest {
   void save_doesNotRetryStatementExecutionExceptionAndFailsWholeBatch() throws Exception {
     TestContext context = newContext(config(2, 1000L, 100), true);
     doThrow(new StatementExecutionException("bad statement"))
+        .when(context.session())
+        .insert(any(Tablet.class));
+
+    ListenableFuture<Integer> first =
+        context.dao().save(TENANT_ID, ENTITY_ID, entry(1L, "first", DataType.LONG, 1L), 0);
+    ListenableFuture<Integer> second =
+        context.dao().save(TENANT_ID, ENTITY_ID, entry(2L, "second", DataType.LONG, 2L), 0);
+
+    assertFutureFailsWith(first, StatementExecutionException.class);
+    assertFutureFailsWith(second, StatementExecutionException.class);
+    verify(context.session(), timeout(3000).times(1)).insert(any(Tablet.class));
+    assertEquals(0, context.dao().stats().retries());
+    assertEquals(1, context.dao().stats().flushFailures());
+  }
+
+  @Test
+  void save_retriesTransientStatementExecutionExceptionThenFailsAfterExhaustingAttempts()
+      throws Exception {
+    // A transient server-side status code (WRITE_PROCESS_REJECT) is retried up to
+    // retryMaxAttempts. Every attempt keeps failing, so the batch ultimately surfaces a failure
+    // after the whole retry budget is spent: insert is called retryMaxAttempts times.
+    IoTDBTableConfig config = config(2, 1000L, 100);
+    config.getTs().getSave().setRetryMaxAttempts(3);
+    TestContext context = newContext(config, true);
+    doThrow(statementExecutionException(TSStatusCode.WRITE_PROCESS_REJECT))
+        .when(context.session())
+        .insert(any(Tablet.class));
+
+    ListenableFuture<Integer> first =
+        context.dao().save(TENANT_ID, ENTITY_ID, entry(1L, "first", DataType.LONG, 1L), 0);
+    ListenableFuture<Integer> second =
+        context.dao().save(TENANT_ID, ENTITY_ID, entry(2L, "second", DataType.LONG, 2L), 0);
+
+    assertFutureFailsWith(first, StatementExecutionException.class);
+    assertFutureFailsWith(second, StatementExecutionException.class);
+    verify(context.session(), timeout(3000).times(3)).insert(any(Tablet.class));
+    assertEquals(2, context.dao().stats().retries());
+    assertEquals(1, context.dao().stats().flushFailures());
+  }
+
+  @Test
+  void save_failsFastOnPermanentStatementExecutionExceptionWithoutRetrying() throws Exception {
+    // A non-transient status code (EXECUTE_STATEMENT_ERROR is a semantic/permanent failure, not in
+    // the transient set) must NOT be retried even though retryMaxAttempts > 1: insert is called
+    // exactly once and the batch fails fast.
+    IoTDBTableConfig config = config(2, 1000L, 100);
+    config.getTs().getSave().setRetryMaxAttempts(3);
+    TestContext context = newContext(config, true);
+    doThrow(statementExecutionException(TSStatusCode.EXECUTE_STATEMENT_ERROR))
         .when(context.session())
         .insert(any(Tablet.class));
 
@@ -1232,6 +1283,13 @@ class IoTDBTableTimeseriesDaoTest {
     when(iterator.getTimestamp("time"))
         .thenAnswer(invocation -> new Timestamp(rows[index.get()].ts()));
     return dataSet;
+  }
+
+  private StatementExecutionException statementExecutionException(TSStatusCode code) {
+    // The (TSStatus) constructor is the only way to carry a specific status code into the
+    // exception; getStatusCode() reads it back. The TSStatus message is left unset so the
+    // retry classification is driven by the code, not by any message wording.
+    return new StatementExecutionException(new TSStatus(code.getStatusCode()));
   }
 
   private IoTDBTablePendingSave pendingSave(long ts, String key) {

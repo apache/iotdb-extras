@@ -22,6 +22,7 @@ import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.rpc.IoTDBConnectionException;
 import org.apache.iotdb.rpc.StatementExecutionException;
+import org.apache.iotdb.rpc.TSStatusCode;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -449,9 +450,38 @@ public class IoTDBTableTimeseriesWriter implements DisposableBean {
         retries.incrementAndGet();
         sleepBeforeRetry(backoffMs);
         backoffMs = nextBackoffMs(backoffMs);
+      } catch (StatementExecutionException e) {
+        // No `inserted` guard here (unlike the IoTDBConnectionException path): insert(tablet) is
+        // the
+        // only statement in the try block that can raise StatementExecutionException — session
+        // acquisition and close() raise only IoTDBConnectionException — so reaching this catch
+        // always
+        // means the insert itself failed and nothing was persisted.
+        // Only transient server-side conditions (overload / timeout / dispatch / retryable) are
+        // worth retrying; semantic failures (parse / type / schema) are permanent, so fail fast
+        // instead of burning the whole retry budget on a request that can never succeed.
+        if (!isTransient(e.getStatusCode()) || attempt >= retryMaxAttempts) {
+          throw e;
+        }
+        retries.incrementAndGet();
+        sleepBeforeRetry(backoffMs);
+        backoffMs = nextBackoffMs(backoffMs);
       }
     }
     throw new IllegalStateException("IoTDB insert retry loop exited without success or failure");
+  }
+
+  /**
+   * Transient IoTDB server-side conditions that justify retrying the same batch. Everything else
+   * (parse / semantic / type / schema errors) is treated as permanent and fails fast. Status codes
+   * are referenced via {@link TSStatusCode} so the mapping survives server error-code churn.
+   */
+  private static boolean isTransient(int statusCode) {
+    return statusCode == TSStatusCode.WRITE_PROCESS_REJECT.getStatusCode()
+        || statusCode == TSStatusCode.INTERNAL_REQUEST_TIME_OUT.getStatusCode()
+        || statusCode == TSStatusCode.INTERNAL_REQUEST_RETRY_ERROR.getStatusCode()
+        || statusCode == TSStatusCode.TOO_MANY_CONCURRENT_QUERIES_ERROR.getStatusCode()
+        || statusCode == TSStatusCode.DISPATCH_ERROR.getStatusCode();
   }
 
   static long initialBackoffMs(long initialBackoffMs, long maxBackoffMs) {

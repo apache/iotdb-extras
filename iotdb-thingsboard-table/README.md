@@ -24,14 +24,16 @@
 ## Overview
 
 `iotdb-thingsboard-table` is a ThingsBoard historical-telemetry DAO backend
-built on Apache IoTDB 2.0.8 Table Mode. It lets a ThingsBoard deployment store
+built on Apache IoTDB Table Mode. It lets a ThingsBoard deployment store
 and serve time-series telemetry through IoTDB's table-session API instead of the
-default Cassandra/SQL backends. The module targets ThingsBoard v4.3.1.2. Because
+default Cassandra/SQL backends. It compiles against the reactor's IoTDB 2.0.5
+table-session client; its integration tests run the real write path against an
+`apache/iotdb:2.0.8-standalone` server. The module targets ThingsBoard v4.3.1.2. Because
 it compiles with Java 17 language features (records and others), the
-`iotdb-extras` parent reactor builds and tests it only on JDK 17+: the root pom
-adds it to `<modules>` through a profile activated by `<jdk>[17,)</jdk>`, so the
-JDK 8/11 reactor jobs skip it while the 17/21 jobs build it as part of the root
-project.
+`iotdb-extras` parent reactor builds and tests it only on JDK 17+ through the
+explicit, named `with-thingsboard` opt-in profile (it is not JDK-auto-activated):
+CI passes `-P with-thingsboard` on the JDK 17/21 jobs while the 8/11 jobs omit it
+and skip the module, and a plain reactor build never pulls it in.
 
 ## ThingsBoard SPI surface (Strategy F)
 
@@ -102,20 +104,25 @@ Key activation and operational flags:
 | `iotdb.session-pool-size` | `8` | Table session pool size. |
 | `iotdb.schema.bootstrap` | `true` | When `true`, the module runs an idempotent startup bootstrap that reads `schema-iotdb-table.sql` from the classpath and creates the `telemetry` / `entity_attributes` tables (and database) on a fresh IoTDB before the first write. Set to `false` if you manage the schema out-of-band. |
 
-The module is a Spring Boot **auto-configuration**
-(`IoTDBTableConfiguration`), registered via
+The module is a Spring Boot **auto-configuration** (`IoTDBTableConfiguration`).
+Its deployment host is ThingsBoard 4.3.x, which runs on Spring Boot 3.5.x, so the
+active registration is
 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
-(and `META-INF/spring.factories` as a fallback), so it activates in a real
-ThingsBoard deployment without the host application having to component-scan
-`org.apache.iotdb.extras`.
+(paired with the `@AutoConfiguration` annotation). The legacy
+`META-INF/spring.factories` `EnableAutoConfiguration` entry is retained only so the
+module still activates if it is ever consumed by a Spring Boot 2.7 host; on Boot 3.x
+it is ignored. Either way it activates in a real ThingsBoard deployment without the
+host application having to component-scan `org.apache.iotdb.extras`.
 
 ## Build
 
-The module builds from the repository root as part of the reactor:
+The module is an explicit, named opt-in profile (`with-thingsboard`), so it is built
+only when that profile is activated (a plain reactor build never pulls it in). It
+requires JDK 17+:
 
 ```bash
 # from the iotdb-extras repository root
-mvn -pl iotdb-thingsboard-table -am clean test
+mvn -pl iotdb-thingsboard-table -am -P with-thingsboard clean test
 ```
 
 It can also be built standalone from the module directory:

@@ -2074,15 +2074,15 @@
         </profile>
         <!--
       The iotdb-thingsboard-table module compiles with release 17 (it uses records and other
-      Java 17 language features), so it cannot build on the JDK 8/11 reactor jobs. Gate it behind
-      a JDK 17+ activated profile instead of the default <modules> list so the 8/11 CI jobs skip it
-      while 17/21 still build and test it as part of the reactor.
+      Java 17 language features) and integrates ThingsBoard storage SPIs. Following the connector
+      opt-in convention (cf. the with-springboot profile / iotdb-spring-boot-starter), it is wired
+      as an explicit, named profile rather than JDK-auto-activated, so a plain `mvn clean verify`
+      never pulls it into the reactor implicitly. CI builds and tests it on the JDK 17+ jobs by
+      passing `-P with-thingsboard` (see .github/workflows/compile-check.yml); the JDK 8/11 jobs
+      omit the flag and skip it.
     -->
         <profile>
-            <id>iotdb-thingsboard-table-jdk17</id>
-            <activation>
-                <jdk>[17,)</jdk>
-            </activation>
+            <id>with-thingsboard</id>
             <modules>
                 <module>iotdb-thingsboard-table</module>
             </modules>

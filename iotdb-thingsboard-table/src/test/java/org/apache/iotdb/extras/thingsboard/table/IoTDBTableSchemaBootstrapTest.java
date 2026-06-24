@@ -18,9 +18,11 @@
 
 package org.apache.iotdb.extras.thingsboard.table;
 
+import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.rpc.StatementExecutionException;
+import org.apache.iotdb.rpc.TSStatusCode;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -67,20 +69,20 @@ class IoTDBTableSchemaBootstrapTest {
         "database name should be rewritten to the configured database: " + executed.get(0));
     assertTrue(executed.get(1).contains("USE tb_custom"), executed.get(1));
     assertTrue(
-        executed.stream().anyMatch(s -> s.contains("CREATE TABLE telemetry")),
+        executed.stream().anyMatch(s -> s.contains("CREATE TABLE IF NOT EXISTS telemetry")),
         "telemetry table DDL must be applied");
     assertTrue(
-        executed.stream().anyMatch(s -> s.contains("CREATE TABLE entity_attributes")),
+        executed.stream().anyMatch(s -> s.contains("CREATE TABLE IF NOT EXISTS entity_attributes")),
         "entity_attributes table DDL must be applied");
     assertContainsInOrder(
-        statementContaining(executed, "CREATE TABLE telemetry"),
+        statementContaining(executed, "CREATE TABLE IF NOT EXISTS telemetry"),
         "entity_type",
         "tenant_id",
         "key",
         "entity_id",
         "bool_v");
     assertContainsInOrder(
-        statementContaining(executed, "CREATE TABLE entity_attributes"),
+        statementContaining(executed, "CREATE TABLE IF NOT EXISTS entity_attributes"),
         "time",
         "attribute_scope",
         "entity_type",
@@ -122,6 +124,31 @@ class IoTDBTableSchemaBootstrapTest {
     IoTDBTableConfig config = new IoTDBTableConfig();
 
     // Must not throw despite the already-exists failures.
+    new IoTDBTableSchemaBootstrap(pool, config).afterPropertiesSet();
+
+    verify(session, times(4)).executeNonQueryStatement(anyString());
+    verify(session).close();
+  }
+
+  @Test
+  void toleratesAlreadyExistsByStatusCodeEvenWhenMessageDoesNotSayAlreadyExists() throws Exception {
+    ITableSessionPool pool = mock(ITableSessionPool.class);
+    ITableSession session = mock(ITableSession.class);
+    when(pool.getSession()).thenReturn(session);
+    // Structured-status-code path: the CREATE TABLE failure carries the TABLE_ALREADY_EXISTS status
+    // code but a message that does NOT contain "already exist"/"has already been". The bootstrap
+    // must still treat it as already-exists (skip, do not propagate), proving idempotency is driven
+    // by the status code rather than the wording.
+    doThrow(
+            new StatementExecutionException(
+                new TSStatus(TSStatusCode.TABLE_ALREADY_EXISTS.getStatusCode()).setMessage("boom")))
+        .when(session)
+        .executeNonQueryStatement(org.mockito.ArgumentMatchers.contains("CREATE TABLE"));
+
+    IoTDBTableConfig config = new IoTDBTableConfig();
+
+    // Must not throw despite the failures, because the status code identifies them as
+    // already-exists.
     new IoTDBTableSchemaBootstrap(pool, config).afterPropertiesSet();
 
     verify(session, times(4)).executeNonQueryStatement(anyString());

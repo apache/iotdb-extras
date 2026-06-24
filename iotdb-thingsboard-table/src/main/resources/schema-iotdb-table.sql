@@ -20,7 +20,7 @@
 CREATE DATABASE IF NOT EXISTS thingsboard;
 USE thingsboard;
 
-CREATE TABLE telemetry (
+CREATE TABLE IF NOT EXISTS telemetry (
   entity_type STRING  TAG,    -- DEVICE, ASSET, etc.
   tenant_id   STRING  TAG,    -- multi-tenant isolation
   key         STRING  TAG,    -- telemetry key name
@@ -32,7 +32,7 @@ CREATE TABLE telemetry (
   json_v      TEXT    FIELD
 ) WITH (TTL=DEFAULT);
 
-CREATE TABLE entity_attributes (
+CREATE TABLE IF NOT EXISTS entity_attributes (
   time            TIMESTAMP TIME,
   attribute_scope STRING TAG,   -- CLIENT_SCOPE | SERVER_SCOPE | SHARED_SCOPE
   entity_type     STRING TAG,

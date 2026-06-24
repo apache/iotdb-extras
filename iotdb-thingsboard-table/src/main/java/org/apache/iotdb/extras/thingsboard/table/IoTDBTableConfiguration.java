@@ -44,11 +44,14 @@ import java.util.List;
 /**
  * Spring Boot auto-configuration entry point for the IoTDB Table Mode backend.
  *
- * <p>This class is registered via {@code
- * META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports} (Spring Boot
- * 3.x mechanism) and, as a belt-and-suspenders fallback, via {@code META-INF/spring.factories}, so
- * the module activates in a real ThingsBoard deployment without the host application having to
- * component-scan {@code org.apache.iotdb.extras}.
+ * <p>The deployment host is ThingsBoard 4.3.x, which runs on Spring Boot 3.5.x, so the active
+ * registration is {@code
+ * META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports} paired with the
+ * {@code @AutoConfiguration} annotation below. The legacy {@code META-INF/spring.factories} {@code
+ * EnableAutoConfiguration} entry is retained only so the module still activates if it is ever
+ * consumed by a Spring Boot 2.7 host; on Boot 3.x that entry is ignored. Either way the module
+ * activates in a real ThingsBoard deployment without the host application having to component-scan
+ * {@code org.apache.iotdb.extras}.
  *
  * <p>The {@code @Bean} methods below explicitly register the session pool, the timeseries writer,
  * the schema bootstrap, and the {@code @Repository} {@link IoTDBTableTimeseriesDao}. Explicit bean
@@ -91,10 +94,10 @@ public class IoTDBTableConfiguration {
               .database(config.getDatabase())
               .maxSize(config.getSessionPoolSize())
               .connectionTimeoutInMs(config.getConnectionTimeoutMs())
-              .enableIoTDBRpcCompression(config.isEnableCompression())
+              .enableCompression(config.isEnableCompression())
               .build();
       log.info(
-          "IoTDB Table Mode session pool initialized: nodeUrl={}, database={}, poolSize={}, compression={}, storageAccountingDefaultTtlMs={}",
+          "IoTDB Table Mode session pool initialized: nodeUrl={}, database={}, poolSize={}, compression={}, defaultTtlMs(storageAccountingOnly)={}",
           nodeUrl,
           config.getDatabase(),
           config.getSessionPoolSize(),
@@ -180,7 +183,8 @@ public class IoTDBTableConfiguration {
                 + "' has no resolvable type; expose a concrete IoTDBTableTimeseriesDao type or "
                 + "remove the bean");
       }
-      return beanType != null && IoTDBTableTimeseriesDao.class.isAssignableFrom(beanType);
+      // beanType is guaranteed non-null here (the null case throws above).
+      return IoTDBTableTimeseriesDao.class.isAssignableFrom(beanType);
     }
 
     private static Class<?> resolveBeanType(

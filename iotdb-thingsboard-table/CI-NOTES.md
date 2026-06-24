@@ -21,12 +21,23 @@
 
 # CI Notes
 
-The `iotdb-extras` parent reactor builds and tests this module only on JDK 17+:
-the root pom adds it to `<modules>` through a profile activated by
-`<jdk>[17,)</jdk>` (it compiles with Java 17 language features), so the root
-build compiles and tests it on the 17/21 jobs and skips it on the 8/11 jobs. This
-file is a developer reference of the local checks for the `iotdb-thingsboard-table`
-module; it is not itself a GitHub Actions workflow.
+The `iotdb-extras` parent reactor builds and tests this module through the named
+`with-thingsboard` profile (the module compiles with Java 17 language features and
+integrates ThingsBoard SPIs, so it is an explicit opt-in rather than part of the
+default reactor). CI activates it on the JDK 17+ jobs by passing `-P with-thingsboard`
+(see `.github/workflows/compile-check.yml`); the JDK 8/11 jobs omit the flag and skip
+it. The module overrides NO shared reactor versions — iotdb-session, tsfile and guava
+are inherited from the parent (2.0.5 / 2.1.1 / 32.1.2-jre), like the sibling IoTDB
+connectors; the only deliberate override is jakarta.validation-api 3.0.2 (the
+ThingsBoard 4.3.x Spring Boot 3 runtime namespace). tsfile resolves to the reactor's
+single 2.1.1, so this module introduces no tsfile-convergence conflict. Note: running
+`mvn -P enforce` still reports one pre-existing `dependencyConvergence` finding on
+`org.apache.httpcomponents:httpcore` (4.4.12 vs 4.4.16), which comes transitively from
+`iotdb-session 2.0.5 -> libthrift 0.14.1` and is shared by every iotdb-session consumer
+in the reactor (the parent pom pins httpclient but not httpcore); it is not introduced
+by this module and would be resolved at the parent level. This file is a developer
+reference of the local checks for the `iotdb-thingsboard-table` module; it is not itself
+a GitHub Actions workflow.
 
 ## Candidate Checks
 

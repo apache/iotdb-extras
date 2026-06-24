@@ -24,8 +24,13 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.hibernate.validator.messageinterpolation.ParameterMessageInterpolator;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.BindException;
+import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
+import org.springframework.boot.context.properties.bind.validation.ValidationBindHandler;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+import org.springframework.validation.Errors;
 
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +38,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IoTDBTableConfigTest {
@@ -114,6 +120,57 @@ class IoTDBTableConfigTest {
   }
 
   @Test
+  void binding_throughSpringRejectsValueThatViolatesAJakartaConstraint() {
+    // Mentor finding #2: prove @Validated on IoTDBTableConfig actually rejects a bad bound value
+    // through Spring's real binding/validation path (Binder + ValidationBindHandler), not via a
+    // hand-built Validator. iotdb.ts.save.flush-threads=2 violates @Max(1). The jakarta 3.0.2
+    // constraint (matching the ThingsBoard 4.3.x Spring Boot 3 / jakarta runtime host) is enforced
+    // by hibernate-validator 8.0.2 and surfaced as a Spring BindValidationException, so an operator
+    // who sets an unsupported value gets a fail-fast binding error.
+    MapConfigurationPropertySource source =
+        new MapConfigurationPropertySource(Map.of("iotdb.ts.save.flush-threads", "2"));
+    Binder binder = new Binder(source);
+    ValidationBindHandler handler = new ValidationBindHandler(new JakartaValidatorAdapter());
+
+    // Binder wraps the validation failure as a BindException whose cause is the
+    // BindValidationException carrying the rejected jakarta constraint.
+    BindException failure =
+        assertThrows(
+            BindException.class,
+            () -> binder.bind("iotdb", Bindable.of(IoTDBTableConfig.class), handler));
+    BindValidationException validationFailure = bindValidationCause(failure);
+    assertTrue(
+        validationFailure.getValidationErrors().getAllErrors().stream()
+            .anyMatch(error -> error.toString().contains("ts.save.flushThreads")),
+        "binding error should name the constrained flush-threads property: " + validationFailure);
+  }
+
+  private static BindValidationException bindValidationCause(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof BindValidationException bindValidationException) {
+        return bindValidationException;
+      }
+    }
+    throw new AssertionError(
+        "expected a BindValidationException in the cause chain but found none: " + failure);
+  }
+
+  @Test
+  void binding_throughSpringAcceptsAValidValue() {
+    // The same Binder + ValidationBindHandler path must NOT reject a value that satisfies the
+    // constraints, so the rejection above is attributable to the constraint and not to the wiring.
+    MapConfigurationPropertySource source =
+        new MapConfigurationPropertySource(Map.of("iotdb.ts.save.flush-threads", "1"));
+    Binder binder = new Binder(source);
+    ValidationBindHandler handler = new ValidationBindHandler(new JakartaValidatorAdapter());
+
+    IoTDBTableConfig config =
+        binder.bind("iotdb", Bindable.of(IoTDBTableConfig.class), handler).get();
+
+    assertEquals(1, config.getTs().getSave().getFlushThreads());
+  }
+
+  @Test
   void validation_rejectsInvalidJakartaConstraints() {
     IoTDBTableConfig config = new IoTDBTableConfig();
     config.setHost(" ");
@@ -175,6 +232,40 @@ class IoTDBTableConfigTest {
             .buildValidatorFactory()) {
       Validator validator = factory.getValidator();
       return validator.validate(config);
+    }
+  }
+
+  /**
+   * Bridges the jakarta {@link Validator} (jakarta.validation-api 3.0.2 + hibernate-validator
+   * 8.0.2) into Spring's {@link org.springframework.validation.Validator} SPI that {@link
+   * ValidationBindHandler} drives. The Spring Boot 2.7 build/test parent ships a {@code
+   * SpringValidatorAdapter} bound to {@code javax.validation}, which is absent here on purpose
+   * (this module pins the jakarta namespace to match the ThingsBoard 4.3.x runtime host), so the
+   * jakarta constraints are surfaced through Spring binding via this minimal adapter.
+   */
+  private static final class JakartaValidatorAdapter
+      implements org.springframework.validation.Validator {
+    @Override
+    public boolean supports(Class<?> clazz) {
+      return IoTDBTableConfig.class.isAssignableFrom(clazz);
+    }
+
+    @Override
+    public void validate(Object target, Errors errors) {
+      try (ValidatorFactory factory =
+          Validation.byDefaultProvider()
+              .configure()
+              .messageInterpolator(new ParameterMessageInterpolator())
+              .buildValidatorFactory()) {
+        Validator validator = factory.getValidator();
+        for (ConstraintViolation<Object> violation : validator.validate(target)) {
+          String field = violation.getPropertyPath().toString();
+          errors.rejectValue(
+              field,
+              violation.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName(),
+              violation.getMessage());
+        }
+      }
     }
   }
 }

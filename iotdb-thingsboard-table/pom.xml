@@ -35,18 +35,34 @@
         <maven.compiler.target>17</maven.compiler.target>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <iotdb.version>2.0.8</iotdb.version>
         <!--
-            The iotdb-session 2.0.8 Tablet API this module compiles against requires tsfile 2.3.0,
-            which is newer than the parent reactor's tsfile.version (kept at 2.1.1 for the other
-            connectors). Override it locally so only this module resolves the newer tsfile; the
-            parent property is intentionally left untouched.
+            Version policy: this module overrides NO shared reactor versions. iotdb-session, tsfile
+            and guava are inherited from the parent reactor (2.0.5 / 2.1.1 / 32.1.2-jre), exactly like
+            the sibling spark / flink IoTDB connectors. The Table-Mode client API this module uses
+            (TableSessionPoolBuilder / ITableSessionPool, Tablet with ColumnCategory TAG/FIELD,
+            TSDataType, TableSessionPoolBuilder#enableCompression) is present in iotdb-session 2.0.5 /
+            tsfile 2.1.1 — the parent's native pairing — so a full-reactor build keeps a SINGLE tsfile
+            version across all connectors. The integration test exercises the real write path against
+            the apache/iotdb:2.0.8-standalone server (the 2.0.5 client / 2.0.8 server RPC path is
+            covered by the container ITs).
+
+            The one deliberate override is jakarta.validation-api: this module deploys into
+            ThingsBoard 4.3.1.2, which runs on Spring Boot 3.5.14 / Spring 6 / JDK 17 (the jakarta.*
+            namespace). The build parent is Spring Boot 2.7 with jakarta.validation-api 2.0.2 (the
+            last release carrying the legacy javax.validation.* packages). We compile the @Validated
+            config against jakarta.validation-api 3.0.2 (jakarta.validation.* annotations) to match
+            the runtime host. The API is provided-scope; the Hibernate Validator provider is supplied
+            by the ThingsBoard runtime classpath, not bundled here.
         -->
-        <tsfile.version>2.3.0</tsfile.version>
-        <guava.version>32.1.3-jre</guava.version>
         <jakarta.validation-api.version>3.0.2</jakarta.validation-api.version>
         <junit.jupiter.version>5.10.2</junit.jupiter.version>
         <lombok.version>1.18.42</lombok.version>
+        <!--
+            Parent pins mockito 2.23.4 (parent pom note: "powermock is having issues with the newest
+            mockito versions"). This module has no PowerMock and is JUnit 5 / JDK 17 only, using
+            mockito-junit-jupiter which requires mockito 5.x; the override is module-local and
+            test-scoped, so it does not affect any reactor compile/runtime classpath.
+        -->
         <mockito.version>5.21.0</mockito.version>
         <testcontainers.version>1.21.3</testcontainers.version>
         <thingsboard.version>4.3.1.2</thingsboard.version>
@@ -59,12 +75,12 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>iotdb-session</artifactId>
-            <version>${iotdb.version}</version>
+            <!-- version inherited from the parent reactor (iotdb.version = 2.0.5) -->
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>${guava.version}</version>
+            <!-- version inherited from the parent reactor (guava.version = 32.1.2-jre) -->
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -91,6 +107,9 @@
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
+            <!-- explicit 3.0.2 (jakarta.* namespace) to match the ThingsBoard 4.3.x Spring Boot 3
+                 runtime host; see the version-policy comment in <properties> above -->
+            <version>${jakarta.validation-api.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -108,6 +127,16 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- test-scope only: the unit tests construct StatementExecutionException(TSStatus) with
+                 a specific status code to exercise the retry / idempotency classification. TSStatus
+                 lives in iotdb-thrift-commons (a transitive runtime dependency of iotdb-session);
+                 declared here at test scope so it is a declared, test-only use. Version inherited
+                 from the parent reactor (iotdb.version). -->
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>iotdb-thrift-commons</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

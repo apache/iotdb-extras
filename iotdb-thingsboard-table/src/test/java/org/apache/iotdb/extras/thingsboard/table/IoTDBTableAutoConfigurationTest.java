@@ -37,7 +37,9 @@ import org.thingsboard.server.dao.timeseries.TimeseriesDao;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -140,6 +142,44 @@ class IoTDBTableAutoConfigurationTest {
             "iotdb.schema.bootstrap=false")
         .run(
             context -> {
+              // Proves the context boots cleanly (no NoClassDefFoundError) when ThingsBoard is
+              // absent, in addition to creating none of the module beans.
+              assertThat(context).hasNotFailed();
+              assertFalse(context.containsBean(SESSION_POOL_BEAN_NAME));
+              assertFalse(context.containsBeanDefinition("timeseriesWriter"));
+              assertFalse(context.containsBeanDefinition("schemaBootstrap"));
+              assertFalse(context.containsBeanDefinition("ioTDBTableTimeseriesDao"));
+            });
+  }
+
+  @Test
+  void autoConfigDiscovery_withSelectorEnabledButNoThingsBoardClasspath_bootsCleanlyWithNoBeans() {
+    // Mentor finding #6: even with the IoTDB selector + experimental flag ENABLED, the whole
+    // auto-config chain must boot cleanly when ThingsBoard is hidden from the classpath -- the
+    // @ConditionalOnClass(TimeseriesDao) guard must back the module off without a
+    // NoClassDefFoundError, and none of the module beans may be created.
+    contextRunner
+        .withClassLoader(new FilteredClassLoader("org.thingsboard"))
+        .withPropertyValues(
+            "database.ts.type=iotdb-table",
+            "iotdb.ts.experimental-raw-only=true",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              // The TimeseriesDao class is genuinely hidden from this context's classloader.
+              assertThrows(
+                  ClassNotFoundException.class,
+                  () ->
+                      context
+                          .getClassLoader()
+                          .loadClass("org.thingsboard.server.dao.timeseries.TimeseriesDao"));
               assertFalse(context.containsBean(SESSION_POOL_BEAN_NAME));
               assertFalse(context.containsBeanDefinition("timeseriesWriter"));
               assertFalse(context.containsBeanDefinition("schemaBootstrap"));

@@ -20,6 +20,8 @@ package org.apache.iotdb.extras.thingsboard.table;
 
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
+import org.apache.iotdb.rpc.StatementExecutionException;
+import org.apache.iotdb.rpc.TSStatusCode;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
@@ -37,9 +39,10 @@ import java.util.regex.Pattern;
  * <p>On a fresh IoTDB the {@code telemetry} / {@code entity_attributes} tables (and their database)
  * do not exist, so the very first write would fail. This initializer runs once the session pool
  * bean is up, reads {@code schema-iotdb-table.sql} from the classpath, and executes its statements.
- * The {@code CREATE DATABASE} statement is already {@code IF NOT EXISTS}; the {@code CREATE TABLE}
- * statements are not, so an "already exists" failure on re-run is tolerated rather than propagated,
- * making the bootstrap idempotent.
+ * Every DDL statement uses {@code CREATE ... IF NOT EXISTS}, so a re-run returns SUCCESS without
+ * throwing. As defense-in-depth for racy or partial schema states, an "already exists" failure is
+ * also recognized by its structured IoTDB status code (with a message-substring fallback) and
+ * tolerated rather than propagated, keeping the bootstrap idempotent.
  *
  * <p>Gated behind {@code iotdb.schema.bootstrap} (default {@code true}) so operators who manage the
  * schema out-of-band can disable it; see the module README.
@@ -135,6 +138,18 @@ public class IoTDBTableSchemaBootstrap implements InitializingBean {
 
   private static boolean isAlreadyExists(Throwable t) {
     for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+      // Primary signal: structured IoTDB status code (locale- and wording-independent). The DDL
+      // itself uses CREATE ... IF NOT EXISTS, so the normal re-run path returns SUCCESS without
+      // throwing; this code path is the defense-in-depth fallback for racy/partial schema states.
+      if (cause instanceof StatementExecutionException see) {
+        int code = see.getStatusCode();
+        if (code == TSStatusCode.TABLE_ALREADY_EXISTS.getStatusCode()
+            || code == TSStatusCode.DATABASE_ALREADY_EXISTS.getStatusCode()
+            || code == TSStatusCode.COLUMN_ALREADY_EXISTS.getStatusCode()) {
+          return true;
+        }
+      }
+      // Last-resort fallback for non-typed / wrapped exceptions that carry no status code.
       String message = cause.getMessage();
       if (message != null) {
         String lower = message.toLowerCase(Locale.ROOT);
