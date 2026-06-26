@@ -31,6 +31,7 @@ import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
 import org.thingsboard.server.dao.attributes.AttributesDao;
 import org.thingsboard.server.dao.timeseries.TimeseriesDao;
+import org.thingsboard.server.dao.timeseries.TimeseriesLatestDao;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -163,6 +164,71 @@ class StrategyFContractTest {
         expectedParams,
         method.getParameterTypes(),
         "TimeseriesDao." + name + " parameter types drifted from the pinned SPI expectation");
+  }
+
+  @Test
+  void timeseriesLatestDaoSpiMethodsMatchExpectedSignatures() throws NoSuchMethodException {
+    // IoTDBTableLatestDao implements TimeseriesLatestDao; pin the exact SPI shapes it depends on so
+    // a silent drift in the compile-only surface fails the build. Verified against ThingsBoard
+    // v4.3.1.2 (commit c37fb509); findLatestByEntityIds/findLatestByEntityIdsAsync are new in
+    // v4.3.1.2 relative to v4.3.1.1.
+    assertLatestSpiMethod(
+        "findLatestOpt",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, String.class});
+    assertLatestSpiMethod(
+        "findLatest",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, String.class});
+    assertLatestSpiMethod(
+        "findAllLatest", ListenableFuture.class, new Class<?>[] {TenantId.class, EntityId.class});
+    assertLatestSpiMethod(
+        "saveLatest",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, TsKvEntry.class});
+    assertLatestSpiMethod(
+        "removeLatest",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, DeleteTsKvQuery.class});
+    assertLatestSpiMethod(
+        "findAllKeysByDeviceProfileId",
+        List.class,
+        new Class<?>[] {TenantId.class, DeviceProfileId.class});
+    assertLatestSpiMethod(
+        "findAllKeysByEntityIds", List.class, new Class<?>[] {TenantId.class, List.class});
+    assertLatestSpiMethod(
+        "findAllKeysByEntityIdsAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class});
+    assertLatestSpiMethod(
+        "findLatestByEntityIds", List.class, new Class<?>[] {TenantId.class, List.class});
+    assertLatestSpiMethod(
+        "findLatestByEntityIdsAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class});
+
+    // The DAO is a genuine TimeseriesLatestDao implementation.
+    assertTrue(TimeseriesLatestDao.class.isAssignableFrom(IoTDBTableLatestDao.class));
+    // The interface declares exactly the 10 pinned methods (catches additive drift too).
+    assertEquals(10, TimeseriesLatestDao.class.getDeclaredMethods().length);
+  }
+
+  /**
+   * Asserts that {@link TimeseriesLatestDao} declares a method with exactly the given name, return
+   * type and ordered parameter types, pinning the v4.3.1.2 SPI surface this module consumes.
+   */
+  private static void assertLatestSpiMethod(
+      String name, Class<?> expectedReturn, Class<?>[] expectedParams)
+      throws NoSuchMethodException {
+    Method method = TimeseriesLatestDao.class.getMethod(name, expectedParams);
+    assertEquals(
+        expectedReturn,
+        method.getReturnType(),
+        "TimeseriesLatestDao." + name + " return type drifted from the pinned SPI expectation");
+    assertArrayEquals(
+        expectedParams,
+        method.getParameterTypes(),
+        "TimeseriesLatestDao." + name + " parameter types drifted from the pinned SPI expectation");
   }
 
   @Test
