@@ -20,12 +20,16 @@ package org.apache.iotdb.extras.thingsboard.table;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import org.junit.jupiter.api.Test;
+import org.thingsboard.server.common.data.AttributeScope;
+import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.kv.AttributeKvEntry;
 import org.thingsboard.server.common.data.kv.DeleteTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
+import org.thingsboard.server.dao.attributes.AttributesDao;
 import org.thingsboard.server.dao.timeseries.TimeseriesDao;
 
 import java.io.IOException;
@@ -34,8 +38,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -156,6 +163,106 @@ class StrategyFContractTest {
         expectedParams,
         method.getParameterTypes(),
         "TimeseriesDao." + name + " parameter types drifted from the pinned SPI expectation");
+  }
+
+  @Test
+  void attributesDaoSpiMethodsMatchExpectedSignatures() throws NoSuchMethodException {
+    // IoTDBTableAttributesDao implements AttributesDao; pin all 14 v4.3.1.2 SPI signatures so a
+    // silent change to the local compile-only surface (src/provided) breaks the build. Verified
+    // against ThingsBoard v4.3.1.2 (commit c37fb509).
+    assertAttributesSpiMethod(
+        "find",
+        Optional.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, String.class});
+    assertAttributesSpiMethod(
+        "find",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, Collection.class});
+    assertAttributesSpiMethod(
+        "findAll",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "save",
+        ListenableFuture.class,
+        new Class<?>[] {
+          TenantId.class, EntityId.class, AttributeScope.class, AttributeKvEntry.class
+        });
+    assertAttributesSpiMethod(
+        "removeAll",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, List.class});
+    assertAttributesSpiMethod(
+        "removeAllWithVersions",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, List.class});
+    assertAttributesSpiMethod(
+        "findNextBatch", List.class, new Class<?>[] {UUID.class, int.class, int.class, int.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByDeviceProfileId",
+        List.class,
+        new Class<?>[] {TenantId.class, DeviceProfileId.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByEntityIds", List.class, new Class<?>[] {TenantId.class, List.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByEntityIdsAndScope",
+        List.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByEntityIdsAndScopeAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "findLatestByEntityIdsAndScope",
+        List.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "findLatestByEntityIdsAndScopeAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "removeAllByEntityId", List.class, new Class<?>[] {TenantId.class, EntityId.class});
+
+    // The DAO is a genuine AttributesDao implementation.
+    assertTrue(AttributesDao.class.isAssignableFrom(IoTDBTableAttributesDao.class));
+    // The interface declares exactly the 14 pinned methods (catches additive drift too).
+    assertEquals(14, AttributesDao.class.getDeclaredMethods().length);
+  }
+
+  @Test
+  void attributeValueObjectGettersUsedByDaoExist() throws NoSuchMethodException {
+    // The DAO maps each row into a BaseAttributeKvEntry(KvEntry, ts, version) and reads back these
+    // value-object getters; lock them down so a stub edit that drops one fails the build.
+    AttributeKvEntry.class.getMethod("getLastUpdateTs");
+    AttributeKvEntry.class.getMethod("getVersion");
+    AttributeKvEntry.class.getMethod("getKey");
+    AttributeKvEntry.class.getMethod("getDataType");
+    AttributeKvEntry.class.getMethod("getValue");
+
+    // AttributeScope round-trips by name()/valueOf(String); the custom valueOf(int) is part of the
+    // verified surface too.
+    assertEquals(AttributeScope.SERVER_SCOPE, AttributeScope.valueOf("SERVER_SCOPE"));
+    assertEquals(AttributeScope.SERVER_SCOPE, AttributeScope.valueOf(2));
+    AttributeScope.class.getMethod("name");
+    AttributeScope.class.getMethod("valueOf", int.class);
+  }
+
+  /**
+   * Asserts that {@link AttributesDao} declares a method with exactly the given name, return type
+   * and ordered parameter types, pinning the v4.3.1.2 SPI surface this module consumes.
+   */
+  private static void assertAttributesSpiMethod(
+      String name, Class<?> expectedReturn, Class<?>[] expectedParams)
+      throws NoSuchMethodException {
+    Method method = AttributesDao.class.getMethod(name, expectedParams);
+    assertEquals(
+        expectedReturn,
+        method.getReturnType(),
+        "AttributesDao." + name + " return type drifted from the pinned SPI expectation");
+    assertArrayEquals(
+        expectedParams,
+        method.getParameterTypes(),
+        "AttributesDao." + name + " parameter types drifted from the pinned SPI expectation");
   }
 
   @Test

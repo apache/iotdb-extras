@@ -70,6 +70,57 @@ attribute/label DAOs are outside the current scope.
 > + write + delete only**. **Time-bucketed aggregation is NOT implemented yet**;
 > aggregation, latest telemetry, and attributes are outside the current scope.
 
+## Entity attributes (Path-3 stretch, inert by default)
+
+`IoTDBTableAttributesDao` is an `AttributesDao` implementation for the IoTDB Table
+Mode backend, storing entity attributes in the `entity_attributes` table. It is a
+**Path-3 stretch artifact and is inert by default**: in Phase-1, entity attributes
+stay in the host entity database (PostgreSQL), and this DAO only activates when an
+operator opts in explicitly with `database.attributes.type=iotdb-table`.
+
+This attribute selector is **independent** of `database.ts.type` /
+`database.ts_latest.type` — the attribute DAO routes separately from the
+time-series DAOs (a piggy-back on the timeseries selector was deliberately
+rejected). No shipped ThingsBoard release exposes a `database.attributes.type`
+selector yet (open Q6 / ThingsBoard Discussion #15296), so a real Phase-1
+deployment never sets it; the activation condition stays false, no attribute bean
+or session pool is created, and attributes keep flowing to the host entity-DB
+`AttributesDao`.
+
+When activated, each identity tuple
+`(tenant_id, entity_type, entity_id, attribute_scope, key)` holds exactly one
+current row: `save` is a tag-only `DELETE` (no time predicate) followed by an
+`INSERT` at `time = lastUpdateTs` with exactly one typed FIELD set, both under a
+per-identity in-JVM lock so concurrent same-identity writes converge to a single
+row.
+
+### Phase-1 attribute limitations (documented, not silently degraded)
+
+- **`version` is always `null`.** IoTDB has no SQL sequence, so `save` and
+  `removeAllWithVersions` return a `null` version (type-correct, matching the
+  Cassandra backend). Because the ThingsBoard service only emits an EDQS
+  attribute-delete notification when the version is non-null, that notification is
+  not driven in Phase-1.
+- **`findNextBatch` is unsupported.** It is a relational keyset-pagination
+  migration helper with no IoTDB equivalent; it throws
+  `UnsupportedOperationException`.
+- **`findAllKeysByDeviceProfileId` with a non-null profile returns an empty
+  list.** `entity_attributes` has no `device_profile_id` tag and the module has no
+  device→profile lookup. The null-profile path returns the tenant-wide distinct
+  keys. (Open decision: silent-empty vs fail-loud vs TB join — tracked for the Wk5
+  weekly report.)
+- **`save` is non-atomic.** The tag-only `DELETE`-then-`INSERT` is two separate
+  statements with no rollback: if the `INSERT` fails after the `DELETE`, the value
+  is lost. A concurrent same-identity point `find` takes the same per-identity
+  lock and so never observes the transient empty window, but full-scope reads
+  (`find`-by-keys / `findAll` / `findLatestByEntityIdsAndScope`) are best-effort
+  (unlocked).
+- **Single-JVM convergence only.** The per-identity lock converges writes only
+  within one JVM; cross-node single-writer safety is the operator's
+  responsibility, acknowledged via `iotdb.attributes.cluster_mode` (must be
+  `sticky-routing` or `disabled` when the DAO is active, else construction fails
+  fast).
+
 ## Known limitations
 
 **Same-timestamp type change across separate flushes.** The writer collapses
@@ -98,6 +149,8 @@ Key activation and operational flags:
 | --- | --- | --- |
 | `database.ts.type` | _(unset)_ | Set to `iotdb-table` as the ThingsBoard historical-timeseries backend selector. |
 | `iotdb.ts.experimental-raw-only` | `false` | Explicit opt-in for this initial raw-only backend. Must be `true` together with `database.ts.type=iotdb-table`; write, raw read, and delete are implemented, while time-bucketed aggregation is outside the current scope. |
+| `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO (Path-3 stretch). Independent of the timeseries selectors. Unset in a real Phase-1 deployment, so the attribute DAO is inert by default. |
+| `iotdb.attributes.cluster_mode` | _(empty)_ | Required when `database.attributes.type=iotdb-table`. Must be `sticky-routing` (per-identity writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the attribute write path converges only within a single JVM. |
 | `iotdb.host` / `iotdb.port` | `127.0.0.1` / `6667` | IoTDB node address. |
 | `iotdb.username` / `iotdb.password` | `root` / `root` | IoTDB credentials. |
 | `iotdb.database` | `thingsboard` | Target IoTDB database. |
@@ -165,5 +218,12 @@ docker compose -f docker-compose.test.yml down -v
 Initial module status: `IoTDBTableBaseDao` plus the `IoTDBTableTimeseriesDao`
 write, raw-read, and delete paths are implemented behind
 `database.ts.type=iotdb-table` and `iotdb.ts.experimental-raw-only=true`.
-Without both properties, the module is inert. Aggregation, latest telemetry, and
-attributes are outside the current scope.
+Without both properties, the module is inert. Aggregation and latest telemetry
+are outside the current scope.
+
+`IoTDBTableAttributesDao` is implemented as a **Path-3 stretch artifact**, inert
+by default and activated only by the independent
+`database.attributes.type=iotdb-table` opt-in (see the Entity attributes section
+above and its Phase-1 limitations). In a real Phase-1 deployment the selector is
+unset, so the attribute DAO never activates and attributes stay in the host
+entity database.

@@ -77,6 +77,8 @@ public class IoTDBTableConfig {
 
   @Valid private Ts ts = new Ts();
 
+  @Valid private Attributes attributes = new Attributes();
+
   @Data
   public static class Ts {
     /**
@@ -88,6 +90,24 @@ public class IoTDBTableConfig {
 
     @Valid private Save save = new Save();
     @Valid private Read read = new Read();
+  }
+
+  /**
+   * Entity-attribute DAO configuration, bound from {@code iotdb.attributes.*}. Independent of
+   * {@code iotdb.ts.*} because the attribute DAO routes separately from the time-series DAOs.
+   */
+  @Data
+  public static class Attributes {
+    /**
+     * Cluster routing acknowledgement for the entity-attribute DAO. The IoTDB Table Mode attribute
+     * write path is delete-then-insert under a per-identity in-JVM lock, which converges only
+     * inside a single JVM; cross-node single-writer safety is the operator's responsibility. When
+     * the DAO is activated this must be set explicitly to one of {@code sticky-routing} (all writes
+     * for a given identity are pinned to one node) or {@code disabled} (single-node / acknowledged
+     * best-effort); any other value (including the empty default) fails fast at construction. See
+     * the GSOC-304 Wk5 decision note section 3.5.
+     */
+    private String clusterMode = "";
   }
 
   @Data

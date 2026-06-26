@@ -299,6 +299,14 @@
                                 <ignoredUsedUndeclaredDependency>org.apache.tsfile:common</ignoredUsedUndeclaredDependency>
                                 <ignoredUsedUndeclaredDependency>org.apache.iotdb:service-rpc</ignoredUsedUndeclaredDependency>
                                 <ignoredUsedUndeclaredDependency>org.springframework.boot:spring-boot</ignoredUsedUndeclaredDependency>
+                                <!-- Strategy F: org.apache.commons.lang3.tuple.Pair is a compile-only stub under
+                                     src/provided (the real AttributesDao.removeAllByEntityId returns
+                                     List<Pair<AttributeScope,String>>). commons-lang3 is NOT declared as a module
+                                     dependency: the stub is excluded from the built jar (org/apache/commons/**) and
+                                     the real commons-lang3 is supplied by the ThingsBoard runtime classpath. The
+                                     analyzer sees the transitive commons-lang3 jar on the test classpath and would
+                                     otherwise flag the Pair reference as used-undeclared. -->
+                                <ignoredUsedUndeclaredDependency>org.apache.commons:commons-lang3</ignoredUsedUndeclaredDependency>
                                 <!-- The junit-jupiter aggregate supplies junit-jupiter-api on the test classpath. -->
                                 <ignoredUsedUndeclaredDependency>org.junit.jupiter:junit-jupiter-api</ignoredUsedUndeclaredDependency>
                             </ignoredUsedUndeclaredDependencies>
