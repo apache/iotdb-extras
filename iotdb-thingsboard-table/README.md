@@ -121,6 +121,63 @@ row.
   `sticky-routing` or `disabled` when the DAO is active, else construction fails
   fast).
 
+## Latest telemetry (derived + overlay)
+
+`IoTDBTableLatestDao` is a `TimeseriesLatestDao` implementation that serves the
+latest value per `(tenant, entity, key)`. It activates only when all of
+`database.ts.type=iotdb-table`, `database.ts_latest.type=iotdb-table`, and
+`iotdb.ts.experimental-raw-only=true` are set (the timeseries selector is
+required because the derived latest reads the `telemetry` table that only the
+IoTDB writer populates).
+
+The latest value is read from **both** the historical `telemetry` table
+(derived, `ORDER BY time DESC LIMIT 1` / `LAST_BY(col, time)`, engine-accelerated
+by IoTDB's native last cache) **and** a minimal per-key `telemetry_latest`
+**overlay** table, merged by the maximum timestamp per key (the overlay wins an
+exact tie). The merge is max-by-ts, not additive, so a key present in both stores
+is never double-counted.
+
+**The overlay is written on every `saveLatest`** (mentor-confirmed; a PR-2 review
+flag). The module's historical `save()` write path is asynchronous and batched,
+so at the moment `saveLatest` runs it cannot see whether a paired `telemetry` row
+will be written. It therefore cannot distinguish a latest-only write (e.g. the
+EntityView telemetry-copy `LATEST_AND_WS` / `saveTs=false` path, which calls
+`saveLatest` with **no** paired `save()`) from a normal full-save, and writes the
+overlay unconditionally as a delete-then-insert (one row per identity, under a
+per-identity in-JVM lock). This **closes the latest-only data-loss gap** that a
+no-shadow-table no-op would otherwise drop, at the cost of one extra overlay write
+per latest update (equivalent to the standard ThingsBoard latest-table behavior).
+`removeLatest` snapshots the merged latest under the per-identity lock and, when
+that latest is inside the half-open `[startTs, endTs)` delete window, deletes the
+overlay row; when `rewriteLatestIfDeleted` is set it resurrects the next-older
+historical value (`telemetry` where `time < startTs`) back into the overlay and
+returns it as the removing result's data (so TB emits a WS update rather than a
+delete).
+
+### Residual latest limitations (documented, flagged for PR-2 review)
+
+- **`version` is always `null`.** IoTDB has no SQL sequence (same as Cassandra);
+  type-correct and contract-legal, but TB notifications that key off a non-null
+  version are not driven in Phase-1.
+- **Telemetry-derived race residual.** Overlay-backed values are race-free under
+  the per-identity lock, but the historical `remove` runs as a separate future
+  from `removeLatest`, so a purely telemetry-derived (full-save) latest can
+  transiently still be read from `telemetry` until that historical delete commits
+  (eventually consistent).
+- **Overlay growth.** `telemetry_latest` is `TTL='INF'` with no entity-level
+  cleanup, so under unbounded key cardinality it grows without bound (one row per
+  identity; bounded for normal key sets).
+- **Same-timestamp cross-store type change.** The overlay wins an exact-ts tie,
+  continuing the documented same-timestamp (B1) limitation below.
+- **Batch latest read / key discovery deferred.** `findLatestByEntityIds(Async)`
+  (new in v4.3.1.2) throws `UnsupportedOperationException` (Wk 10); the
+  key-discovery methods throw it too (Wk 9).
+
+The `telemetry_latest` table is created on startup by a **second** idempotent
+schema bootstrap (`schema-iotdb-table-latest.sql`), registered only when the
+latest selector is active and `iotdb.schema.bootstrap` is not disabled; when the
+latest selector is off the overlay table is never created.
+
 ## Known limitations
 
 **Same-timestamp type change across separate flushes.** The writer collapses
@@ -155,7 +212,7 @@ Key activation and operational flags:
 | `iotdb.username` / `iotdb.password` | `root` / `root` | IoTDB credentials. |
 | `iotdb.database` | `thingsboard` | Target IoTDB database. |
 | `iotdb.session-pool-size` | `8` | Table session pool size. |
-| `iotdb.schema.bootstrap` | `true` | When `true`, the module runs an idempotent startup bootstrap that reads `schema-iotdb-table.sql` from the classpath and creates the `telemetry` / `entity_attributes` tables (and database) on a fresh IoTDB before the first write. Set to `false` if you manage the schema out-of-band. |
+| `iotdb.schema.bootstrap` | `true` | When `true`, the module runs an idempotent startup bootstrap that reads `schema-iotdb-table.sql` from the classpath and creates the `telemetry` / `entity_attributes` tables (and database) on a fresh IoTDB before the first write. When the latest selector is active it also runs a second bootstrap from `schema-iotdb-table-latest.sql` to create the `telemetry_latest` overlay table. Set to `false` if you manage the schema out-of-band. |
 
 The module is a Spring Boot **auto-configuration** (`IoTDBTableConfiguration`).
 Its deployment host is ThingsBoard 4.3.x, which runs on Spring Boot 3.5.x, so the

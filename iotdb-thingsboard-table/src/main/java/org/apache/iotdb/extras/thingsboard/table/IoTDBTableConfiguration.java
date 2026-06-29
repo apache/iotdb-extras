@@ -176,6 +176,33 @@ public class IoTDBTableConfiguration {
         IoTDBTableConfig config) {
       return new IoTDBTableSchemaBootstrap(tableSessionPool, config);
     }
+
+    /**
+     * Second idempotent startup schema bootstrap that creates the {@code telemetry_latest} overlay
+     * table from {@code schema-iotdb-table-latest.sql}. It is registered ONLY when the
+     * derived-latest DAO is active (same {@link IoTDBTableLatestEnabledCondition} guard, the {@code
+     * TimeseriesLatestDao} class and the module pool are present) and {@code
+     * iotdb.schema.bootstrap} is not disabled. It deliberately carries NO
+     * {@code @ConditionalOnMissingBean} so it always runs alongside {@link #schemaBootstrap()} (a
+     * distinct bean name); both resources are self-contained ({@code CREATE DATABASE IF NOT EXISTS}
+     * + {@code USE} + {@code CREATE TABLE IF NOT EXISTS}), so the two bootstrap beans are
+     * order-independent and idempotent. When the latest selector is off, the overlay table is never
+     * created (latest path stays inert).
+     */
+    @Bean
+    @ConditionalOnClass(name = TIMESERIES_LATEST_DAO_CLASS_NAME)
+    @ConditionalOnBean(name = IOTDB_TABLE_SESSION_POOL_BEAN_NAME)
+    @Conditional(IoTDBTableLatestEnabledCondition.class)
+    @ConditionalOnProperty(
+        name = "iotdb.schema.bootstrap",
+        havingValue = "true",
+        matchIfMissing = true)
+    IoTDBTableSchemaBootstrap latestSchemaBootstrap(
+        @Qualifier(IOTDB_TABLE_SESSION_POOL_BEAN_NAME) ITableSessionPool tableSessionPool,
+        IoTDBTableConfig config) {
+      return new IoTDBTableSchemaBootstrap(
+          tableSessionPool, config, IoTDBTableSchemaBootstrap.LATEST_SCHEMA_RESOURCE);
+    }
   }
 
   /**

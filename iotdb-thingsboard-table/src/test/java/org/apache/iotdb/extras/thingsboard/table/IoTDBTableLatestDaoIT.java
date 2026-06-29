@@ -19,6 +19,7 @@
 package org.apache.iotdb.extras.thingsboard.table;
 
 import org.apache.iotdb.isession.ITableSession;
+import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
@@ -33,8 +34,10 @@ import org.testcontainers.utility.DockerImageName;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.kv.BaseDeleteTsKvQuery;
 import org.thingsboard.server.common.data.kv.DataType;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
+import org.thingsboard.server.common.data.kv.TsKvLatestRemovingResult;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +51,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -80,6 +85,7 @@ class IoTDBTableLatestDaoIT {
             "55555555-5555-5555-5555-555555555501",
             "66666666-6666-6666-6666-666666666601");
     bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
     try (ITableSessionPool pool = newPool(scope.database())) {
       IoTDBTableConfig config = config(5);
       IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
@@ -123,6 +129,7 @@ class IoTDBTableLatestDaoIT {
             "55555555-5555-5555-5555-555555555502",
             "66666666-6666-6666-6666-666666666602");
     bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
     try (ITableSessionPool pool = newPool(scope.database())) {
       IoTDBTableConfig config = config(8);
       IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
@@ -168,6 +175,7 @@ class IoTDBTableLatestDaoIT {
             "55555555-5555-5555-5555-555555555503",
             "66666666-6666-6666-6666-666666666603");
     bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
     try (ITableSessionPool pool = newPool(scope.database())) {
       IoTDBTableConfig config = config(1);
       IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
@@ -199,6 +207,7 @@ class IoTDBTableLatestDaoIT {
             "55555555-5555-5555-5555-555555555505",
             "66666666-6666-6666-6666-666666666605");
     bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
     try (ITableSessionPool pool = newPool(scope.database())) {
       IoTDBTableConfig config = config(1);
       IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
@@ -232,6 +241,251 @@ class IoTDBTableLatestDaoIT {
                         .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
         assertInstanceOf(IllegalStateException.class, failure.getCause());
         assertTrue(failure.getCause().getMessage().contains("2 typed value columns set"));
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  // ---- latest overlay (telemetry_latest): second bootstrap, saveLatest, merge, removeLatest ----
+
+  @Test
+  void latestOverlayBootstrap_createsTelemetryLatestTable() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_boot",
+            "55555555-5555-5555-5555-555555555510",
+            "66666666-6666-6666-6666-666666666610");
+    bootstrapSchema(scope.database());
+    // The SECOND bootstrap (schema-iotdb-table-latest.sql via the 3-arg ctor) creates the overlay.
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      // Querying telemetry_latest must succeed (table exists); it is empty until a saveLatest.
+      try (ITableSession session = pool.getSession();
+          SessionDataSet dataSet =
+              session.executeQueryStatement("SELECT key FROM telemetry_latest")) {
+        assertFalse(dataSet.iterator().next(), "telemetry_latest should exist and be empty");
+      }
+      // Idempotency: a second bootstrap run must not throw.
+      bootstrapLatestSchema(scope.database());
+    }
+  }
+
+  @Test
+  void withoutLatestBootstrap_telemetryLatestTableIsNotCreated() throws Exception {
+    // The latest overlay DDL lives in a SEPARATE resource gated by the latest selector; the base
+    // bootstrap alone must NOT create telemetry_latest (latest-off => overlay table absent).
+    TestScope scope =
+        scope(
+            "lt_off",
+            "55555555-5555-5555-5555-555555555511",
+            "66666666-6666-6666-6666-666666666611");
+    bootstrapSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database());
+        ITableSession session = pool.getSession()) {
+      assertThrows(
+          Exception.class, () -> session.executeQueryStatement("SELECT key FROM telemetry_latest"));
+    }
+  }
+
+  @Test
+  void latestOnlySaveLatest_thenFindLatest_roundTripsWithoutPairedSave() throws Exception {
+    // Load-bearing EntityView LATEST_AND_WS case: saveLatest is called with NO paired tsDao.save(),
+    // so nothing writes the telemetry table. The overlay must capture the value and findLatest must
+    // return it (the no-shadow-table no-op would have dropped it).
+    TestScope scope =
+        scope(
+            "lt_only",
+            "55555555-5555-5555-5555-555555555512",
+            "66666666-6666-6666-6666-666666666612");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(1);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        saveLatest(latestDao, scope, entry(1000L, "bool", DataType.BOOLEAN, true));
+        saveLatest(latestDao, scope, entry(1000L, "long", DataType.LONG, 42L));
+        saveLatest(latestDao, scope, entry(1000L, "double", DataType.DOUBLE, 4.2D));
+        saveLatest(latestDao, scope, entry(1000L, "string", DataType.STRING, "value"));
+        saveLatest(latestDao, scope, entry(1000L, "json", DataType.JSON, "{\"v\":1}"));
+
+        assertLatest(latestDao, scope, "bool", 1000L, DataType.BOOLEAN, true);
+        assertLatest(latestDao, scope, "long", 1000L, DataType.LONG, 42L);
+        assertLatest(latestDao, scope, "double", 1000L, DataType.DOUBLE, 4.2D);
+        assertLatest(latestDao, scope, "string", 1000L, DataType.STRING, "value");
+        assertLatest(latestDao, scope, "json", 1000L, DataType.JSON, "{\"v\":1}");
+
+        // Overwrite is delete-then-insert: a single overlay row survives, holding the newer value.
+        saveLatest(latestDao, scope, entry(2000L, "long", DataType.LONG, 99L));
+        assertLatest(latestDao, scope, "long", 2000L, DataType.LONG, 99L);
+        assertEquals(1, overlayRowCount(pool, scope, "long"));
+      } finally {
+        latestDao.destroy();
+      }
+    }
+  }
+
+  @Test
+  void findLatest_mergesTelemetryAndOverlayByMaxTs() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_merge",
+            "55555555-5555-5555-5555-555555555513",
+            "66666666-6666-6666-6666-666666666613");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(2);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // k_over: telemetry@1000 then a NEWER overlay@2000 -> overlay wins.
+        saveAll(tsDao, scope, List.of(entry(1000L, "k_over", DataType.LONG, 1L)));
+        saveLatest(latestDao, scope, entry(2000L, "k_over", DataType.LONG, 99L));
+        assertLatest(latestDao, scope, "k_over", 2000L, DataType.LONG, 99L);
+
+        // k_deriv: overlay@2000 then a NEWER telemetry@3000 -> derived wins.
+        saveLatest(latestDao, scope, entry(2000L, "k_deriv", DataType.LONG, 5L));
+        saveAll(tsDao, scope, List.of(entry(3000L, "k_deriv", DataType.LONG, 7L)));
+        assertLatest(latestDao, scope, "k_deriv", 3000L, DataType.LONG, 7L);
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void findAllLatest_mixesDerivedAndOverlayOnlyKeys() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_all_mix",
+            "55555555-5555-5555-5555-555555555514",
+            "66666666-6666-6666-6666-666666666614");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(4);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // derived-only key, overlay-only key, and a key present in both (overlay newer -> wins).
+        saveAll(
+            tsDao,
+            scope,
+            List.of(
+                entry(1000L, "derived", DataType.DOUBLE, 1.5D),
+                entry(1000L, "both", DataType.LONG, 1L)));
+        saveLatest(latestDao, scope, entry(2000L, "overlay", DataType.STRING, "ov"));
+        saveLatest(latestDao, scope, entry(2000L, "both", DataType.LONG, 9L));
+
+        List<TsKvEntry> latest =
+            latestDao
+                .findAllLatest(scope.tenantId(), scope.entityId())
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        latest.sort(Comparator.comparing(TsKvEntry::getKey));
+
+        assertEquals(3, latest.size());
+        assertEntry(latest.get(0), 2000L, "both", DataType.LONG, 9L);
+        assertEntry(latest.get(1), 1000L, "derived", DataType.DOUBLE, 1.5D);
+        assertEntry(latest.get(2), 2000L, "overlay", DataType.STRING, "ov");
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void removeLatest_ofOverlayValue_marksRemovedAndClearsOverlay() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_rm",
+            "55555555-5555-5555-5555-555555555515",
+            "66666666-6666-6666-6666-666666666615");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(1);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        saveLatest(latestDao, scope, entry(1500L, "k", DataType.LONG, 7L));
+        assertLatest(latestDao, scope, "k", 1500L, DataType.LONG, 7L);
+
+        TsKvLatestRemovingResult result =
+            latestDao
+                .removeLatest(
+                    scope.tenantId(), scope.entityId(), new BaseDeleteTsKvQuery("k", 1000L, 2000L))
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertTrue(result.isRemoved());
+        assertNull(result.getVersion());
+
+        // Overlay row deleted and (no telemetry) findLatest is now empty.
+        assertEquals(0, overlayRowCount(pool, scope, "k"));
+        assertTrue(
+            latestDao
+                .findLatestOpt(scope.tenantId(), scope.entityId(), "k")
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .isEmpty());
+      } finally {
+        latestDao.destroy();
+      }
+    }
+  }
+
+  @Test
+  void removeLatest_rewriteResurrectsPriorHistoryIntoOverlay() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_rw",
+            "55555555-5555-5555-5555-555555555516",
+            "66666666-6666-6666-6666-666666666616");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(2);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // History: a prior value@1000 (outside the delete window) and the in-window latest@1500.
+        saveAll(
+            tsDao,
+            scope,
+            List.of(entry(1000L, "k", DataType.LONG, 10L), entry(1500L, "k", DataType.LONG, 20L)));
+        assertLatest(latestDao, scope, "k", 1500L, DataType.LONG, 20L);
+
+        // Delete window [1200, 2000) covers the latest@1500 but not the prior@1000; rewrite=true.
+        TsKvLatestRemovingResult result =
+            latestDao
+                .removeLatest(
+                    scope.tenantId(),
+                    scope.entityId(),
+                    new BaseDeleteTsKvQuery("k", 1200L, 2000L, true))
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        // The removing result carries the resurrected prior value (WS UPDATE, not DELETE).
+        assertTrue(result.isRemoved());
+        assertNull(result.getVersion());
+        assertNotNull(result.getData());
+        assertEquals(1000L, result.getData().getTs());
+        assertEquals(DataType.LONG, result.getData().getDataType());
+        assertEquals(10L, result.getData().getValue());
+
+        // The prior was written back into the overlay (one row, holding 1000/10). The in-window
+        // telemetry row is NOT deleted by this DAO (TB's historical remove is a separate path), so
+        // the derived read still sees 1500 -- assert the overlay write-back directly.
+        assertEquals(1, overlayRowCount(pool, scope, "k"));
+        OverlayRow overlay = overlayRow(pool, scope, "k");
+        assertEquals(1000L, overlay.ts());
+        assertEquals(10L, overlay.longValue());
       } finally {
         latestDao.destroy();
         tsDao.destroy();
@@ -313,6 +567,20 @@ class IoTDBTableLatestDaoIT {
     }
   }
 
+  private void bootstrapLatestSchema(String database) throws Exception {
+    // Exercise the REAL production bootstrap path: the 3-arg IoTDBTableSchemaBootstrap loading the
+    // telemetry_latest overlay resource. The bootstrap pool has no fixed database (CREATE DATABASE
+    // runs first), and the config carries the target database so the DDL is rewritten onto it.
+    awaitIoTDBReady(database);
+    IoTDBTableConfig config = new IoTDBTableConfig();
+    config.setDatabase(database);
+    try (ITableSessionPool bootstrapPool = newPool(null)) {
+      new IoTDBTableSchemaBootstrap(
+              bootstrapPool, config, IoTDBTableSchemaBootstrap.LATEST_SCHEMA_RESOURCE)
+          .afterPropertiesSet();
+    }
+  }
+
   private void awaitIoTDBReady(String database) throws Exception {
     long deadlineNanos = System.nanoTime() + IOTDB_READY_TIMEOUT.toNanos();
     Exception lastFailure = null;
@@ -354,6 +622,55 @@ class IoTDBTableLatestDaoIT {
       assertEquals(1, future.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
   }
+
+  private void saveLatest(IoTDBTableLatestDao dao, TestScope scope, TestTsKvEntry entry)
+      throws Exception {
+    // saveLatest writes the overlay only (no paired tsDao.save()) and returns a null version.
+    assertNull(
+        dao.saveLatest(scope.tenantId(), scope.entityId(), entry)
+            .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+  }
+
+  private int overlayRowCount(ITableSessionPool pool, TestScope scope, String key)
+      throws Exception {
+    try (ITableSession session = pool.getSession();
+        SessionDataSet dataSet =
+            session.executeQueryStatement(
+                "SELECT bool_v,long_v,double_v,str_v,json_v FROM telemetry_latest WHERE tenant_id='"
+                    + scope.tenantId().getId()
+                    + "' AND entity_type='DEVICE' AND entity_id='"
+                    + scope.entityId().getId()
+                    + "' AND key='"
+                    + key.replace("'", "''")
+                    + "'")) {
+      SessionDataSet.DataIterator rows = dataSet.iterator();
+      int rowCount = 0;
+      while (rows.next()) {
+        rowCount++;
+      }
+      return rowCount;
+    }
+  }
+
+  private OverlayRow overlayRow(ITableSessionPool pool, TestScope scope, String key)
+      throws Exception {
+    try (ITableSession session = pool.getSession();
+        SessionDataSet dataSet =
+            session.executeQueryStatement(
+                "SELECT time, long_v FROM telemetry_latest WHERE tenant_id='"
+                    + scope.tenantId().getId()
+                    + "' AND entity_type='DEVICE' AND entity_id='"
+                    + scope.entityId().getId()
+                    + "' AND key='"
+                    + key.replace("'", "''")
+                    + "'")) {
+      SessionDataSet.DataIterator rows = dataSet.iterator();
+      assertTrue(rows.next(), "expected one overlay row for key " + key);
+      return new OverlayRow(rows.getTimestamp("time").getTime(), rows.getLong("long_v"));
+    }
+  }
+
+  private record OverlayRow(long ts, long longValue) {}
 
   private TestScope scope(String databasePrefix, String tenantId, String entityId) {
     return new TestScope(
