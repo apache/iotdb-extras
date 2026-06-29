@@ -51,6 +51,7 @@ import org.thingsboard.server.common.data.kv.TsKvLatestRemovingResult;
 import org.thingsboard.server.dao.timeseries.TimeseriesLatestDao;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,15 +125,23 @@ import java.util.concurrent.locks.Lock;
  *   <li><b>Overlay growth.</b> {@code telemetry_latest} is {@code TTL='INF'} with no entity-level
  *       cleanup, so under unbounded key cardinality it grows without bound (one row per identity;
  *       bounded for normal key sets).
+ *   <li><b>Single-JVM overlay convergence.</b> The per-identity lock serializing overlay writes is
+ *       in-JVM (Striped), so the delete-then-insert converges to one row per identity only within a
+ *       node. In a clustered ThingsBoard deployment two nodes writing the same identity
+ *       concurrently can transiently leave two overlay rows until the next write (the max-ts read
+ *       merge still returns the newer value). The sibling AttributesDao gates this with an explicit
+ *       cluster-mode acknowledgement; a symmetric ack for the latest overlay is a mentor-review
+ *       option, documented here for parity in the meantime.
  *   <li><b>Same-timestamp cross-store type change.</b> The overlay wins an exact-ts tie, continuing
  *       the documented B1 same-timestamp limitation.
  * </ul>
  *
- * <p>The key-discovery SPI methods ({@link #findAllKeysByDeviceProfileId}, {@link
- * #findAllKeysByEntityIds}, {@link #findAllKeysByEntityIdsAsync}) are deferred to GSOC-304 Wk 9,
- * and the batch {@link #findLatestByEntityIds}/{@link #findLatestByEntityIdsAsync} pair (new in
- * ThingsBoard v4.3.1.2) to GSOC-304 Wk 10; all currently throw {@link
- * UnsupportedOperationException}.
+ * <p>The key-discovery SPI methods ({@link #findAllKeysByEntityIds}, {@link
+ * #findAllKeysByEntityIdsAsync}) are deferred to GSOC-304 Wk 9, and the batch {@link
+ * #findLatestByEntityIds}/{@link #findLatestByEntityIdsAsync} pair (new in ThingsBoard v4.3.1.2) to
+ * GSOC-304 Wk 10; all currently throw {@link UnsupportedOperationException}. {@link
+ * #findAllKeysByDeviceProfileId} instead returns an empty list (no 500) pending full tenant-wide
+ * key discovery in GSOC-304 Wk 9.
  *
  * @see "GSOC-304 design doc section 6.0"
  * @see "GSOC-304 latest-overlay design note"
@@ -200,9 +209,9 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
   private final AtomicBoolean accepting = new AtomicBoolean(true);
   private final AtomicBoolean destroyed = new AtomicBoolean(false);
   private final long shutdownDrainTimeoutMs;
-  // Per-identity write/snapshot serialization for the overlay (single-JVM convergence). Only
-  // saveLatest and removeLatest take it; the merged reads (findLatest/findAllLatest) stay
-  // best-effort/unlocked like the derived reads.
+  // Per-identity write/snapshot serialization for the overlay (single-JVM convergence). saveLatest,
+  // removeLatest and the single-key point reads (findLatest/findLatestOpt) take it; only the
+  // multi-key findAllLatest stays best-effort/unlocked like the derived reads.
   private final Striped<Lock> identityLocks = Striped.lock(256);
 
   public IoTDBTableLatestDao(ITableSessionPool tableSessionPool, IoTDBTableConfig config) {
@@ -227,7 +236,7 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     Objects.requireNonNull(tenantId, "tenantId");
     Objects.requireNonNull(entityId, "entityId");
     String telemetryKey = requireTelemetryKey(key);
-    return submitReadTask(() -> doFindLatest(tenantId, entityId, telemetryKey));
+    return submitReadTask(() -> lockedFindLatest(tenantId, entityId, telemetryKey));
   }
 
   @Override
@@ -237,7 +246,7 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     String telemetryKey = requireTelemetryKey(key);
     return submitReadTask(
         () ->
-            doFindLatest(tenantId, entityId, telemetryKey)
+            lockedFindLatest(tenantId, entityId, telemetryKey)
                 .orElseGet(() -> nullEntry(telemetryKey)));
   }
 
@@ -256,16 +265,26 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     Objects.requireNonNull(tsKvEntry, "tsKvEntry");
     String key = requireTelemetryKey(tsKvEntry.getKey());
     // The async/batched historical save() cannot be observed here, so saveLatest cannot tell a
-    // latest-only write from a full-save and writes the per-key overlay UNCONDITIONALLY
-    // (delete-then-insert under a per-identity lock). This closes the latest-only data-loss gap
-    // (e.g. EntityView LATEST_AND_WS / saveTs=false) that a no-shadow-table no-op would drop. See
-    // the class javadoc (overlay rationale + PR-2 review flags).
+    // latest-only write from a full-save and writes the per-key overlay (delete-then-insert under a
+    // per-identity lock) on every call EXCEPT when a strictly newer latest already exists (max-ts
+    // guard below). This closes the latest-only data-loss gap (e.g. EntityView LATEST_AND_WS /
+    // saveTs=false) that a no-shadow-table no-op would drop. See the class javadoc (overlay
+    // rationale + PR-2 review flags).
     Lock lock = identityLock(tenantId, entityId, key);
     return submitReadTask(
         () -> {
           lock.lock();
           try {
-            upsertOverlay(tenantId, entityId, tsKvEntry, key);
+            // Max-ts-wins, not last-write-wins: skip a backdated saveLatest so an out-of-order
+            // write never regresses the latest below a newer value already stored (matches the
+            // ThingsBoard ts_kv_latest default ON CONFLICT ... WHERE ts <= excluded.ts). Strict '>'
+            // keeps the documented overlay-wins-on-exact-tie (B1) rule. saveLatest already holds
+            // the
+            // identity lock, so doFindLatest is called directly (no re-lock).
+            Optional<TsKvEntry> current = doFindLatest(tenantId, entityId, key);
+            if (current.isEmpty() || current.get().getTs() <= tsKvEntry.getTs()) {
+              upsertOverlay(tenantId, entityId, tsKvEntry, key);
+            }
           } finally {
             lock.unlock();
           }
@@ -301,9 +320,14 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
   @Override
   public List<String> findAllKeysByDeviceProfileId(
       TenantId tenantId, DeviceProfileId deviceProfileId) {
-    // Key discovery is deferred to GSOC-304 Wk 9 (design doc 6.2 "key discovery methods").
-    throw new UnsupportedOperationException(
-        "IoTDB Table Mode latest key discovery not implemented yet (GSOC-304 Wk 9)");
+    // Config-time UI key enumeration (GET /api/deviceProfile/devices/keys/timeseries,
+    // TENANT_ADMIN).
+    // Return empty rather than throwing so the endpoint degrades gracefully instead of returning
+    // 500 — matching the sibling IoTDBTableAttributesDao and the non-relational ThingsBoard
+    // backends
+    // (e.g. CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId returns an empty list).
+    // Tenant-wide DISTINCT-key discovery (the null-deviceProfileId branch) is GSOC-304 Wk 9.
+    return Collections.emptyList();
   }
 
   @Override
@@ -370,6 +394,21 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     Optional<TsKvEntry> overlay =
         readLatestRow(buildFindLatestOverlaySql(tenantId, entityId, key), key, "time");
     return mergeLatest(derived, overlay);
+  }
+
+  // Single-key point reads take the per-identity lock so a concurrent saveLatest/removeLatest
+  // delete-then-insert on the same identity is never observed mid-window (for an overlay-only key
+  // there is no derived row to mask the gap). The multi-key findAllLatest stays unlocked, matching
+  // the sibling IoTDBTableAttributesDao.findAll.
+  private Optional<TsKvEntry> lockedFindLatest(TenantId tenantId, EntityId entityId, String key)
+      throws Exception {
+    Lock lock = identityLock(tenantId, entityId, key);
+    lock.lock();
+    try {
+      return doFindLatest(tenantId, entityId, key);
+    } finally {
+      lock.unlock();
+    }
   }
 
   private List<TsKvEntry> doFindAllLatest(TenantId tenantId, EntityId entityId) throws Exception {

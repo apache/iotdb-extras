@@ -272,6 +272,8 @@ class IoTDBTableLatestDaoTest {
   @Test
   void saveLatest_upsertsOverlayWithDeleteThenInsertAndNullVersion() throws Exception {
     TestContext context = newContext();
+    // No existing latest in either store (max-ts guard passes), so the overlay write proceeds.
+    stubReads(context.session(), rows(), rows());
 
     Long version =
         context
@@ -311,6 +313,8 @@ class IoTDBTableLatestDaoTest {
     // (entity_type, tenant_id, key, entity_id), then the five typed FIELDs, with NO
     // ColumnCategory.TIME entry (the time column is written via addTimestamp).
     TestContext context = newContext();
+    // No existing latest in either store (max-ts guard passes), so the overlay write proceeds.
+    stubReads(context.session(), rows(), rows());
 
     context
         .dao()
@@ -348,6 +352,8 @@ class IoTDBTableLatestDaoTest {
   @Test
   void saveLatest_escapesSingleQuotesInKey() throws Exception {
     TestContext context = newContext();
+    // No existing latest in either store (max-ts guard passes), so the overlay write proceeds.
+    stubReads(context.session(), rows(), rows());
 
     context
         .dao()
@@ -366,6 +372,35 @@ class IoTDBTableLatestDaoTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> context.dao().saveLatest(TENANT_ID, ENTITY_ID, entry(1L, "  ", DataType.LONG, 1L)));
+  }
+
+  @Test
+  void saveLatest_backdatedWriteDoesNotRegressOverlayOnlyLatest() throws Exception {
+    TestContext context = newContext();
+    // Overlay-only latest already at ts=200 (no derived row). A backdated saveLatest(ts=100) reads
+    // the merged latest first and, because 200 is strictly newer, must be SKIPPED (max-ts-wins) so
+    // it never regresses the latest below the newer stored value.
+    stubReads(context.session(), rows(), rows(row(200L, "long_v", 7L)));
+
+    Long version =
+        context
+            .dao()
+            .saveLatest(TENANT_ID, ENTITY_ID, entry(100L, "temperature", DataType.LONG, 1L))
+            .get(3, TimeUnit.SECONDS);
+    assertNull(version);
+
+    // The backdated write is skipped: no overlay DELETE and no overlay INSERT happened.
+    verify(context.session(), never()).executeNonQueryStatement(anyString());
+    verify(context.session(), never()).insert(any());
+
+    // A forward saveLatest(ts=300) is newer than the stored 200, so it MUST write the overlay
+    // (delete-then-insert).
+    context
+        .dao()
+        .saveLatest(TENANT_ID, ENTITY_ID, entry(300L, "temperature", DataType.LONG, 9L))
+        .get(3, TimeUnit.SECONDS);
+    verify(context.session(), timeout(3000)).executeNonQueryStatement(anyString());
+    verify(context.session(), timeout(3000)).insert(any());
   }
 
   // ---- removeLatest: overlay-aware ----

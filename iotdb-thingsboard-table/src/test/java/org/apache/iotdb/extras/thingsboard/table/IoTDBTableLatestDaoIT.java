@@ -494,6 +494,37 @@ class IoTDBTableLatestDaoIT {
     }
   }
 
+  @Test
+  void saveLatest_outOfOrderDoesNotRegressOverlayOnlyLatest() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_ooo",
+            "55555555-5555-5555-5555-555555555517",
+            "66666666-6666-6666-6666-666666666617");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(1);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // Overlay-only key (no paired tsDao.save()): saveLatest@200 then a BACKDATED
+        // saveLatest@100.
+        // Max-ts-wins: the out-of-order write must NOT regress the latest below the stored 200.
+        saveLatest(latestDao, scope, entry(200L, "k", DataType.LONG, 20L));
+        saveLatest(latestDao, scope, entry(100L, "k", DataType.LONG, 10L));
+        assertLatest(latestDao, scope, "k", 200L, DataType.LONG, 20L);
+        // The backdated write was skipped, so a single overlay row (the 200 value) survives.
+        assertEquals(1, overlayRowCount(pool, scope, "k"));
+
+        // A forward saveLatest@300 is newer than the stored 200 and MUST win.
+        saveLatest(latestDao, scope, entry(300L, "k", DataType.LONG, 30L));
+        assertLatest(latestDao, scope, "k", 300L, DataType.LONG, 30L);
+      } finally {
+        latestDao.destroy();
+      }
+    }
+  }
+
   private void assertLatest(
       IoTDBTableLatestDao latestDao,
       TestScope scope,
