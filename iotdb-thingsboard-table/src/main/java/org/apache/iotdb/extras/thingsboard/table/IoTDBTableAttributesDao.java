@@ -128,8 +128,14 @@ import java.util.concurrent.locks.ReadWriteLock;
  *       scope, consistent with the Wk4 latest DAO).
  *   <li>{@code findNextBatch} is a relational keyset-pagination migration helper with no IoTDB
  *       equivalent; it throws {@code UnsupportedOperationException} (Wk5 decision note section 6).
- *   <li>{@code findAllKeysByDeviceProfileId} with a non-null profile returns an empty list: {@code
- *       entity_attributes} has no {@code device_profile_id} tag (mirrors the Wk4 latest DAO).
+ *   <li>{@code findAllKeysByDeviceProfileId} with a non-null profile returns an empty list,
+ *       matching the official non-relational backend ({@code
+ *       CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId} also returns {@code
+ *       Collections.emptyList()}): {@code entity_attributes} has no {@code device_profile_id} tag,
+ *       and the sole caller — {@code DeviceProfileController} {@code GET
+ *       /api/deviceProfile/devices/keys/attributes} (TENANT_ADMIN, a config-time UI key
+ *       enumeration) — tolerates an empty result. A real device→profile lookup is a Phase-2 / Wk9
+ *       optional enhancement.
  *   <li>{@code removeAllByEntityId} is best-effort select-then-delete (IoTDB has no {@code DELETE
  *       ... RETURNING}); a key inserted between the select and the delete may be deleted but not
  *       reported.
@@ -611,8 +617,18 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
         throw new IllegalStateException("Failed to read attribute keys by tenant", e);
       }
     }
-    // Non-null profile lookup is documented-deferred: entity_attributes has no device_profile_id
-    // tag and the module has no device -> profile lookup (mirrors the Wk4 latest DAO).
+    // Non-null profile lookup returns an empty list, matching the official non-relational backend:
+    // CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId also returns
+    // Collections.emptyList(), because a NoSQL / time-series store cannot do the cross-device-table
+    // profile-dimension join. The sole upstream caller is DeviceProfileController
+    // GET /api/deviceProfile/devices/keys/attributes (getAttributesKeys, @PreAuthorize
+    // TENANT_ADMIN)
+    // -- a config-time UI key-enumeration endpoint that tolerates an empty result; failing loud
+    // here
+    // would 500 under IoTDB while Cassandra returns empty, an avoidable backend inconsistency.
+    // entity_attributes has no device_profile_id tag and the module has no device -> profile
+    // lookup;
+    // a real cross-DB implementation is a Phase-2 / Wk9 optional enhancement, not Phase-1.
     return Collections.emptyList();
   }
 

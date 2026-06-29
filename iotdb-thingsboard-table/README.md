@@ -105,10 +105,17 @@ row.
   migration helper with no IoTDB equivalent; it throws
   `UnsupportedOperationException`.
 - **`findAllKeysByDeviceProfileId` with a non-null profile returns an empty
-  list.** `entity_attributes` has no `device_profile_id` tag and the module has no
-  device→profile lookup. The null-profile path returns the tenant-wide distinct
-  keys. (Open decision: silent-empty vs fail-loud vs TB join — tracked for the Wk5
-  weekly report.)
+  list**, matching the official non-relational backend:
+  `CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId` also returns
+  `Collections.emptyList()`, since a NoSQL / time-series store cannot do the
+  cross-device-table profile-dimension join. `entity_attributes` has no
+  `device_profile_id` tag and the module has no device→profile lookup. The sole
+  upstream caller is `DeviceProfileController`
+  `GET /api/deviceProfile/devices/keys/attributes` (TENANT_ADMIN, a config-time UI
+  key enumeration) which tolerates an empty result; failing loud would 500 under
+  IoTDB while Cassandra returns empty. The null-profile path returns the
+  tenant-wide distinct keys. A real device→profile lookup is a Phase-2 / Wk9
+  optional enhancement.
 - **`save` is non-atomic.** The tag-only `DELETE`-then-`INSERT` is two separate
   statements with no rollback: if the `INSERT` fails after the `DELETE`, the value
   is lost. A concurrent same-identity point `find` takes the same per-identity
