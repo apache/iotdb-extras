@@ -27,7 +27,7 @@ package org.thingsboard.server.dao.model.sql;
  * <p>The upstream type is a relational JPA entity ({@code @Entity}, {@code @EmbeddedId},
  * {@code jakarta.persistence}) used only by the keyset-pagination migration helper {@code
  * AttributesDao.findNextBatch}. The IoTDB Table Mode backend documents that method as deferred (it
- * throws {@code UnsupportedOperationException}; see the Wk5 decision note section 6), so this stub
+ * throws {@code UnsupportedOperationException}), so this stub
  * carries none of the ORM fields or annotations — it exists purely so the {@code AttributesDao}
  * interface signature resolves at compile time. Excluded from the built jar; the IoTDB DAO never
  * constructs or returns an instance.

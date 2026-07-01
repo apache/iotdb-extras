@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,16 +86,17 @@ import java.util.concurrent.locks.Lock;
  * last cache ({@code ORDER BY time DESC LIMIT 1} and {@code LAST_BY(col, time)}); the overlay
  * supplements it.
  *
- * <p><b>Why the overlay is written on EVERY {@code saveLatest} (mentor-confirmed, PR-2 review
- * flag):</b> the module's historical {@code save()} write path is ASYNCHRONOUS and batched, so at
- * the moment {@code saveLatest} runs it cannot see whether a paired {@code telemetry} row will be
- * written (a normal full-save) or not (a latest-only write, e.g. the EntityView telemetry-copy
- * {@code LATEST_AND_WS} / {@code saveTs=false} path). It therefore cannot distinguish latest-only
- * from full-save and writes the overlay UNCONDITIONALLY (delete-then-insert, one row per identity).
- * This closes the data-loss gap for latest-only writes that the earlier no-shadow-table design left
- * open, at the cost of one extra overlay write per latest update (equivalent to the standard
- * ThingsBoard latest-table behavior). The overlay is effectively a latest table, so this partially
- * reverses the Phase-1 "no shadow table" choice; it is flagged here for the mentor's PR-2 review.
+ * <p><b>Why the overlay is written on EVERY {@code saveLatest}:</b> the module's historical {@code
+ * save()} write path is ASYNCHRONOUS and batched, so at the moment {@code saveLatest} runs it
+ * cannot see whether a paired {@code telemetry} row will be written (a normal full-save) or not (a
+ * latest-only write, e.g. the EntityView telemetry-copy {@code LATEST_AND_WS} / {@code
+ * saveTs=false} path). It therefore cannot distinguish latest-only from full-save and writes the
+ * overlay on every save (delete-then-insert, one row per identity), except a backdated write
+ * strictly older than the current latest, which the max-ts guard skips. This closes the data-loss
+ * gap for latest-only writes that the earlier no-shadow-table design left open, at the cost of one
+ * extra overlay write per latest update (equivalent to the standard ThingsBoard latest-table
+ * behavior). The overlay is effectively a latest table, so this partially reverses the Phase-1 "no
+ * shadow table" choice.
  *
  * <ul>
  *   <li>{@link #saveLatest} performs a tag-only {@code DELETE} of the identity in {@code
@@ -104,15 +106,16 @@ import java.util.concurrent.locks.Lock;
  *   <li>{@link #findLatestOpt}/{@link #findLatest}/{@link #findAllLatest} read the derived latest
  *       and the overlay and merge them by max timestamp per key (overlay wins on tie). The merge is
  *       not additive (max-by-ts), so a key present in both stores is never double-counted.
- *   <li>{@link #removeLatest} snapshots the merged latest under the per-identity lock, and when
- *       that latest is inside the half-open {@code [startTs, endTs)} delete window: deletes the
- *       overlay row, and — if {@code rewriteLatestIfDeleted} is set — resurrects the next-older
- *       historical value ({@code telemetry} where {@code time < startTs}) back into the overlay and
- *       returns it as {@code getData()} (so {@code onTimeSeriesDelete} emits a WS UPDATE rather
- *       than a DELETE).
+ *   <li>{@link #removeLatest} reads derived and overlay separately under the per-identity lock;
+ *       when the merged latest is inside the half-open {@code [startTs, endTs)} delete window it
+ *       deletes the overlay row ONLY if the overlay's own ts is in-window (an out-of-window overlay
+ *       value survives), and — if {@code rewriteLatestIfDeleted} is set — resurrects the next-older
+ *       value across BOTH stores ({@code telemetry} where {@code time < startTs} and an overlay
+ *       value older than the window; max-ts-wins) back into the overlay and returns it as {@code
+ *       getData()} (so {@code onTimeSeriesDelete} emits a WS UPDATE rather than a DELETE).
  * </ul>
  *
- * <p>Residual Phase-1 limitations (documented, flagged for the mentor's PR-2 review):
+ * <p>Residual Phase-1 limitations (documented):
  *
  * <ul>
  *   <li><b>{@code version} is always {@code null}.</b> IoTDB has no SQL sequence (same as the
@@ -122,6 +125,26 @@ import java.util.concurrent.locks.Lock;
  *       per-identity lock, but the historical {@code remove} runs as a SEPARATE future from {@code
  *       removeLatest}; a purely telemetry-derived (full-save) latest can transiently still be read
  *       from {@code telemetry} until that historical delete commits. Eventually consistent.
+ *   <li><b>Non-atomic overlay write (delete-then-insert).</b> The overlay write deletes the
+ *       identity then inserts the new row, and IoTDB has no multi-statement transaction.
+ *       Delete-first is REQUIRED so a same-timestamp type change converges to one typed column (an
+ *       insert at an existing {@code (tags, time)} merges columns), so the order cannot be reversed
+ *       to insert-first. Consequently an {@code INSERT} failure after the {@code DELETE} commits
+ *       loses a latest-only (overlay-only) value (a derived full-save value is still recoverable
+ *       from {@code telemetry}); the {@code saveLatest} future fails loud and the caller retries.
+ *   <li><b>Telemetry-only writes (saveWithoutLatest) surface via the derived read.</b> The latest
+ *       is MAX-ts over derived {@code telemetry} and the overlay, so a history-only write ({@code
+ *       saveWithoutLatest} / "skip latest persistence") that bumps {@code telemetry} above the last
+ *       {@code saveLatest} surfaces as the latest even though no {@code saveLatest} ran. Making the
+ *       overlay strictly authoritative when present is an option (not done in Phase-1 to keep the
+ *       engine-accelerated derived read primary).
+ *   <li><b>removeLatest honesty + overlapping deletes.</b> {@code removeLatest} deletes only an
+ *       overlay row whose OWN ts is inside the delete window and (on rewrite) resurrects the
+ *       next-older value across BOTH stores, so an out-of-window overlay value is never wiped.
+ *       {@code removed=true} still reflects the in-window latest being removed even when that value
+ *       is derived-only (deleted by the separate historical future); and a value resurrected by one
+ *       rewrite delete that a SECOND overlapping concurrent delete window also covers can
+ *       transiently persist in the overlay until the next write. Eventually consistent.
  *   <li><b>Overlay growth.</b> {@code telemetry_latest} is {@code TTL='INF'} with no entity-level
  *       cleanup, so under unbounded key cardinality it grows without bound (one row per identity;
  *       bounded for normal key sets).
@@ -130,22 +153,23 @@ import java.util.concurrent.locks.Lock;
  *       node. In a clustered ThingsBoard deployment two nodes writing the same identity
  *       concurrently can transiently leave two overlay rows until the next write (the max-ts read
  *       merge still returns the newer value). The sibling AttributesDao gates this with an explicit
- *       cluster-mode acknowledgement; a symmetric ack for the latest overlay is a mentor-review
- *       option, documented here for parity in the meantime.
+ *       cluster-mode acknowledgement; a symmetric ack for the latest overlay is an option,
+ *       documented here for parity in the meantime.
  *   <li><b>Same-timestamp cross-store type change.</b> The overlay wins an exact-ts tie, continuing
- *       the documented B1 same-timestamp limitation.
+ *       the documented same-timestamp two-type-column limitation (B1).
  * </ul>
  *
  * <p>The key-discovery SPI methods ({@link #findAllKeysByEntityIds}, {@link
- * #findAllKeysByEntityIdsAsync}) are deferred to GSOC-304 Wk 9, and the batch {@link
- * #findLatestByEntityIds}/{@link #findLatestByEntityIdsAsync} pair (new in ThingsBoard v4.3.1.2) to
- * GSOC-304 Wk 10; all currently throw {@link UnsupportedOperationException}. {@link
- * #findAllKeysByDeviceProfileId} instead returns an empty list (no 500) pending full tenant-wide
- * key discovery in GSOC-304 Wk 9.
- *
- * @see "GSOC-304 design doc section 6.0"
- * @see "GSOC-304 latest-overlay design note"
- * @since GSOC-304 Wk 4 latest DAO
+ * #findAllKeysByEntityIdsAsync}; full derived discovery is a follow-up) and the batch {@link
+ * #findLatestByEntityIds}/{@link #findLatestByEntityIdsAsync} pair (new in ThingsBoard v4.3.1.2;
+ * derived batch read is a follow-up) return an empty list rather than throwing, because they are
+ * reachable in normal operation — {@code findAllKeysByEntityIdsAsync}/{@code
+ * findLatestByEntityIdsAsync} back the dashboard {@code POST /api/entitiesQuery/find/keys} lookup
+ * (DefaultEntityQueryService#fetchTimeseriesKeys), and the sync {@code findAllKeysByEntityIds}
+ * backs entity-delete housekeeping — where a thrown {@link UnsupportedOperationException} would
+ * surface as an HTTP 500 / a failed cleanup task. This matches the official {@code
+ * CassandraBaseTimeseriesLatestDao}, which returns empty for all four, and {@link
+ * #findAllKeysByDeviceProfileId}.
  */
 @Slf4j
 @Repository
@@ -205,7 +229,7 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
           ColumnCategory.FIELD);
 
   private final ThreadPoolExecutor readExecutor;
-  private final java.util.Set<ReadTask<?>> readTasks = ConcurrentHashMap.newKeySet();
+  private final Set<ReadTask<?>> readTasks = ConcurrentHashMap.newKeySet();
   private final AtomicBoolean accepting = new AtomicBoolean(true);
   private final AtomicBoolean destroyed = new AtomicBoolean(false);
   private final long shutdownDrainTimeoutMs;
@@ -269,7 +293,7 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     // per-identity lock) on every call EXCEPT when a strictly newer latest already exists (max-ts
     // guard below). This closes the latest-only data-loss gap (e.g. EntityView LATEST_AND_WS /
     // saveTs=false) that a no-shadow-table no-op would drop. See the class javadoc (overlay
-    // rationale + PR-2 review flags).
+    // rationale).
     Lock lock = identityLock(tenantId, entityId, key);
     return submitReadTask(
         () -> {
@@ -280,8 +304,9 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
             // ThingsBoard ts_kv_latest default ON CONFLICT ... WHERE ts <= excluded.ts). Strict '>'
             // keeps the documented overlay-wins-on-exact-tie (B1) rule. saveLatest already holds
             // the
-            // identity lock, so doFindLatest is called directly (no re-lock).
-            Optional<TsKvEntry> current = doFindLatest(tenantId, entityId, key);
+            // identity lock, so the snapshot reads run directly (no re-lock); currentLatestForGuard
+            // is the B1-lenient merge so an ambiguous derived row never blocks every saveLatest.
+            Optional<TsKvEntry> current = currentLatestForGuard(tenantId, entityId, key);
             if (current.isEmpty() || current.get().getTs() <= tsKvEntry.getTs()) {
               upsertOverlay(tenantId, entityId, tsKvEntry, key);
             }
@@ -321,45 +346,49 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
   public List<String> findAllKeysByDeviceProfileId(
       TenantId tenantId, DeviceProfileId deviceProfileId) {
     // Config-time UI key enumeration (GET /api/deviceProfile/devices/keys/timeseries,
-    // TENANT_ADMIN).
-    // Return empty rather than throwing so the endpoint degrades gracefully instead of returning
-    // 500 — matching the sibling IoTDBTableAttributesDao and the non-relational ThingsBoard
-    // backends
-    // (e.g. CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId returns an empty list).
-    // Tenant-wide DISTINCT-key discovery (the null-deviceProfileId branch) is GSOC-304 Wk 9.
+    // TENANT_ADMIN). Return empty rather than throwing so the endpoint degrades gracefully instead
+    // of returning 500 — matching the sibling IoTDBTableAttributesDao and the non-relational
+    // ThingsBoard backends (e.g. CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId
+    // returns an empty list). Tenant-wide DISTINCT-key discovery (the null-deviceProfileId branch)
+    // is a follow-up.
     return Collections.emptyList();
   }
 
   @Override
   public List<String> findAllKeysByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
-    // Key discovery is deferred to GSOC-304 Wk 9 (design doc 6.2 "key discovery methods").
-    throw new UnsupportedOperationException(
-        "IoTDB Table Mode latest key discovery not implemented yet (GSOC-304 Wk 9)");
+    // Reachable in normal operation (entity-delete housekeeping, TelemetryDeletionTaskProcessor),
+    // so degrade gracefully rather than throw: the official CassandraBaseTimeseriesLatestDao also
+    // returns an empty list. Full derived DISTINCT-key discovery over the telemetry table
+    // is a follow-up.
+    return Collections.emptyList();
   }
 
   @Override
   public ListenableFuture<List<String>> findAllKeysByEntityIdsAsync(
       TenantId tenantId, List<EntityId> entityIds) {
-    // Key discovery is deferred to GSOC-304 Wk 9 (design doc 6.2 "key discovery methods").
-    throw new UnsupportedOperationException(
-        "IoTDB Table Mode latest key discovery not implemented yet (GSOC-304 Wk 9)");
+    // Backs POST /api/entitiesQuery/find/keys (DefaultEntityQueryService#fetchTimeseriesKeys), the
+    // dashboard "available telemetry keys" lookup — a synchronous throw here would surface as an
+    // HTTP 500. Mirror CassandraBaseTimeseriesLatestDao and return an empty future; full derived
+    // DISTINCT-key discovery is a follow-up.
+    return Futures.immediateFuture(Collections.emptyList());
   }
 
   @Override
   public List<TsKvEntry> findLatestByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
-    // Batch latest read (new in ThingsBoard v4.3.1.2) is deferred to GSOC-304 Wk 10
-    // (design doc 6.2 "findLatestByEntityIds batch optimization").
-    throw new UnsupportedOperationException(
-        "IoTDB Table Mode batch latest read not implemented yet (GSOC-304 Wk 10)");
+    // Batch latest read (new in ThingsBoard v4.3.1.2). Return empty (graceful) rather than throw,
+    // matching CassandraBaseTimeseriesLatestDao.findLatestByEntityIds; the derived batch
+    // read is a follow-up.
+    return Collections.emptyList();
   }
 
   @Override
   public ListenableFuture<List<TsKvEntry>> findLatestByEntityIdsAsync(
       TenantId tenantId, List<EntityId> entityIds) {
-    // Batch latest read (new in ThingsBoard v4.3.1.2) is deferred to GSOC-304 Wk 10
-    // (design doc 6.2 "findLatestByEntityIds batch optimization").
-    throw new UnsupportedOperationException(
-        "IoTDB Table Mode batch latest read not implemented yet (GSOC-304 Wk 10)");
+    // Backs the includeSamples branch of POST /api/entitiesQuery/find/keys
+    // (DefaultEntityQueryService#fetchTimeseriesKeys); a synchronous throw would surface as an HTTP
+    // 500. Mirror CassandraBaseTimeseriesLatestDao and return an empty future; the derived batch
+    // read is a follow-up.
+    return Futures.immediateFuture(Collections.emptyList());
   }
 
   @Override
@@ -393,6 +422,44 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
         readLatestRow(buildFindLatestSql(tenantId, entityId, key), key, "time");
     Optional<TsKvEntry> overlay =
         readLatestRow(buildFindLatestOverlaySql(tenantId, entityId, key), key, "time");
+    return mergeLatest(derived, overlay);
+  }
+
+  // Reads a single latest row but TOLERATES the B1 same-timestamp two-type fail-fast (getEntry's
+  // >1-typed-column IllegalStateException): returns empty instead of propagating, so an ambiguous
+  // telemetry row never blocks a saveLatest guard, a removeLatest snapshot, or a rewrite resurrect.
+  // The strict read paths (findLatest/findLatestOpt/findAllLatest) keep surfacing B1 as a fault.
+  // The
+  // catch is precise: IoTDBTableBaseDao.getEntry is the only IllegalStateException source here.
+  private Optional<TsKvEntry> readLatestRowB1Lenient(String sql, String key) throws Exception {
+    try {
+      return readLatestRow(sql, key, "time");
+    } catch (IllegalStateException b1) {
+      log.debug(
+          "Latest row for key '{}' is an ambiguous same-timestamp two-type row; treating it as "
+              + "absent for this guard/snapshot/resurrect",
+          key,
+          b1);
+      return Optional.empty();
+    }
+  }
+
+  // Derived (telemetry) point-read latest, B1-lenient: used by the saveLatest max-ts guard and the
+  // removeLatest snapshot so an ambiguous telemetry row never blocks a write or a delete.
+  private Optional<TsKvEntry> readDerivedLatestLenient(
+      TenantId tenantId, EntityId entityId, String key) throws Exception {
+    return readLatestRowB1Lenient(buildFindLatestSql(tenantId, entityId, key), key);
+  }
+
+  // Max-ts guard snapshot for saveLatest: B1-lenient derived + overlay (reads derived first, then
+  // overlay — the order the unit tests stub), so a same-timestamp two-type telemetry row cannot
+  // make
+  // every saveLatest for the identity fail.
+  private Optional<TsKvEntry> currentLatestForGuard(
+      TenantId tenantId, EntityId entityId, String key) throws Exception {
+    Optional<TsKvEntry> derived = readDerivedLatestLenient(tenantId, entityId, key);
+    Optional<TsKvEntry> overlay =
+        readLatestRowB1Lenient(buildFindLatestOverlaySql(tenantId, entityId, key), key);
     return mergeLatest(derived, overlay);
   }
 
@@ -481,13 +548,20 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
 
   // ---- overlay write (delete-then-insert) ----
 
+  // Delete-then-insert (NOT insert-then-delete): the tag-only DELETE removes the identity's overlay
+  // row across ALL time, then the single current row is inserted at time = tsKvEntry.getTs(). The
+  // delete must run first because an IoTDB insert at an existing (tags, time) MERGES typed columns
+  // (a null field does not overwrite an existing value), so inserting a different-type value at a
+  // same-timestamp row without clearing it first would leave two typed columns (the B1 fail-fast on
+  // read). The trade-off is a non-atomic write (IoTDB has no multi-statement transaction): if the
+  // INSERT fails after the DELETE commits the prior overlay value is lost (the future fails loud;
+  // documented in the class limitations). Insert-first would avoid that loss but re-break the
+  // same-timestamp convergence, so it is deliberately not used.
   private void upsertOverlay(TenantId tenantId, EntityId entityId, TsKvEntry tsKvEntry, String key)
       throws Exception {
     String deleteSql = buildDeleteLatestSql(tenantId, entityId, key);
     Tablet tablet = buildLatestTablet(tenantId, entityId, tsKvEntry, key);
     try (ITableSession session = tableSessionPool.getSession()) {
-      // Step 1: tag-only DELETE removes the identity's overlay row across all time (no time
-      // predicate). Step 2: insert the single current row at time = tsKvEntry.getTs().
       session.executeNonQueryStatement(deleteSql);
       session.insert(tablet);
     }
@@ -527,17 +601,28 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
 
   private TsKvLatestRemovingResult doRemoveLatest(
       TenantId tenantId, EntityId entityId, DeleteTsKvQuery query, String key) throws Exception {
-    // (1) Snapshot the merged latest (derived + overlay) under the per-identity lock; the overlay
-    // part of the snapshot is race-free wrt concurrent saveLatest/removeLatest on this identity.
-    Optional<TsKvEntry> latest = doFindLatest(tenantId, entityId, key);
+    long startTs = query.getStartTs();
+    long endTs = query.getEndTs();
+    // (1) Snapshot derived and overlay SEPARATELY under the per-identity lock, so the overlay
+    // mutation below is bounded by the OVERLAY row's OWN ts — not the merged ts, which can come
+    // from
+    // the derived telemetry store (e.g. a telemetry-only / saveWithoutLatest write). BOTH reads are
+    // B1-lenient: a same-ts two-type telemetry row must not block a delete, and although the
+    // overlay
+    // is single-typed within a JVM (per-identity lock + delete-then-insert), a clustered deployment
+    // (the latest path has no cluster-mode gate) could leave a same-ts two-type overlay row, which
+    // must not wedge the delete either — an ambiguous overlay is treated as absent and self-heals.
+    Optional<TsKvEntry> derived = readDerivedLatestLenient(tenantId, entityId, key);
+    Optional<TsKvEntry> overlay =
+        readLatestRowB1Lenient(buildFindLatestOverlaySql(tenantId, entityId, key), key);
+    Optional<TsKvEntry> latest = mergeLatest(derived, overlay);
     if (latest.isEmpty()) {
       return new TsKvLatestRemovingResult(key, false);
     }
     long ts = latest.get().getTs();
-    boolean inWindow = ts >= query.getStartTs() && ts < query.getEndTs();
-    if (!inWindow) {
-      // (4) the current latest is outside the half-open [startTs, endTs) window: nothing removed,
-      // so TB is not told to delete a latest value that is still valid.
+    if (ts < startTs || ts >= endTs) {
+      // The current latest is outside the half-open [startTs, endTs) window: nothing removed, so TB
+      // is not told to delete a latest value that is still valid.
       return new TsKvLatestRemovingResult(key, false);
     }
     // TB only invokes removeLatest with deleteLatest=true (BaseTimeseriesService gates it); the
@@ -546,26 +631,57 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     if (!deleteLatest) {
       return new TsKvLatestRemovingResult(key, false);
     }
+    // (2) Only an overlay row whose OWN ts is inside the window may be deleted; an overlay value
+    // older than the window (e.g. when the in-window latest is a derived/telemetry-only value) must
+    // SURVIVE as the next latest rather than being wiped by the tag-only all-time DELETE.
+    boolean overlayInWindow =
+        overlay.isPresent() && overlay.get().getTs() >= startTs && overlay.get().getTs() < endTs;
     boolean rewrite = Boolean.TRUE.equals(query.getRewriteLatestIfDeleted());
     if (rewrite) {
-      // (5) resurrect the next-older historical value (telemetry, time < startTs) as the new latest
-      // by writing it into the overlay, and return it as data so onTimeSeriesDelete emits a WS
-      // UPDATE (removed=true, getData()=prior).
-      Optional<TsKvEntry> prior = doFindHistoryBefore(tenantId, entityId, key, query.getStartTs());
+      // (3) Resurrect the next-older value as the new latest, looking BEFORE the window across BOTH
+      // stores: telemetry (time < startTs) and the overlay row if its own ts is < startTs (the
+      // overlay is single-row, so an out-of-window-older overlay value is itself a candidate);
+      // max-ts-wins. Write it into the overlay and return it as data so onTimeSeriesDelete emits a
+      // WS UPDATE (removed=true, getData()=prior).
+      Optional<TsKvEntry> priorDerived = doFindHistoryBefore(tenantId, entityId, key, startTs);
+      Optional<TsKvEntry> priorOverlay = overlay.filter(e -> e.getTs() < startTs);
+      Optional<TsKvEntry> prior = mergeLatest(priorDerived, priorOverlay);
       if (prior.isPresent()) {
-        upsertOverlay(tenantId, entityId, prior.get(), key);
+        // If the resurrected prior is the overlay's OWN out-of-window value (priorOverlay won the
+        // max-ts merge), it is ALREADY stored and outside the delete window — do NOT rewrite it: a
+        // redundant delete-then-insert would needlessly risk an out-of-window, possibly
+        // latest-only,
+        // value on an INSERT failure (and converges to the same result with no write). Only a prior
+        // that came from the derived telemetry store is installed into the overlay; that write also
+        // drops any in-window overlay row via the delete-then-insert, and is recoverable from
+        // {@code
+        // telemetry} if the insert fails.
+        boolean priorIsExistingOverlay =
+            priorOverlay.isPresent()
+                && (priorDerived.isEmpty()
+                    || priorOverlay.get().getTs() >= priorDerived.get().getTs());
+        if (!priorIsExistingOverlay) {
+          upsertOverlay(tenantId, entityId, prior.get(), key);
+        }
         return new TsKvLatestRemovingResult(prior.get(), null);
       }
-      // No older history to resurrect: fall through to a plain latest delete.
+      // No older value anywhere to resurrect: fall through to a plain latest delete.
     }
-    // (3 + 6) delete the overlay row for this identity and report a real latest delete (WS DELETE).
-    deleteOverlay(tenantId, entityId, key);
+    // (4) Plain delete: remove ONLY an in-window overlay row (the in-window derived telemetry value
+    // is removed by the separate historical remove future). removed=true reports the in-window
+    // latest was deleted; an out-of-window overlay value, if any, survives and resurfaces via the
+    // derived merge (the documented telemetry-derived eventual-consistency residual).
+    if (overlayInWindow) {
+      deleteOverlay(tenantId, entityId, key);
+    }
     return new TsKvLatestRemovingResult(key, true, null);
   }
 
   private Optional<TsKvEntry> doFindHistoryBefore(
       TenantId tenantId, EntityId entityId, String key, long startTs) throws Exception {
-    return readLatestRow(buildRewriteHistorySql(tenantId, entityId, key, startTs), key, "time");
+    // B1-lenient like the snapshot read: a same-ts two-type next-older row is treated as no
+    // resurrectable prior (fall through to a plain delete) rather than failing the removeLatest.
+    return readLatestRowB1Lenient(buildRewriteHistorySql(tenantId, entityId, key, startTs), key);
   }
 
   // ---- SQL builders ----

@@ -214,7 +214,7 @@ public class IoTDBTableConfiguration {
    * is present. Because no shipped ThingsBoard release exposes {@code database.attributes.type},
    * the default Phase-1 deployment leaves it unset, this configuration is skipped, no session pool
    * or attribute bean is created, and attributes keep flowing to the host entity-DB {@code
-   * AttributesDao} (Path-3 stretch, inert by default).
+   * AttributesDao} (inert by default).
    *
    * <p>The session pool / schema bootstrap beans here reuse the same bean name as {@link
    * EnabledRawOnlyConfiguration} and carry {@code @ConditionalOnMissingBean(name=...)}, so when

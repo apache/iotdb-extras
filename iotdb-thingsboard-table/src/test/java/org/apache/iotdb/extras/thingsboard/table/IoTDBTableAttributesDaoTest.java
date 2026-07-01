@@ -101,8 +101,9 @@ class IoTDBTableAttributesDaoTest {
                 attribute(7000L, "temperature", new LongDataEntry("temperature", 42L)))
             .get(3, TimeUnit.SECONDS);
 
-    // IoTDB has no sequence; the save returns a null version (Phase-1 contract).
-    assertNull(version);
+    // save MUST return a non-null version (ThingsBoard unboxes it into AttributeKv(..., long)).
+    // IoTDB has no sequence, so it is the attribute's lastUpdateTs.
+    assertEquals(7000L, version.longValue());
 
     // delete-then-insert: the DELETE is a tag-only equality match (no time predicate) so it removes
     // the identity across all time, then a single attribute row is inserted at time=lastUpdateTs.
@@ -127,7 +128,7 @@ class IoTDBTableAttributesDaoTest {
 
   @Test
   void save_tabletColumnsFollowNewDdlTagOrder() throws Exception {
-    // TAG-order rot guard (Wk5 risk): the Tablet column schema must follow the entity_attributes
+    // TAG-order rot guard: the Tablet column schema must follow the entity_attributes
     // DDL tag order (attribute_scope, entity_type, tenant_id, key, entity_id), then the five typed
     // FIELDs, with NO ColumnCategory.TIME entry (the time column is written via addTimestamp).
     TestContext context = newContext();
@@ -188,6 +189,7 @@ class IoTDBTableAttributesDaoTest {
             attribute(1L, "k", new BooleanDataEntry("k", true)))
         .get(3, TimeUnit.SECONDS);
 
+    // Delete-first is required so a same-timestamp type change converges to one typed column.
     org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(context.session());
     inOrder.verify(context.session()).executeNonQueryStatement(anyString());
     inOrder.verify(context.session()).insert(org.mockito.ArgumentMatchers.any());

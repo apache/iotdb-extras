@@ -70,22 +70,21 @@ attribute/label DAOs are outside the current scope.
 > + write + delete only**. **Time-bucketed aggregation is NOT implemented yet**;
 > aggregation, latest telemetry, and attributes are outside the current scope.
 
-## Entity attributes (Path-3 stretch, inert by default)
+## Entity attributes (inert by default)
 
 `IoTDBTableAttributesDao` is an `AttributesDao` implementation for the IoTDB Table
-Mode backend, storing entity attributes in the `entity_attributes` table. It is a
-**Path-3 stretch artifact and is inert by default**: in Phase-1, entity attributes
-stay in the host entity database (PostgreSQL), and this DAO only activates when an
-operator opts in explicitly with `database.attributes.type=iotdb-table`.
+Mode backend, storing entity attributes in the `entity_attributes` table. It is
+**inert by default**: in Phase-1, entity attributes stay in the host entity
+database (PostgreSQL), and this DAO only activates when an operator opts in
+explicitly with `database.attributes.type=iotdb-table`.
 
 This attribute selector is **independent** of `database.ts.type` /
 `database.ts_latest.type` — the attribute DAO routes separately from the
 time-series DAOs (a piggy-back on the timeseries selector was deliberately
 rejected). No shipped ThingsBoard release exposes a `database.attributes.type`
-selector yet (open Q6 / ThingsBoard Discussion #15296), so a real Phase-1
-deployment never sets it; the activation condition stays false, no attribute bean
-or session pool is created, and attributes keep flowing to the host entity-DB
-`AttributesDao`.
+selector yet, so a real Phase-1 deployment never sets it; the activation condition
+stays false, no attribute bean or session pool is created, and attributes keep
+flowing to the host entity-DB `AttributesDao`.
 
 When activated, each identity tuple
 `(tenant_id, entity_type, entity_id, attribute_scope, key)` holds exactly one
@@ -96,11 +95,14 @@ row.
 
 ### Phase-1 attribute limitations (documented, not silently degraded)
 
-- **`version` is always `null`.** IoTDB has no SQL sequence, so `save` and
-  `removeAllWithVersions` return a `null` version (type-correct, matching the
-  Cassandra backend). Because the ThingsBoard service only emits an EDQS
-  attribute-delete notification when the version is non-null, that notification is
-  not driven in Phase-1.
+- **No SQL sequence, so versions are best-effort.** `removeAllWithVersions`
+  returns a `null` version (type-correct; the ThingsBoard service null-checks it
+  before the EDQS attribute-delete notification, so that notification is not driven
+  in Phase-1). `save`, however, returns a **non-null** version — the attribute's
+  `lastUpdateTs` — because `BaseAttributesService#doSave` passes the version into
+  `AttributeKv(..., long)` with no null-check, so a `null` would unbox to a
+  `NullPointerException` on every save. `lastUpdateTs` is a per-identity-monotonic
+  version proxy (stable across restarts).
 - **`findNextBatch` is unsupported.** It is a relational keyset-pagination
   migration helper with no IoTDB equivalent; it throws
   `UnsupportedOperationException`.
@@ -114,14 +116,18 @@ row.
   `GET /api/deviceProfile/devices/keys/attributes` (TENANT_ADMIN, a config-time UI
   key enumeration) which tolerates an empty result; failing loud would 500 under
   IoTDB while Cassandra returns empty. The null-profile path returns the
-  tenant-wide distinct keys. A real device→profile lookup is a Phase-2 / Wk9
-  optional enhancement.
+  tenant-wide distinct keys. A real device→profile lookup is a Phase-2 optional
+  enhancement.
 - **`save` is non-atomic.** The tag-only `DELETE`-then-`INSERT` is two separate
-  statements with no rollback: if the `INSERT` fails after the `DELETE`, the value
-  is lost. A concurrent same-identity point `find` takes the same per-identity
-  lock and so never observes the transient empty window, but full-scope reads
-  (`find`-by-keys / `findAll` / `findLatestByEntityIdsAndScope`) are best-effort
-  (unlocked).
+  statements with no rollback (IoTDB has no multi-statement transaction): if the
+  `INSERT` fails after the `DELETE`, the prior value is lost (the future fails
+  loud; the caller retries). Delete-first is **required** — an IoTDB insert at an
+  existing `(tags, time)` merges typed columns, so a same-timestamp type change
+  would otherwise leave two typed columns (the B1 fail-fast); insert-first would
+  re-break that, so the order is not reversed. A concurrent same-identity point
+  `find` takes the same per-identity lock and so never observes the transient empty
+  window, but full-scope reads (`find`-by-keys / `findAll` /
+  `findLatestByEntityIdsAndScope`) are best-effort (unlocked).
 - **Single-JVM convergence only.** The per-identity lock converges writes only
   within one JVM; cross-node single-writer safety is the operator's
   responsibility, acknowledged via `iotdb.attributes.cluster_mode` (must be
@@ -144,8 +150,8 @@ by IoTDB's native last cache) **and** a minimal per-key `telemetry_latest`
 exact tie). The merge is max-by-ts, not additive, so a key present in both stores
 is never double-counted.
 
-**The overlay is written on every `saveLatest`** (mentor-confirmed; a PR-2 review
-flag). The module's historical `save()` write path is asynchronous and batched,
+**The overlay is written on every `saveLatest`**. The module's historical `save()`
+write path is asynchronous and batched,
 so at the moment `saveLatest` runs it cannot see whether a paired `telemetry` row
 will be written. It therefore cannot distinguish a latest-only write (e.g. the
 EntityView telemetry-copy `LATEST_AND_WS` / `saveTs=false` path, which calls
@@ -154,14 +160,17 @@ overlay unconditionally as a delete-then-insert (one row per identity, under a
 per-identity in-JVM lock). This **closes the latest-only data-loss gap** that a
 no-shadow-table no-op would otherwise drop, at the cost of one extra overlay write
 per latest update (equivalent to the standard ThingsBoard latest-table behavior).
-`removeLatest` snapshots the merged latest under the per-identity lock and, when
-that latest is inside the half-open `[startTs, endTs)` delete window, deletes the
-overlay row; when `rewriteLatestIfDeleted` is set it resurrects the next-older
-historical value (`telemetry` where `time < startTs`) back into the overlay and
-returns it as the removing result's data (so TB emits a WS update rather than a
-delete).
+`removeLatest` reads the derived and overlay latest **separately** under the
+per-identity lock and, when the merged latest is inside the half-open
+`[startTs, endTs)` delete window, deletes the overlay row **only if the overlay's
+own timestamp is in-window** (an out-of-window overlay value survives as the next
+latest rather than being wiped). When `rewriteLatestIfDeleted` is set it resurrects
+the next-older value across **both** stores (`telemetry` where `time < startTs` and
+the overlay row if its own ts is `< startTs`; max-ts-wins) and returns it as the
+removing result's data (so TB emits a WS update rather than a delete); a prior that
+is the overlay's own already-stored value is reported without a redundant rewrite.
 
-### Residual latest limitations (documented, flagged for PR-2 review)
+### Residual latest limitations
 
 - **`version` is always `null`.** IoTDB has no SQL sequence (same as Cassandra);
   type-correct and contract-legal, but TB notifications that key off a non-null
@@ -176,9 +185,13 @@ delete).
   identity; bounded for normal key sets).
 - **Same-timestamp cross-store type change.** The overlay wins an exact-ts tie,
   continuing the documented same-timestamp (B1) limitation below.
-- **Batch latest read / key discovery deferred.** `findLatestByEntityIds(Async)`
-  (new in v4.3.1.2) throws `UnsupportedOperationException` (Wk 10); the
-  key-discovery methods throw it too (Wk 9).
+- **Batch latest read / key discovery deferred (graceful, not throwing).**
+  `findLatestByEntityIds(Async)` (new in v4.3.1.2, full impl is a follow-up) and the
+  key-discovery methods `findAllKeysByEntityIds(Async)` (a follow-up) return an **empty
+  list** rather than throwing, because they are reachable in normal operation (the
+  dashboard `/api/entitiesQuery/find/keys` lookup and entity-delete housekeeping),
+  where a throw would surface as an HTTP 500 / a failed cleanup task. This matches
+  the official `CassandraBaseTimeseriesLatestDao`, which returns empty for all four.
 
 The `telemetry_latest` table is created on startup by a **second** idempotent
 schema bootstrap (`schema-iotdb-table-latest.sql`), registered only when the
@@ -213,7 +226,7 @@ Key activation and operational flags:
 | --- | --- | --- |
 | `database.ts.type` | _(unset)_ | Set to `iotdb-table` as the ThingsBoard historical-timeseries backend selector. |
 | `iotdb.ts.experimental-raw-only` | `false` | Explicit opt-in for this initial raw-only backend. Must be `true` together with `database.ts.type=iotdb-table`; write, raw read, and delete are implemented, while time-bucketed aggregation is outside the current scope. |
-| `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO (Path-3 stretch). Independent of the timeseries selectors. Unset in a real Phase-1 deployment, so the attribute DAO is inert by default. |
+| `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO. Independent of the timeseries selectors. Unset in a real Phase-1 deployment, so the attribute DAO is inert by default. |
 | `iotdb.attributes.cluster_mode` | _(empty)_ | Required when `database.attributes.type=iotdb-table`. Must be `sticky-routing` (per-identity writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the attribute write path converges only within a single JVM. |
 | `iotdb.host` / `iotdb.port` | `127.0.0.1` / `6667` | IoTDB node address. |
 | `iotdb.username` / `iotdb.password` | `root` / `root` | IoTDB credentials. |
@@ -285,8 +298,7 @@ write, raw-read, and delete paths are implemented behind
 Without both properties, the module is inert. Aggregation and latest telemetry
 are outside the current scope.
 
-`IoTDBTableAttributesDao` is implemented as a **Path-3 stretch artifact**, inert
-by default and activated only by the independent
+`IoTDBTableAttributesDao` is **inert by default** and activated only by the independent
 `database.attributes.type=iotdb-table` opt-in (see the Entity attributes section
 above and its Phase-1 limitations). In a real Phase-1 deployment the selector is
 unset, so the attribute DAO never activates and attributes stay in the host

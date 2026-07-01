@@ -73,14 +73,13 @@ import java.util.concurrent.locks.ReadWriteLock;
  * Entity-attribute DAO for the IoTDB Table Mode backend.
  *
  * <p>Spring activation: {@code database.attributes.type=iotdb-table}. NOTE: this activation
- * property is the Phase-1 selector pending upstream ThingsBoard confirmation (open Q6 / ThingsBoard
- * Discussion #15296); upstream ThingsBoard does not yet expose an {@code AttributesDao} selector,
- * so the DAO is <b>inert by default</b> (no real Phase-1 deployment sets {@code
- * database.attributes.type}, so the {@link IoTDBTableAttributesEnabledCondition} stays false and
- * the bean is never instantiated). The selector is independent of {@code database.ts.type} / {@code
- * database.ts_latest.type} (the attribute DAO routes separately); if Q6 resolves to a different
- * property, the condition is updated. See the GSOC-304 design doc section 6.0 and the Wk5 decision
- * note section 7. This is a Path-3 stretch artifact: Phase-1 attributes stay in the host entity DB.
+ * property is the Phase-1 selector pending upstream ThingsBoard confirmation; upstream ThingsBoard
+ * does not yet expose an {@code AttributesDao} selector, so the DAO is <b>inert by default</b> (no
+ * real Phase-1 deployment sets {@code database.attributes.type}, so the {@link
+ * IoTDBTableAttributesEnabledCondition} stays false and the bean is never instantiated). The
+ * selector is independent of {@code database.ts.type} / {@code database.ts_latest.type} (the
+ * attribute DAO routes separately); if upstream resolves to a different property, the condition is
+ * updated. Phase-1 attributes stay in the host entity DB.
  *
  * <p>This DAO is wired as an explicit {@code @Bean} in {@link IoTDBTableConfiguration} (guarded by
  * the activation property) rather than via component scanning, so the {@code ITableSessionPool}
@@ -88,15 +87,20 @@ import java.util.concurrent.locks.ReadWriteLock;
  * {@code @ConditionalOnBean} bean-definition ordering trap, where a component-scanned bean can be
  * condition-evaluated before the imported configuration's pool {@code @Bean} is registered.
  *
- * <p>Current-state (latest-only) contract on the historical-shaped {@code entity_attributes} table
- * (design doc section 3.5): each identity tuple {@code (tenant_id, entity_type, entity_id,
- * attribute_scope, key)} holds exactly one current row, so:
+ * <p>Current-state (latest-only) contract on the historical-shaped {@code entity_attributes} table:
+ * each identity tuple {@code (tenant_id, entity_type, entity_id, attribute_scope, key)} holds
+ * exactly one current row, so:
  *
  * <ul>
  *   <li>{@link #save} is delete-then-insert: a tag-only {@code DELETE} (no time predicate) removes
  *       the identity across all time, then one row is inserted at {@code time =
- *       attribute.getLastUpdateTs()} with exactly one typed FIELD set. Both statements run under a
- *       per-identity in-JVM lock so concurrent same-identity writes converge to a single row.
+ *       attribute.getLastUpdateTs()} with exactly one typed FIELD set. Delete-first is required: an
+ *       IoTDB insert at an existing {@code (tags, time)} merges typed columns, so a same-timestamp
+ *       type change would otherwise leave two typed columns — the same-timestamp two-type-column
+ *       limitation (B1), enforced fail-fast. Both statements run under a per-identity in-JVM lock
+ *       so concurrent same-identity writes converge to a single row. The write is non-atomic (IoTDB
+ *       has no multi-statement transaction): an {@code INSERT} failure after the {@code DELETE}
+ *       commits loses the prior value — see the limitations list.
  *   <li>{@code find}/{@code findAll} are synchronous single/multi-row {@code SELECT}s that run on
  *       the calling thread (the ThingsBoard service wraps them in {@code
  *       Futures.immediateFuture(...)}).
@@ -121,32 +125,48 @@ import java.util.concurrent.locks.ReadWriteLock;
  * <p>Phase-1 honest limitations (documented, not silently degraded):
  *
  * <ul>
- *   <li>IoTDB has no SQL sequence, so {@code save} and {@code removeAllWithVersions} return a
- *       {@code null} version (type-correct, matching the Cassandra backend). Because the
- *       ThingsBoard service only emits an EDQS attribute-delete notification when the version is
- *       non-null, that notification is not driven in Phase-1 (EDQS integration is out of Phase-1
- *       scope, consistent with the Wk4 latest DAO).
+ *   <li>IoTDB has no SQL sequence. {@code removeAllWithVersions} returns a {@code null} version
+ *       (type-correct; the ThingsBoard service null-checks it before the EDQS attribute-delete
+ *       notification, so that notification is simply not driven in Phase-1). {@code save}, however,
+ *       MUST return a NON-null version: {@code BaseAttributesService#doSave} passes it into {@code
+ *       AttributeKv(EntityId, AttributeScope, AttributeKvEntry, long)} with no null-check, so a
+ *       {@code null} would unbox to a {@code NullPointerException} on every save. It therefore
+ *       returns the attribute's {@code lastUpdateTs} as a per-identity-monotonic version proxy
+ *       (stable across restarts; EDQS integration otherwise stays out of Phase-1 scope, consistent
+ *       with the latest DAO).
  *   <li>{@code findNextBatch} is a relational keyset-pagination migration helper with no IoTDB
- *       equivalent; it throws {@code UnsupportedOperationException} (Wk5 decision note section 6).
+ *       equivalent; it throws {@code UnsupportedOperationException}.
  *   <li>{@code findAllKeysByDeviceProfileId} with a non-null profile returns an empty list,
  *       matching the official non-relational backend ({@code
  *       CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId} also returns {@code
  *       Collections.emptyList()}): {@code entity_attributes} has no {@code device_profile_id} tag,
  *       and the sole caller — {@code DeviceProfileController} {@code GET
  *       /api/deviceProfile/devices/keys/attributes} (TENANT_ADMIN, a config-time UI key
- *       enumeration) — tolerates an empty result. A real device→profile lookup is a Phase-2 / Wk9
+ *       enumeration) — tolerates an empty result. A real device→profile lookup is a Phase-2
  *       optional enhancement.
  *   <li>{@code removeAllByEntityId} is best-effort select-then-delete (IoTDB has no {@code DELETE
  *       ... RETURNING}); a key inserted between the select and the delete may be deleted but not
  *       reported.
+ *   <li><b>Non-atomic delete-then-insert.</b> {@code save} runs a DELETE then an INSERT with no
+ *       multi-statement transaction (IoTDB has none). Delete-first is required so a same-timestamp
+ *       type change converges to one typed column (an insert at an existing {@code (tags, time)}
+ *       merges columns); insert-first would re-break that, so the order cannot be reversed. An
+ *       {@code INSERT} failure after the {@code DELETE} commits therefore loses the prior value (no
+ *       derived store to recover an attribute from); the {@code save} future fails loud and the
+ *       caller retries.
+ *   <li><b>Best-effort multi-key reads.</b> The single-key {@code find} takes the per-identity lock
+ *       so it never observes the delete→insert gap, but {@code find(keys)} / {@code findAll} /
+ *       {@code findLatestByEntityIdsAndScope} read WITHOUT a lock, so a concurrent same-identity
+ *       {@code save} can make a key transiently absent (between its {@code DELETE} and {@code
+ *       INSERT}). Eventually consistent; bulk-read callers tolerate transient key-absence.
+ *   <li><b>Unbounded predicate fan-out.</b> {@code find(keys)} builds a {@code key IN (...)} list
+ *       and the entity-id methods build a {@code (entity_type=.. AND entity_id=..) OR ...} set with
+ *       no chunking, so a very large key/entity set yields a large SQL string (bounded for normal
+ *       scopes; chunking is a follow-up if large fan-outs appear).
  *   <li>The per-identity lock converges writes only within a single JVM; cross-node single-writer
  *       safety is the operator's responsibility, acknowledged via {@code
  *       iotdb.attributes.cluster_mode}.
  * </ul>
- *
- * @see "GSOC-304 design doc section 3.5 / 6.0"
- * @see "GSOC-304 Wk5 attributes decision note"
- * @since GSOC-304 Wk 5 attributes DAO
  */
 @Slf4j
 public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
@@ -166,7 +186,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
   // then bool_v, long_v, double_v, str_v, json_v (FIELDs). They must stay positionally aligned and
   // cover exactly the 10 non-time columns; the `time TIMESTAMP TIME` column is written through
   // Tablet#addTimestamp (NOT a ColumnCategory.TIME entry), so COLUMN_CATEGORIES holds only TAG and
-  // FIELD. Rebuilding with a different tag order is a correctness bug (Wk5 risk: TAG-order rot).
+  // FIELD. Rebuilding with a different tag order is a correctness bug (TAG-order rot).
   private static final List<String> COLUMN_NAMES =
       List.of(
           "attribute_scope",
@@ -209,7 +229,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
   private final AtomicBoolean accepting = new AtomicBoolean(true);
   private final AtomicBoolean destroyed = new AtomicBoolean(false);
   private final long shutdownDrainTimeoutMs;
-  // Per-identity write serialization (single-JVM convergence, design doc section 3.5).
+  // Per-identity write serialization (single-JVM convergence).
   private final Striped<Lock> identityLocks = Striped.lock(256);
   // Per-ENTITY read/write serialization guarding entity-wide removeAllByEntityId against concurrent
   // single-identity save/delete. A per-key mutate (save/deleteIdentity) takes the entity READ lock
@@ -273,8 +293,14 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
           } finally {
             entityReadLock.unlock();
           }
-          // IoTDB has no sequence; Phase-1 returns a null version (see class javadoc).
-          return null;
+          // The version MUST be non-null: ThingsBoard's BaseAttributesService#doSave passes it
+          // straight into AttributeKv(EntityId, AttributeScope, AttributeKvEntry, long) with no
+          // null-check, so a null would unbox to a NullPointerException on every attribute save
+          // (the save() future would fail even though the row was written). IoTDB has no monotonic
+          // sequence, so use the attribute's last-update timestamp as a per-identity-monotonic
+          // version proxy: it is stable across restarts (unlike an in-JVM counter) and only drives
+          // the EDQS update ordering. See the class javadoc.
+          return attribute.getLastUpdateTs();
         });
   }
 
@@ -288,10 +314,18 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     String deleteSql = buildDeleteSql(tenantId, entityId, attributeScope, key);
     Tablet tablet = buildTablet(tenantId, entityId, attributeScope, attribute, key);
     try (ITableSession session = tableSessionPool.getSession()) {
-      // Step 1: tag-only DELETE removes the identity across all time (no time predicate); proven
-      // legal and full-range by the IoTDB analyzer (see Wk5 decision note evidence baseline).
+      // Delete-then-insert (NOT insert-then-delete): the tag-only DELETE removes the identity
+      // across
+      // ALL time, then the single current row is inserted at time = lastUpdateTs. The delete must
+      // run first because an IoTDB insert at an existing (tags, time) MERGES typed columns (a null
+      // field does not overwrite an existing value), so a same-timestamp type change would
+      // otherwise
+      // leave two typed columns (the B1 fail-fast). The trade-off is a non-atomic write (IoTDB has
+      // no multi-statement transaction): an INSERT failure after the DELETE commits loses the prior
+      // value (the future fails loud; documented in the class limitations). Insert-first would
+      // avoid
+      // that loss but re-break the same-timestamp convergence, so it is deliberately not used.
       session.executeNonQueryStatement(deleteSql);
-      // Step 2: insert the single current row at time = lastUpdateTs with one typed FIELD set.
       session.insert(tablet);
     }
   }
@@ -514,7 +548,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
       UUID entityId, int attributeType, int attributeKey, int batchSize) {
     throw new UnsupportedOperationException(
         "findNextBatch is a relational keyset-pagination migration helper not supported by the "
-            + "IoTDB Table Mode backend; see Wk5 decision note section 6");
+            + "IoTDB Table Mode backend");
   }
 
   // ---- key discovery + bulk latest read + removeAllByEntityId ----
@@ -607,7 +641,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
       TenantId tenantId, DeviceProfileId deviceProfileId) {
     Objects.requireNonNull(tenantId, "tenantId");
     // A null deviceProfileId is the "all profiles" path: return the tenant-wide distinct keys,
-    // which entity_attributes CAN derive (mirrors the Wk4 latest DAO).
+    // which entity_attributes CAN derive (mirrors the latest DAO).
     if (deviceProfileId == null) {
       try {
         return doFindDistinctKeys(buildKeysByTenantSql(tenantId));
@@ -622,13 +656,11 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     // Collections.emptyList(), because a NoSQL / time-series store cannot do the cross-device-table
     // profile-dimension join. The sole upstream caller is DeviceProfileController
     // GET /api/deviceProfile/devices/keys/attributes (getAttributesKeys, @PreAuthorize
-    // TENANT_ADMIN)
-    // -- a config-time UI key-enumeration endpoint that tolerates an empty result; failing loud
-    // here
-    // would 500 under IoTDB while Cassandra returns empty, an avoidable backend inconsistency.
-    // entity_attributes has no device_profile_id tag and the module has no device -> profile
-    // lookup;
-    // a real cross-DB implementation is a Phase-2 / Wk9 optional enhancement, not Phase-1.
+    // TENANT_ADMIN) -- a config-time UI key-enumeration endpoint that tolerates an empty result;
+    // failing loud here would 500 under IoTDB while Cassandra returns empty, an avoidable backend
+    // inconsistency. entity_attributes has no device_profile_id tag and the module has no
+    // device -> profile lookup; a real cross-DB implementation is a Phase-2 optional enhancement,
+    // not Phase-1.
     return Collections.emptyList();
   }
 
@@ -896,11 +928,11 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
               + clusterMode
               + "'. The attribute write path (delete-then-insert under a per-identity in-JVM lock) "
               + "converges only within a single JVM, so cross-node single-writer safety must be "
-              + "acknowledged. See the GSOC-304 Wk5 decision note section 3.5.");
+              + "acknowledged.");
     }
   }
 
-  // ---- bounded IO executor (mirrors the Wk4 latest read executor) ----
+  // ---- bounded IO executor (mirrors the latest read executor) ----
 
   @Override
   public void destroy() {

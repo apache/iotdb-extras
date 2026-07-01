@@ -47,7 +47,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -520,6 +523,207 @@ class IoTDBTableLatestDaoIT {
         saveLatest(latestDao, scope, entry(300L, "k", DataType.LONG, 30L));
         assertLatest(latestDao, scope, "k", 300L, DataType.LONG, 30L);
       } finally {
+        latestDao.destroy();
+      }
+    }
+  }
+
+  @Test
+  void removeLatest_inWindowDerivedKeepsOutOfWindowOverlay() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_oow",
+            "55555555-5555-5555-5555-555555555518",
+            "66666666-6666-6666-6666-666666666618");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(2);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // Overlay holds an out-of-window value @50; a telemetry-only write @150 (no saveLatest) is
+        // the in-window derived latest. removeLatest[100,200) removes the in-window latest but must
+        // NOT wipe the out-of-window overlay @50 (a tag-only all-time delete would). The overlay
+        // value survives as the next latest once TB's separate historical path removes telemetry.
+        saveLatest(latestDao, scope, entry(50L, "k", DataType.LONG, 5L));
+        saveAll(tsDao, scope, List.of(entry(150L, "k", DataType.LONG, 15L)));
+
+        TsKvLatestRemovingResult result =
+            latestDao
+                .removeLatest(
+                    scope.tenantId(), scope.entityId(), new BaseDeleteTsKvQuery("k", 100L, 200L))
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertTrue(result.isRemoved());
+
+        // The out-of-window overlay row survived.
+        assertEquals(1, overlayRowCount(pool, scope, "k"));
+        OverlayRow overlay = overlayRow(pool, scope, "k");
+        assertEquals(50L, overlay.ts());
+        assertEquals(5L, overlay.longValue());
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void removeLatest_rewritePrefersNewerOverlayOverOlderHistory() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_rwo",
+            "55555555-5555-5555-5555-555555555519",
+            "66666666-6666-6666-6666-666666666619");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(2);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // Out-of-window overlay value @50 plus an older telemetry history @30, with the in-window
+        // derived latest @150. rewrite must resurrect the NEWEST next-older across BOTH stores: the
+        // overlay @50, not the telemetry history @30 (telemetry-only lookup would pick 30).
+        saveLatest(latestDao, scope, entry(50L, "k", DataType.LONG, 5L));
+        saveAll(
+            tsDao,
+            scope,
+            List.of(entry(30L, "k", DataType.LONG, 3L), entry(150L, "k", DataType.LONG, 15L)));
+
+        TsKvLatestRemovingResult result =
+            latestDao
+                .removeLatest(
+                    scope.tenantId(),
+                    scope.entityId(),
+                    new BaseDeleteTsKvQuery("k", 100L, 200L, true))
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertTrue(result.isRemoved());
+        assertNotNull(result.getData());
+        assertEquals(50L, result.getData().getTs());
+        assertEquals(5L, result.getData().getValue());
+        OverlayRow overlay = overlayRow(pool, scope, "k");
+        assertEquals(50L, overlay.ts());
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void keyEscaping_adversarialKeysRoundTripWithoutInjection() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_esc",
+            "55555555-5555-5555-5555-555555555520",
+            "66666666-6666-6666-6666-666666666620");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(1);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        List<String> keys =
+            List.of(
+                "a'b",
+                "a''b",
+                "O'Brien's \"key\"",
+                "back\\slash",
+                "'; DROP TABLE telemetry_latest; --",
+                "' OR '1'='1",
+                "中文键名",
+                "emoji🔑key",
+                "key with spaces");
+        long ts = 1000L;
+        for (String key : keys) {
+          saveLatest(latestDao, scope, entry(ts, key, DataType.LONG, ts));
+          assertLatest(latestDao, scope, key, ts, DataType.LONG, ts);
+          ts++;
+        }
+        // No injection: each key's latest is removable independently (escaped DELETE predicate),
+        // and
+        // the "DROP TABLE" key never dropped the overlay table.
+        long t = 1000L;
+        for (String key : keys) {
+          TsKvLatestRemovingResult result =
+              latestDao
+                  .removeLatest(
+                      scope.tenantId(), scope.entityId(), new BaseDeleteTsKvQuery(key, 0L, t + 1))
+                  .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+          assertTrue(result.isRemoved(), "removeLatest failed for key: " + key);
+          assertTrue(
+              latestDao
+                  .findLatestOpt(scope.tenantId(), scope.entityId(), key)
+                  .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                  .isEmpty(),
+              "delete left a value for key: " + key);
+          t++;
+        }
+      } finally {
+        latestDao.destroy();
+      }
+    }
+  }
+
+  @Test
+  void concurrentSaveLatestSameIdentity_convergesToOneRowMaxTsWins() throws Exception {
+    TestScope scope =
+        scope(
+            "lt_conc",
+            "55555555-5555-5555-5555-555555555522",
+            "66666666-6666-6666-6666-666666666622");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(8);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      ExecutorService callers = Executors.newFixedThreadPool(8);
+      try {
+        int writes = 50;
+        CountDownLatch start = new CountDownLatch(1);
+        List<ListenableFuture<Long>> futures = new ArrayList<>();
+        List<java.util.concurrent.Future<?>> submissions = new ArrayList<>();
+        for (int i = 0; i < writes; i++) {
+          long value = i;
+          submissions.add(
+              callers.submit(
+                  () -> {
+                    try {
+                      start.await();
+                    } catch (InterruptedException e) {
+                      Thread.currentThread().interrupt();
+                      throw new RuntimeException(e);
+                    }
+                    synchronized (futures) {
+                      futures.add(
+                          latestDao.saveLatest(
+                              scope.tenantId(),
+                              scope.entityId(),
+                              entry(1000L + value, "temp", DataType.LONG, value)));
+                    }
+                  }));
+        }
+        start.countDown();
+        for (java.util.concurrent.Future<?> submission : submissions) {
+          submission.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+        for (ListenableFuture<Long> future : futures) {
+          future.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+
+        // Per-identity lock + delete-then-insert converge to exactly one overlay row, and the
+        // max-ts
+        // guard makes the highest timestamp win regardless of the concurrent interleaving.
+        assertEquals(1, overlayRowCount(pool, scope, "temp"));
+        assertLatest(latestDao, scope, "temp", 1049L, DataType.LONG, 49L);
+      } finally {
+        callers.shutdownNow();
         latestDao.destroy();
       }
     }

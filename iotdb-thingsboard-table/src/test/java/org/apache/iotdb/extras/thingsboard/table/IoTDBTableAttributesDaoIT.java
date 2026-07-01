@@ -226,7 +226,7 @@ class IoTDBTableAttributesDaoIT {
   }
 
   @Test
-  void removeAll_thenFindIsEmpty_andVersionIsNull() throws Exception {
+  void save_returnsLastUpdateTs_removeAllVersionNull_findEmpty() throws Exception {
     TestScope scope = scope("attr_remove", "55555555-5555-5555-5555-555555555505");
     bootstrapSchema(scope.database());
     try (ITableSessionPool pool = newPool(scope.database())) {
@@ -241,7 +241,8 @@ class IoTDBTableAttributesDaoIT {
                     AttributeScope.SERVER_SCOPE,
                     attr(2L, "temp", lng("temp", 2L)))
                 .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        assertNull(version);
+        // save returns a non-null version (the attribute's lastUpdateTs); ThingsBoard unboxes it.
+        assertEquals(2L, version.longValue());
 
         List<ListenableFuture<TbPair<String, Long>>> futures =
             dao.removeAllWithVersions(
@@ -382,6 +383,51 @@ class IoTDBTableAttributesDaoIT {
         assertTrue(
             dao.find(scope.tenantId(), scope.entityId(), AttributeScope.SERVER_SCOPE, key)
                 .isEmpty());
+      } finally {
+        dao.destroy();
+      }
+    }
+  }
+
+  @Test
+  void keyEscaping_adversarialKeysRoundTripWithoutInjection() throws Exception {
+    TestScope scope = scope("attr_esc2", "55555555-5555-5555-5555-555555555521");
+    bootstrapSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableAttributesDao dao = new IoTDBTableAttributesDao(pool, config());
+      try {
+        List<String> keys =
+            List.of(
+                "a'b",
+                "a''b",
+                "O'Brien's \"key\"",
+                "back\\slash",
+                "'; DROP TABLE entity_attributes; --",
+                "' OR '1'='1",
+                "中文键名",
+                "emoji🔑key",
+                "key with spaces");
+        long ts = 1000L;
+        for (String key : keys) {
+          save(dao, scope, AttributeScope.SERVER_SCOPE, attr(ts, key, lng(key, ts)));
+          AttributeKvEntry found =
+              dao.find(scope.tenantId(), scope.entityId(), AttributeScope.SERVER_SCOPE, key)
+                  .orElseThrow(() -> new AssertionError("round-trip read failed for key: " + key));
+          assertEquals(ts, found.getValue(), "value round-trip for key: " + key);
+          ts++;
+        }
+        // No injection: the "DROP TABLE" key did not drop the table; every key is still present.
+        assertEquals(
+            keys.size(),
+            dao.findAll(scope.tenantId(), scope.entityId(), AttributeScope.SERVER_SCOPE).size());
+        // The DELETE predicate escapes too: each key deletes independently and exactly.
+        for (String key : keys) {
+          removeAll(dao, scope, AttributeScope.SERVER_SCOPE, List.of(key));
+          assertTrue(
+              dao.find(scope.tenantId(), scope.entityId(), AttributeScope.SERVER_SCOPE, key)
+                  .isEmpty(),
+              "delete failed for key: " + key);
+        }
       } finally {
         dao.destroy();
       }

@@ -403,6 +403,48 @@ class IoTDBTableLatestDaoTest {
     verify(context.session(), timeout(3000)).insert(any());
   }
 
+  @Test
+  void saveLatest_b1DerivedRow_doesNotBlockOverlayWrite() throws Exception {
+    TestContext context = newContext();
+    // The derived telemetry point-read is a B1 same-timestamp two-type row (long_v AND bool_v set):
+    // getEntry would throw. The saveLatest max-ts guard must TOLERATE it (treat the derived latest
+    // as
+    // unusable, fall back to the overlay) and still write the overlay, rather than failing every
+    // saveLatest for this identity until the ambiguous telemetry row is gone.
+    stubReads(context.session(), rows(rowOf(4000L, Map.of("long_v", 7L, "bool_v", true))), rows());
+
+    Long version =
+        context
+            .dao()
+            .saveLatest(TENANT_ID, ENTITY_ID, entry(5000L, "temperature", DataType.LONG, 9L))
+            .get(3, TimeUnit.SECONDS);
+
+    assertNull(version);
+    verify(context.session(), timeout(3000)).insert(any());
+    verify(context.session(), timeout(3000)).executeNonQueryStatement(anyString());
+  }
+
+  @Test
+  void saveLatest_b1OverlayRow_doesNotWedgeAndSelfHeals() throws Exception {
+    TestContext context = newContext();
+    // A same-timestamp two-type OVERLAY row (only reachable cross-node, since the latest path has
+    // no
+    // cluster-mode gate) must NOT wedge saveLatest. The guard's overlay read is B1-lenient (treats
+    // it
+    // as absent), so the write proceeds and the delete-then-insert self-heals the ambiguous row.
+    stubReads(context.session(), rows(), rows(rowOf(4000L, Map.of("long_v", 7L, "bool_v", true))));
+
+    Long version =
+        context
+            .dao()
+            .saveLatest(TENANT_ID, ENTITY_ID, entry(5000L, "temperature", DataType.LONG, 9L))
+            .get(3, TimeUnit.SECONDS);
+
+    assertNull(version);
+    verify(context.session(), timeout(3000)).insert(any());
+    verify(context.session(), timeout(3000)).executeNonQueryStatement(anyString());
+  }
+
   // ---- removeLatest: overlay-aware ----
 
   @Test
@@ -568,6 +610,168 @@ class IoTDBTableLatestDaoTest {
     assertFalse(result.isRemoved());
     verify(context.session(), never()).executeNonQueryStatement(anyString());
     verify(context.session(), never()).insert(any());
+  }
+
+  @Test
+  void removeLatest_inWindowDerivedButOlderOverlay_keepsOutOfWindowOverlay() throws Exception {
+    TestContext context = newContext();
+    // Derived (telemetry) latest 150 is in window [100,200); the overlay's OWN value is 50, OUTSIDE
+    // the window. The in-window derived value is removed by the separate historical future, but the
+    // overlay must NOT be wiped by the tag-only delete (50 survives as the next latest).
+    stubReads(context.session(), rows(row(150L, "long_v", 42L)), rows(row(50L, "long_v", 7L)));
+
+    TsKvLatestRemovingResult result =
+        context
+            .dao()
+            .removeLatest(TENANT_ID, ENTITY_ID, new BaseDeleteTsKvQuery("temperature", 100L, 200L))
+            .get(3, TimeUnit.SECONDS);
+
+    assertTrue(result.isRemoved());
+    // The out-of-window overlay row is not deleted and nothing is inserted.
+    verify(context.session(), never()).executeNonQueryStatement(anyString());
+    verify(context.session(), never()).insert(any());
+  }
+
+  @Test
+  void removeLatest_rewrite_resurrectsOlderOverlayOverOlderHistory() throws Exception {
+    TestContext context = newContext();
+    // In-window derived latest 150; rewrite=true. Next-older candidates are telemetry@30 and the
+    // overlay's own value@50 (both < startTs=100); max-ts-wins resurrects the overlay 50, not 30.
+    // Because the prior IS the overlay's own out-of-window row (already stored, outside the
+    // window),
+    // removeLatest reports it as data but does NOT rewrite the overlay — no redundant,
+    // failure-risky
+    // delete-then-insert of an already-safe (possibly latest-only) value.
+    stubReads(
+        context.session(),
+        rows(row(150L, "long_v", 42L)),
+        rows(row(50L, "long_v", 7L)),
+        rows(row(30L, "long_v", 3L)));
+
+    TsKvLatestRemovingResult result =
+        context
+            .dao()
+            .removeLatest(
+                TENANT_ID, ENTITY_ID, new BaseDeleteTsKvQuery("temperature", 100L, 200L, true))
+            .get(3, TimeUnit.SECONDS);
+
+    assertTrue(result.isRemoved());
+    TsKvEntry data = result.getData();
+    assertEquals(50L, data.getTs());
+    assertEquals(7L, data.getValue());
+    // No overlay mutation: the already-stored out-of-window value is neither deleted nor
+    // re-inserted.
+    verify(context.session(), never()).insert(any());
+    verify(context.session(), never()).executeNonQueryStatement(anyString());
+  }
+
+  @Test
+  void removeLatest_rewrite_b1HistoryRow_fallsThroughToPlainDeleteWithoutFailing()
+      throws Exception {
+    TestContext context = newContext();
+    // In-window derived latest 150; rewrite=true; the next-older-before-window telemetry row is a
+    // B1
+    // same-ts two-type row. doFindHistoryBefore must be B1-lenient (no resurrectable prior) and
+    // fall
+    // through to a plain delete, NOT fail the removeLatest future.
+    stubReads(
+        context.session(),
+        rows(row(150L, "long_v", 42L)),
+        rows(),
+        rows(rowOf(50L, Map.of("long_v", 7L, "str_v", "x"))));
+
+    TsKvLatestRemovingResult result =
+        context
+            .dao()
+            .removeLatest(
+                TENANT_ID, ENTITY_ID, new BaseDeleteTsKvQuery("temperature", 100L, 200L, true))
+            .get(3, TimeUnit.SECONDS);
+
+    assertTrue(result.isRemoved());
+    assertNull(result.getData());
+  }
+
+  @Test
+  void removeLatest_b1DerivedSnapshot_doesNotFailTheFuture() throws Exception {
+    TestContext context = newContext();
+    // The derived SNAPSHOT read (first stub) is a B1 same-ts two-type telemetry row; the
+    // removeLatest
+    // snapshot is B1-lenient, so a clean in-window overlay value is still removed without the
+    // future
+    // failing.
+    stubReads(
+        context.session(),
+        rows(rowOf(150L, Map.of("long_v", 7L, "str_v", "x"))),
+        rows(row(150L, "long_v", 42L)));
+
+    TsKvLatestRemovingResult result =
+        context
+            .dao()
+            .removeLatest(TENANT_ID, ENTITY_ID, new BaseDeleteTsKvQuery("temperature", 100L, 200L))
+            .get(3, TimeUnit.SECONDS);
+
+    assertTrue(result.isRemoved());
+  }
+
+  @Test
+  void removeLatest_b1OverlayRow_doesNotWedge() throws Exception {
+    TestContext context = newContext();
+    // A same-timestamp two-type OVERLAY row (cross-node artifact) must NOT wedge removeLatest: the
+    // overlay snapshot read is B1-lenient (treats it as absent), so a clean in-window derived
+    // latest
+    // is still reported removed and the future does not fail.
+    stubReads(
+        context.session(),
+        rows(row(150L, "long_v", 42L)),
+        rows(rowOf(4000L, Map.of("long_v", 7L, "bool_v", true))));
+
+    TsKvLatestRemovingResult result =
+        context
+            .dao()
+            .removeLatest(TENANT_ID, ENTITY_ID, new BaseDeleteTsKvQuery("temperature", 100L, 200L))
+            .get(3, TimeUnit.SECONDS);
+
+    assertTrue(result.isRemoved());
+  }
+
+  // ---- key discovery / batch latest: graceful empty (reachable paths must not 500) ----
+
+  @Test
+  void findAllKeysByEntityIds_returnsEmptyWithoutThrowing() {
+    TestContext context = newContext();
+    assertTrue(context.dao().findAllKeysByEntityIds(TENANT_ID, List.of(ENTITY_ID)).isEmpty());
+    verifyNoSession(context);
+  }
+
+  @Test
+  void findAllKeysByEntityIdsAsync_returnsImmediateEmpty() throws Exception {
+    TestContext context = newContext();
+    assertTrue(
+        context
+            .dao()
+            .findAllKeysByEntityIdsAsync(TENANT_ID, List.of(ENTITY_ID))
+            .get(3, TimeUnit.SECONDS)
+            .isEmpty());
+    verifyNoSession(context);
+  }
+
+  @Test
+  void findLatestByEntityIds_returnsEmptyWithoutThrowing() {
+    TestContext context = newContext();
+    assertTrue(context.dao().findLatestByEntityIds(TENANT_ID, List.of(ENTITY_ID)).isEmpty());
+    verifyNoSession(context);
+  }
+
+  @Test
+  void findLatestByEntityIdsAsync_returnsImmediateEmpty() throws Exception {
+    TestContext context = newContext();
+    assertTrue(
+        context
+            .dao()
+            .findLatestByEntityIdsAsync(TENANT_ID, List.of(ENTITY_ID))
+            .get(3, TimeUnit.SECONDS)
+            .isEmpty());
+    verifyNoSession(context);
   }
 
   // ---- input validation / escaping ----
