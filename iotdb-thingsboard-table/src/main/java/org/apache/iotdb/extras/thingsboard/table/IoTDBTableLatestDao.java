@@ -24,7 +24,6 @@ import org.apache.iotdb.isession.pool.ITableSessionPool;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Striped;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tsfile.enums.ColumnCategory;
@@ -38,13 +37,8 @@ import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.kv.BasicTsKvEntry;
-import org.thingsboard.server.common.data.kv.BooleanDataEntry;
 import org.thingsboard.server.common.data.kv.DataType;
 import org.thingsboard.server.common.data.kv.DeleteTsKvQuery;
-import org.thingsboard.server.common.data.kv.DoubleDataEntry;
-import org.thingsboard.server.common.data.kv.JsonDataEntry;
-import org.thingsboard.server.common.data.kv.KvEntry;
-import org.thingsboard.server.common.data.kv.LongDataEntry;
 import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
 import org.thingsboard.server.common.data.kv.TsKvLatestRemovingResult;
@@ -57,16 +51,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 
 /**
@@ -152,9 +136,11 @@ import java.util.concurrent.locks.Lock;
  *       in-JVM (Striped), so the delete-then-insert converges to one row per identity only within a
  *       node. In a clustered ThingsBoard deployment two nodes writing the same identity
  *       concurrently can transiently leave two overlay rows until the next write (the max-ts read
- *       merge still returns the newer value). The sibling AttributesDao gates this with an explicit
- *       cluster-mode acknowledgement; a symmetric ack for the latest overlay is an option,
- *       documented here for parity in the meantime.
+ *       merge still returns the newer value). This is gated by an explicit {@code
+ *       iotdb.ts_latest.cluster_mode} acknowledgement at construction, symmetric with the sibling
+ *       AttributesDao's {@code iotdb.attributes.cluster_mode} gate: the operator must set it to
+ *       {@code sticky-routing} or {@code disabled} so the cross-node single-writer decision is made
+ *       deliberately.
  *   <li><b>Same-timestamp cross-store type change.</b> The overlay wins an exact-ts tie, continuing
  *       the documented same-timestamp two-type-column limitation (B1).
  * </ul>
@@ -228,11 +214,6 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
           ColumnCategory.FIELD,
           ColumnCategory.FIELD);
 
-  private final ThreadPoolExecutor readExecutor;
-  private final Set<ReadTask<?>> readTasks = ConcurrentHashMap.newKeySet();
-  private final AtomicBoolean accepting = new AtomicBoolean(true);
-  private final AtomicBoolean destroyed = new AtomicBoolean(false);
-  private final long shutdownDrainTimeoutMs;
   // Per-identity write/snapshot serialization for the overlay (single-JVM convergence). saveLatest,
   // removeLatest and the single-key point reads (findLatest/findLatestOpt) take it; only the
   // multi-key findAllLatest stays best-effort/unlocked like the derived reads.
@@ -240,18 +221,29 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
 
   public IoTDBTableLatestDao(ITableSessionPool tableSessionPool, IoTDBTableConfig config) {
     super(tableSessionPool);
-    this.shutdownDrainTimeoutMs = config.getTs().getSave().getShutdownDrainTimeoutMs();
-    int readThreads = config.getTs().getRead().getThreads();
-    int readQueueCapacity = config.getTs().getRead().getQueueCapacity();
-    this.readExecutor =
-        new ThreadPoolExecutor(
-            readThreads,
-            readThreads,
-            0L,
-            TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(readQueueCapacity),
-            readThreadFactory(),
-            new ThreadPoolExecutor.AbortPolicy());
+    // Cluster opt-in validator, symmetric with the sibling IoTDBTableAttributesDao: when the latest
+    // overlay is active the operator must acknowledge cluster routing explicitly, because the
+    // overlay delete-then-insert write path serializes on a per-identity in-JVM Striped lock that
+    // converges only within a single JVM. The race is benign (two nodes writing the same identity
+    // can transiently leave two overlay rows, but the max-ts read merge still returns the newer
+    // value, and a B1 two-type overlay row self-heals via the B1-lenient guard/remove reads), but
+    // it is acknowledged for parity so an operator makes the cross-node single-writer decision
+    // deliberately. Fail fast at construction on an absent/invalid value.
+    requireClusterModeAcknowledged(config.getTsLatest().getClusterMode());
+    // The overlay write path (saveLatest/removeLatest) shares this SAME bounded read executor and
+    // queue (sized by iotdb.ts.read.*) with the dashboard findLatest/findAllLatest reads, so a
+    // write
+    // burst that fills the queue can reject a concurrent read; the rejection message names this
+    // rather than splitting the executors. See the base initReadExecutor javadoc.
+    initReadExecutor(
+        config.getTs().getRead().getThreads(),
+        config.getTs().getRead().getQueueCapacity(),
+        config.getTs().getSave().getShutdownDrainTimeoutMs(),
+        "iotdb-table-latest-read-worker-",
+        "IoTDB Table Mode latest queue is full (the latest overlay write path shares this "
+            + "read-configured executor/queue, so a saveLatest/removeLatest write burst can reject a "
+            + "concurrent findLatest/findAllLatest read)",
+        "IoTDB Table Mode latest DAO is shutting down");
   }
 
   @Override
@@ -294,6 +286,10 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     // guard below). This closes the latest-only data-loss gap (e.g. EntityView LATEST_AND_WS /
     // saveTs=false) that a no-shadow-table no-op would drop. See the class javadoc (overlay
     // rationale).
+    // Executor note: this write runs on the SAME bounded read executor/queue (iotdb.ts.read.*) as
+    // the dashboard findLatest/findAllLatest reads, so a saveLatest/removeLatest write burst that
+    // fills the queue can reject a concurrent read with IoTDBTableReadQueueFullException. The
+    // executors are deliberately shared (not split); size the read queue for the combined load.
     Lock lock = identityLock(tenantId, entityId, key);
     return submitReadTask(
         () -> {
@@ -396,19 +392,7 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     if (!destroyed.compareAndSet(false, true)) {
       return;
     }
-    accepting.set(false);
-    IoTDBTableDaoShuttingDownException failure = shuttingDownException();
-    for (Runnable dropped : readExecutor.shutdownNow()) {
-      failDroppedReadTask(dropped, failure);
-    }
-    try {
-      readExecutor.awaitTermination(shutdownDrainTimeoutMs, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    for (ReadTask<?> task : readTasks) {
-      task.fail(failure);
-    }
+    shutdownReadExecutor();
   }
 
   // ---- read merge (derived primary + overlay, max-ts-per-key, overlay wins on tie) ----
@@ -610,8 +594,9 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     // B1-lenient: a same-ts two-type telemetry row must not block a delete, and although the
     // overlay
     // is single-typed within a JVM (per-identity lock + delete-then-insert), a clustered deployment
-    // (the latest path has no cluster-mode gate) could leave a same-ts two-type overlay row, which
-    // must not wedge the delete either — an ambiguous overlay is treated as absent and self-heals.
+    // (acknowledged via iotdb.ts_latest.cluster_mode) could leave a same-ts two-type overlay row,
+    // which must not wedge the delete either — an ambiguous overlay is treated as absent and
+    // self-heals.
     Optional<TsKvEntry> derived = readDerivedLatestLenient(tenantId, entityId, key);
     Optional<TsKvEntry> overlay =
         readLatestRowB1Lenient(buildFindLatestOverlaySql(tenantId, entityId, key), key);
@@ -756,39 +741,11 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     return entityPredicate(tenantId, entityId) + " AND key=" + sqlString(key);
   }
 
-  private String entityPredicate(TenantId tenantId, EntityId entityId) {
-    return "tenant_id="
-        + sqlString(tenantId.getId().toString())
-        + " AND entity_type="
-        + sqlString(entityId.getEntityType().name())
-        + " AND entity_id="
-        + sqlString(entityId.getId().toString());
-  }
-
   // ---- mapping + helpers ----
 
   private static TsKvEntry nullEntry(String key) {
     // SPI contract: findLatest returns this sentinel when the value is not present in the DB.
     return new BasicTsKvEntry(System.currentTimeMillis(), new StringDataEntry(key, null));
-  }
-
-  private KvEntry kvEntry(String key, TypedKvValue value) {
-    if (value.booleanValue() != null) {
-      return new BooleanDataEntry(key, value.booleanValue());
-    }
-    if (value.longValue() != null) {
-      return new LongDataEntry(key, value.longValue());
-    }
-    if (value.doubleValue() != null) {
-      return new DoubleDataEntry(key, value.doubleValue());
-    }
-    if (value.stringValue() != null) {
-      return new StringDataEntry(key, value.stringValue());
-    }
-    if (value.jsonValue() != null) {
-      return new JsonDataEntry(key, value.jsonValue());
-    }
-    throw new IllegalArgumentException("Telemetry row does not contain a typed value");
   }
 
   private Lock identityLock(TenantId tenantId, EntityId entityId, String key) {
@@ -802,87 +759,19 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
             + key);
   }
 
-  private static String sqlString(String value) {
-    return "'" + Objects.requireNonNull(value, "value").replace("'", "''") + "'";
-  }
-
-  private static String requireTelemetryKey(String key) {
-    if (key == null || key.trim().isEmpty()) {
-      throw new IllegalArgumentException("Telemetry key must not be blank");
-    }
-    return key;
-  }
-
-  private <T> ListenableFuture<T> submitReadTask(Callable<T> callable) {
-    if (!accepting.get()) {
-      return Futures.immediateFailedFuture(shuttingDownException());
-    }
-    ReadTask<T> task = new ReadTask<>(callable);
-    readTasks.add(task);
-    try {
-      readExecutor.execute(task);
-    } catch (RejectedExecutionException e) {
-      if (!accepting.get() || readExecutor.isShutdown()) {
-        task.fail(shuttingDownException());
-      } else {
-        task.fail(new IoTDBTableReadQueueFullException("IoTDB Table Mode latest queue is full", e));
-      }
-      readTasks.remove(task);
-      return task.future();
-    }
-    if (!accepting.get() && readExecutor.remove(task)) {
-      task.fail(shuttingDownException());
-      readTasks.remove(task);
-    }
-    return task.future();
-  }
-
-  private void failDroppedReadTask(Runnable dropped, IoTDBTableDaoShuttingDownException failure) {
-    if (dropped instanceof ReadTask<?> task) {
-      task.fail(failure);
-      readTasks.remove(task);
-    }
-  }
-
-  private IoTDBTableDaoShuttingDownException shuttingDownException() {
-    return new IoTDBTableDaoShuttingDownException("IoTDB Table Mode latest DAO is shutting down");
-  }
-
-  private static ThreadFactory readThreadFactory() {
-    AtomicInteger sequence = new AtomicInteger();
-    return runnable -> {
-      Thread thread =
-          new Thread(runnable, "iotdb-table-latest-read-worker-" + sequence.incrementAndGet());
-      thread.setDaemon(true);
-      return thread;
-    };
-  }
-
-  private final class ReadTask<T> implements Runnable {
-    private final Callable<T> callable;
-    private final SettableFuture<T> future = SettableFuture.create();
-
-    private ReadTask(Callable<T> callable) {
-      this.callable = Objects.requireNonNull(callable, "callable");
-    }
-
-    @Override
-    public void run() {
-      try {
-        future.set(callable.call());
-      } catch (Throwable t) {
-        future.setException(t);
-      } finally {
-        readTasks.remove(this);
-      }
-    }
-
-    private ListenableFuture<T> future() {
-      return future;
-    }
-
-    private void fail(Throwable t) {
-      future.setException(t);
+  private static void requireClusterModeAcknowledged(String clusterMode) {
+    String mode = clusterMode == null ? null : clusterMode.trim();
+    if (mode == null || (!mode.equals("sticky-routing") && !mode.equals("disabled"))) {
+      throw new IllegalStateException(
+          "iotdb.ts_latest.cluster_mode must be explicitly set to 'sticky-routing' or 'disabled' "
+              + "when the IoTDB Table Mode latest overlay DAO is active; got '"
+              + clusterMode
+              + "'. The latest overlay write path (delete-then-insert under a per-identity in-JVM "
+              + "lock) converges only within a single JVM, so cross-node single-writer safety must "
+              + "be acknowledged. The race is benign (transient dual overlay rows; the max-ts merge "
+              + "still returns the newer value and a B1 two-type overlay row self-heals via the "
+              + "B1-lenient guard/remove reads), but the decision is made deliberately for parity "
+              + "with the sibling attribute DAO.");
     }
   }
 }

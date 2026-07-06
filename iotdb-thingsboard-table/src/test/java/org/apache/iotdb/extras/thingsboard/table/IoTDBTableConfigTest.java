@@ -67,6 +67,11 @@ class IoTDBTableConfigTest {
     assertEquals(50L, config.getTs().getSave().getRetryInitialBackoffMs());
     assertEquals(1000L, config.getTs().getSave().getRetryMaxBackoffMs());
     assertEquals(10000, config.getTs().getRead().getQueueCapacity());
+    // Attribute executor defaults equal the ts.read defaults so behavior is unchanged by default.
+    assertEquals(4, config.getAttributes().getExecutor().getThreads());
+    assertEquals(10000, config.getAttributes().getExecutor().getQueueCapacity());
+    assertEquals("", config.getAttributes().getClusterMode());
+    assertEquals("", config.getTsLatest().getClusterMode());
   }
 
   @Test
@@ -93,7 +98,11 @@ class IoTDBTableConfigTest {
                 Map.entry("iotdb.ts.save.flush-threads", "1"),
                 Map.entry("iotdb.ts.save.retry-max-attempts", "4"),
                 Map.entry("iotdb.ts.save.retry-initial-backoff-ms", "10"),
-                Map.entry("iotdb.ts.save.retry-max-backoff-ms", "100")));
+                Map.entry("iotdb.ts.save.retry-max-backoff-ms", "100"),
+                Map.entry("iotdb.attributes.cluster_mode", "disabled"),
+                Map.entry("iotdb.attributes.executor.threads", "3"),
+                Map.entry("iotdb.attributes.executor.queue-capacity", "1234"),
+                Map.entry("iotdb.ts_latest.cluster_mode", "sticky-routing")));
 
     IoTDBTableConfig config = new Binder(source).bind("iotdb", IoTDBTableConfig.class).get();
 
@@ -117,6 +126,10 @@ class IoTDBTableConfigTest {
     assertEquals(4, config.getTs().getSave().getRetryMaxAttempts());
     assertEquals(10L, config.getTs().getSave().getRetryInitialBackoffMs());
     assertEquals(100L, config.getTs().getSave().getRetryMaxBackoffMs());
+    assertEquals("disabled", config.getAttributes().getClusterMode());
+    assertEquals(3, config.getAttributes().getExecutor().getThreads());
+    assertEquals(1234, config.getAttributes().getExecutor().getQueueCapacity());
+    assertEquals("sticky-routing", config.getTsLatest().getClusterMode());
   }
 
   @Test

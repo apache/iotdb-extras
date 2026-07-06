@@ -24,7 +24,6 @@ import org.apache.iotdb.isession.pool.ITableSessionPool;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Striped;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,13 +37,7 @@ import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.kv.AttributeKvEntry;
 import org.thingsboard.server.common.data.kv.BaseAttributeKvEntry;
-import org.thingsboard.server.common.data.kv.BooleanDataEntry;
 import org.thingsboard.server.common.data.kv.DataType;
-import org.thingsboard.server.common.data.kv.DoubleDataEntry;
-import org.thingsboard.server.common.data.kv.JsonDataEntry;
-import org.thingsboard.server.common.data.kv.KvEntry;
-import org.thingsboard.server.common.data.kv.LongDataEntry;
-import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.common.data.util.TbPair;
 import org.thingsboard.server.dao.attributes.AttributesDao;
 import org.thingsboard.server.dao.model.sql.AttributeKvEntity;
@@ -55,17 +48,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 
@@ -224,11 +207,6 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
           ColumnCategory.FIELD,
           ColumnCategory.FIELD);
 
-  private final ThreadPoolExecutor ioExecutor;
-  private final Set<IoTask<?>> ioTasks = ConcurrentHashMap.newKeySet();
-  private final AtomicBoolean accepting = new AtomicBoolean(true);
-  private final AtomicBoolean destroyed = new AtomicBoolean(false);
-  private final long shutdownDrainTimeoutMs;
   // Per-identity write serialization (single-JVM convergence).
   private final Striped<Lock> identityLocks = Striped.lock(256);
   // Per-ENTITY read/write serialization guarding entity-wide removeAllByEntityId against concurrent
@@ -247,18 +225,16 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     // only within a single JVM. This is intentionally independent of ts.type / ts_latest.type
     // (the attribute DAO routes separately). Fail fast at construction on an absent/invalid value.
     requireClusterModeAcknowledged(config.getAttributes().getClusterMode());
-    this.shutdownDrainTimeoutMs = config.getTs().getSave().getShutdownDrainTimeoutMs();
-    int ioThreads = config.getTs().getRead().getThreads();
-    int ioQueueCapacity = config.getTs().getRead().getQueueCapacity();
-    this.ioExecutor =
-        new ThreadPoolExecutor(
-            ioThreads,
-            ioThreads,
-            0L,
-            TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(ioQueueCapacity),
-            ioThreadFactory(),
-            new ThreadPoolExecutor.AbortPolicy());
+    // The attribute DAO activates independently of the timeseries selector, so its IO executor is
+    // sized by its OWN config block (iotdb.attributes.executor.*), whose defaults equal the
+    // ts.read defaults so behavior is unchanged unless an operator tunes them.
+    initReadExecutor(
+        config.getAttributes().getExecutor().getThreads(),
+        config.getAttributes().getExecutor().getQueueCapacity(),
+        config.getTs().getSave().getShutdownDrainTimeoutMs(),
+        "iotdb-table-attributes-io-worker-",
+        "IoTDB Table Mode attribute IO queue is full",
+        "IoTDB Table Mode attribute DAO is shutting down");
   }
 
   // ---- save: delete-then-insert under a per-identity lock ----
@@ -276,7 +252,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     String key = requireKey(attribute.getKey());
     Lock entityReadLock = entityLock(tenantId, entityId).readLock();
     Lock lock = identityLock(tenantId, entityId, attributeScope, key);
-    return submitIoTask(
+    return submitReadTask(
         () -> {
           // Lock ordering: entity read lock (outer) then per-identity lock (inner). The shared read
           // lock lets concurrent saves of different keys on the same entity proceed, while
@@ -482,7 +458,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     List<ListenableFuture<String>> futures = new ArrayList<>(validatedKeys.size());
     for (String key : validatedKeys) {
       futures.add(
-          submitIoTask(
+          submitReadTask(
               () -> {
                 deleteIdentity(tenantId, entityId, attributeScope, key);
                 return key;
@@ -507,7 +483,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     List<ListenableFuture<TbPair<String, Long>>> futures = new ArrayList<>(validatedKeys.size());
     for (String key : validatedKeys) {
       futures.add(
-          submitIoTask(
+          submitReadTask(
               () -> {
                 deleteIdentity(tenantId, entityId, attributeScope, key);
                 // null version: IoTDB has no sequence (see class javadoc). The ThingsBoard service
@@ -597,7 +573,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
       return Futures.immediateFuture(List.of());
     }
     // [v4.3.1.2] async wrapper: run the same distinct-key read on the bounded IO executor.
-    return submitIoTask(
+    return submitReadTask(
         () -> doFindDistinctKeys(buildKeysByEntityIdsSql(tenantId, entityIds, scope)));
   }
 
@@ -633,7 +609,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
       return Futures.immediateFuture(List.of());
     }
     // [v4.3.1.2] async wrapper: run the same bulk latest read on the bounded IO executor.
-    return submitIoTask(() -> doFindKeyed(buildLatestByEntityIdsSql(tenantId, entityIds, scope)));
+    return submitReadTask(() -> doFindKeyed(buildLatestByEntityIdsSql(tenantId, entityIds, scope)));
   }
 
   @Override
@@ -851,35 +827,7 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
         + sqlString(attributeScope.name());
   }
 
-  private String entityPredicate(TenantId tenantId, EntityId entityId) {
-    return "tenant_id="
-        + sqlString(tenantId.getId().toString())
-        + " AND entity_type="
-        + sqlString(entityId.getEntityType().name())
-        + " AND entity_id="
-        + sqlString(entityId.getId().toString());
-  }
-
   // ---- mapping + helpers ----
-
-  private KvEntry kvEntry(String key, TypedKvValue value) {
-    if (value.booleanValue() != null) {
-      return new BooleanDataEntry(key, value.booleanValue());
-    }
-    if (value.longValue() != null) {
-      return new LongDataEntry(key, value.longValue());
-    }
-    if (value.doubleValue() != null) {
-      return new DoubleDataEntry(key, value.doubleValue());
-    }
-    if (value.stringValue() != null) {
-      return new StringDataEntry(key, value.stringValue());
-    }
-    if (value.jsonValue() != null) {
-      return new JsonDataEntry(key, value.jsonValue());
-    }
-    throw new IllegalArgumentException("Attribute row does not contain a typed value");
-  }
 
   private Lock identityLock(
       TenantId tenantId, EntityId entityId, AttributeScope attributeScope, String key) {
@@ -904,19 +852,8 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
             + entityId.getId().toString());
   }
 
-  private static String sqlString(String value) {
-    // Single-quote SQL string literal. This relies on the IoTDB Table-Mode STRING-literal grammar
-    // (RelationalSql.g4): the single quote is the only special character and is escaped by doubling
-    // it (''), with NO backslash escaping. If a future IoTDB lexer adds backslash/other escapes,
-    // this doubling alone would no longer be sufficient and must be revisited.
-    return "'" + Objects.requireNonNull(value, "value").replace("'", "''") + "'";
-  }
-
   private static String requireKey(String key) {
-    if (key == null || key.trim().isEmpty()) {
-      throw new IllegalArgumentException("Attribute key must not be blank");
-    }
-    return key;
+    return requireKey(key, "Attribute");
   }
 
   private static void requireClusterModeAcknowledged(String clusterMode) {
@@ -932,100 +869,13 @@ public class IoTDBTableAttributesDao extends IoTDBTableBaseDao
     }
   }
 
-  // ---- bounded IO executor (mirrors the latest read executor) ----
+  // ---- bounded IO executor (shared base mechanism; iotdb.attributes.executor.*) ----
 
   @Override
   public void destroy() {
     if (!destroyed.compareAndSet(false, true)) {
       return;
     }
-    accepting.set(false);
-    IoTDBTableDaoShuttingDownException failure = shuttingDownException();
-    for (Runnable dropped : ioExecutor.shutdownNow()) {
-      failDroppedIoTask(dropped, failure);
-    }
-    try {
-      ioExecutor.awaitTermination(shutdownDrainTimeoutMs, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    for (IoTask<?> task : ioTasks) {
-      task.fail(failure);
-    }
-  }
-
-  private <T> ListenableFuture<T> submitIoTask(Callable<T> callable) {
-    if (!accepting.get()) {
-      return Futures.immediateFailedFuture(shuttingDownException());
-    }
-    IoTask<T> task = new IoTask<>(callable);
-    ioTasks.add(task);
-    try {
-      ioExecutor.execute(task);
-    } catch (RejectedExecutionException e) {
-      if (!accepting.get() || ioExecutor.isShutdown()) {
-        task.fail(shuttingDownException());
-      } else {
-        task.fail(
-            new IoTDBTableReadQueueFullException("IoTDB Table Mode attribute IO queue is full", e));
-      }
-      ioTasks.remove(task);
-      return task.future();
-    }
-    if (!accepting.get() && ioExecutor.remove(task)) {
-      task.fail(shuttingDownException());
-      ioTasks.remove(task);
-    }
-    return task.future();
-  }
-
-  private void failDroppedIoTask(Runnable dropped, IoTDBTableDaoShuttingDownException failure) {
-    if (dropped instanceof IoTask<?> task) {
-      task.fail(failure);
-      ioTasks.remove(task);
-    }
-  }
-
-  private IoTDBTableDaoShuttingDownException shuttingDownException() {
-    return new IoTDBTableDaoShuttingDownException(
-        "IoTDB Table Mode attribute DAO is shutting down");
-  }
-
-  private static ThreadFactory ioThreadFactory() {
-    AtomicInteger sequence = new AtomicInteger();
-    return runnable -> {
-      Thread thread =
-          new Thread(runnable, "iotdb-table-attributes-io-worker-" + sequence.incrementAndGet());
-      thread.setDaemon(true);
-      return thread;
-    };
-  }
-
-  private final class IoTask<T> implements Runnable {
-    private final Callable<T> callable;
-    private final SettableFuture<T> future = SettableFuture.create();
-
-    private IoTask(Callable<T> callable) {
-      this.callable = Objects.requireNonNull(callable, "callable");
-    }
-
-    @Override
-    public void run() {
-      try {
-        future.set(callable.call());
-      } catch (Throwable t) {
-        future.setException(t);
-      } finally {
-        ioTasks.remove(this);
-      }
-    }
-
-    private ListenableFuture<T> future() {
-      return future;
-    }
-
-    private void fail(Throwable t) {
-      future.setException(t);
-    }
+    shutdownReadExecutor();
   }
 }

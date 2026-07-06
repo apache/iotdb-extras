@@ -844,6 +844,7 @@ class IoTDBTableLatestDaoIT {
     config.getTs().getSave().setRetryInitialBackoffMs(1L);
     config.getTs().getSave().setRetryMaxBackoffMs(1L);
     config.getTs().getRead().setThreads(1);
+    config.getTsLatest().setClusterMode("disabled");
     return config;
   }
 

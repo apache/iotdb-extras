@@ -797,6 +797,30 @@ class IoTDBTableLatestDaoTest {
     verifyNoSession(context);
   }
 
+  @Test
+  void constructor_failsWhenClusterModeUnset() {
+    ITableSessionPool pool = mock(ITableSessionPool.class);
+    IoTDBTableConfig config = new IoTDBTableConfig();
+    config.getTs().getRead().setThreads(1);
+    // iotdb.ts_latest.cluster_mode defaults to blank -> must fail fast, symmetric with the
+    // attribute DAO's iotdb.attributes.cluster_mode gate.
+
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> new IoTDBTableLatestDao(pool, config));
+    assertTrue(ex.getMessage().contains("cluster_mode"));
+  }
+
+  @Test
+  void constructor_acceptsStickyRoutingClusterMode() {
+    ITableSessionPool pool = mock(ITableSessionPool.class);
+    IoTDBTableConfig config = new IoTDBTableConfig();
+    config.getTs().getRead().setThreads(1);
+    config.getTsLatest().setClusterMode("sticky-routing");
+
+    IoTDBTableLatestDao dao = new IoTDBTableLatestDao(pool, config);
+    daos.add(dao);
+  }
+
   // ---- helpers ----
 
   private TestContext newContext() {
@@ -809,6 +833,7 @@ class IoTDBTableLatestDaoTest {
     }
     IoTDBTableConfig config = new IoTDBTableConfig();
     config.getTs().getRead().setThreads(1);
+    config.getTsLatest().setClusterMode("disabled");
     IoTDBTableLatestDao dao = new IoTDBTableLatestDao(pool, config);
     daos.add(dao);
     return new TestContext(dao, pool, session);

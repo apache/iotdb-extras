@@ -440,7 +440,7 @@ class IoTDBTableAttributesDaoIT {
     bootstrapSchema(scope.database());
     try (ITableSessionPool pool = newPool(scope.database())) {
       IoTDBTableConfig config = config();
-      config.getTs().getRead().setThreads(8);
+      config.getAttributes().getExecutor().setThreads(8);
       IoTDBTableAttributesDao dao = new IoTDBTableAttributesDao(pool, config);
       ExecutorService callers = Executors.newFixedThreadPool(8);
       try {
@@ -624,7 +624,7 @@ class IoTDBTableAttributesDaoIT {
 
   private IoTDBTableConfig config() {
     IoTDBTableConfig config = new IoTDBTableConfig();
-    config.getTs().getRead().setThreads(2);
+    config.getAttributes().getExecutor().setThreads(2);
     config.getAttributes().setClusterMode("disabled");
     return config;
   }

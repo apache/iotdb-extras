@@ -93,6 +93,7 @@ class IoTDBTableAutoConfigurationTest {
             "database.ts.type=iotdb-table",
             "database.ts_latest.type=iotdb-table",
             "iotdb.ts.experimental-raw-only=true",
+            "iotdb.ts_latest.cluster_mode=disabled",
             "iotdb.host=localhost",
             "iotdb.port=6667",
             "iotdb.username=root",

@@ -796,7 +796,7 @@ class IoTDBTableAttributesDaoTest {
   void constructor_failsWhenClusterModeUnset() {
     ITableSessionPool pool = mock(ITableSessionPool.class);
     IoTDBTableConfig config = new IoTDBTableConfig();
-    config.getTs().getRead().setThreads(1);
+    config.getAttributes().getExecutor().setThreads(1);
     // iotdb.attributes.cluster_mode defaults to blank -> must fail fast.
 
     IllegalStateException ex =
@@ -808,7 +808,7 @@ class IoTDBTableAttributesDaoTest {
   void constructor_acceptsDisabledClusterMode() {
     ITableSessionPool pool = mock(ITableSessionPool.class);
     IoTDBTableConfig config = new IoTDBTableConfig();
-    config.getTs().getRead().setThreads(1);
+    config.getAttributes().getExecutor().setThreads(1);
     config.getAttributes().setClusterMode("disabled");
 
     IoTDBTableAttributesDao dao = new IoTDBTableAttributesDao(pool, config);
@@ -826,7 +826,7 @@ class IoTDBTableAttributesDaoTest {
       throw new AssertionError(e);
     }
     IoTDBTableConfig config = new IoTDBTableConfig();
-    config.getTs().getRead().setThreads(1);
+    config.getAttributes().getExecutor().setThreads(1);
     config.getAttributes().setClusterMode("sticky-routing");
     IoTDBTableAttributesDao dao = new IoTDBTableAttributesDao(pool, config);
     daos.add(dao);

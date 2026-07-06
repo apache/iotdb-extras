@@ -79,6 +79,8 @@ public class IoTDBTableConfig {
 
   @Valid private Attributes attributes = new Attributes();
 
+  @Valid private TsLatest tsLatest = new TsLatest();
+
   @Data
   public static class Ts {
     /**
@@ -107,10 +109,49 @@ public class IoTDBTableConfig {
      * best-effort); any other value (including the empty default) fails fast at construction.
      */
     private String clusterMode = "";
+
+    /**
+     * IO-executor sizing for the attribute DAO, bound from {@code iotdb.attributes.executor.*}. The
+     * attribute DAO activates independently of the time-series selector, so it owns its own
+     * executor config rather than borrowing {@code iotdb.ts.read.*}. The defaults equal the {@code
+     * iotdb.ts.read.*} defaults, so behavior is unchanged unless an operator tunes them.
+     */
+    @Valid private Executor executor = new Executor();
+  }
+
+  /**
+   * Latest-telemetry overlay DAO configuration, bound from {@code iotdb.ts_latest.*}. Independent
+   * of the {@code Attributes} block so the latest overlay can be acknowledged on its own terms.
+   */
+  @Data
+  public static class TsLatest {
+    /**
+     * Cluster routing acknowledgement for the latest overlay DAO, symmetric with {@code
+     * iotdb.attributes.cluster_mode}. The overlay write path is delete-then-insert under a
+     * per-identity in-JVM lock, which converges only inside a single JVM; cross-node single-writer
+     * safety is the operator's responsibility. When the DAO is activated this must be set
+     * explicitly to one of {@code sticky-routing} or {@code disabled}; any other value (including
+     * the empty default) fails fast at construction.
+     */
+    private String clusterMode = "";
   }
 
   @Data
   public static class Read {
+    @Min(1)
+    private int threads = 4;
+
+    @Min(1)
+    private int queueCapacity = 10000;
+  }
+
+  /**
+   * Bounded IO-executor sizing (worker thread count + task-queue capacity), reused by DAO blocks
+   * that own their own executor. Defaults mirror {@link Read} so the shape and defaults match the
+   * {@code iotdb.ts.read.*} executor config.
+   */
+  @Data
+  public static class Executor {
     @Min(1)
     private int threads = 4;
 
