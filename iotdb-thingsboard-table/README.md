@@ -141,7 +141,10 @@ latest value per `(tenant, entity, key)`. It activates only when all of
 `database.ts.type=iotdb-table`, `database.ts_latest.type=iotdb-table`, and
 `iotdb.ts.experimental-raw-only=true` are set (the timeseries selector is
 required because the derived latest reads the `telemetry` table that only the
-IoTDB writer populates).
+IoTDB writer populates). When it activates, `iotdb.ts_latest.cluster_mode` must
+also be set to `sticky-routing` or `disabled` (mirroring `iotdb.attributes.cluster_mode`);
+the empty default fails construction fast, because the overlay's per-identity lock
+converges only within a single JVM.
 
 The latest value is read from **both** the historical `telemetry` table
 (derived, `ORDER BY time DESC LIMIT 1` / `LAST_BY(col, time)`, engine-accelerated
@@ -228,6 +231,9 @@ Key activation and operational flags:
 | `iotdb.ts.experimental-raw-only` | `false` | Explicit opt-in for this initial raw-only backend. Must be `true` together with `database.ts.type=iotdb-table`; write, raw read, and delete are implemented, while time-bucketed aggregation is outside the current scope. |
 | `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO. Independent of the timeseries selectors. Unset in a real Phase-1 deployment, so the attribute DAO is inert by default. |
 | `iotdb.attributes.cluster_mode` | _(empty)_ | Required when `database.attributes.type=iotdb-table`. Must be `sticky-routing` (per-identity writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the attribute write path converges only within a single JVM. |
+| `iotdb.ts_latest.cluster_mode` | _(empty)_ | Required when `database.ts_latest.type=iotdb-table` (the latest-overlay DAO is active). Must be `sticky-routing` (per-identity latest writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the latest-overlay write path converges only within a single JVM. This is the symmetric acknowledgement to `iotdb.attributes.cluster_mode`. |
+| `iotdb.attributes.executor.threads` | `4` | Worker-thread count for the attribute DAO's bounded IO executor. Sized independently of `iotdb.ts.read.*` so the attribute path's concurrency can be tuned on its own; the default matches `iotdb.ts.read`. |
+| `iotdb.attributes.executor.queue-capacity` | `10000` | Bounded task-queue capacity for the attribute DAO's IO executor; a full queue rejects fast (back-pressure) rather than growing unboundedly. Default matches `iotdb.ts.read`. |
 | `iotdb.host` / `iotdb.port` | `127.0.0.1` / `6667` | IoTDB node address. |
 | `iotdb.username` / `iotdb.password` | `root` / `root` | IoTDB credentials. |
 | `iotdb.database` | `thingsboard` | Target IoTDB database. |
