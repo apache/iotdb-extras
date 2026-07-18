@@ -19,16 +19,28 @@
 package org.apache.iotdb.extras.thingsboard.table;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
 import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.kv.AttributeKvEntry;
+import org.thingsboard.server.common.data.kv.BaseAttributeKvEntry;
+import org.thingsboard.server.common.data.kv.BasicTsKvEntry;
+import org.thingsboard.server.common.data.kv.BooleanDataEntry;
 import org.thingsboard.server.common.data.kv.DeleteTsKvQuery;
+import org.thingsboard.server.common.data.kv.DoubleDataEntry;
+import org.thingsboard.server.common.data.kv.JsonDataEntry;
+import org.thingsboard.server.common.data.kv.KvEntry;
+import org.thingsboard.server.common.data.kv.LongDataEntry;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
+import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
+import org.thingsboard.server.common.data.kv.TsKvLatestRemovingResult;
+import org.thingsboard.server.common.data.kv.TsKvQuery;
+import org.thingsboard.server.common.data.util.TbPair;
 import org.thingsboard.server.dao.attributes.AttributesDao;
 import org.thingsboard.server.dao.timeseries.TimeseriesDao;
 import org.thingsboard.server.dao.timeseries.TimeseriesLatestDao;
@@ -345,5 +357,61 @@ class StrategyFContractTest {
     ReadTsKvQuery.class.getMethod("getLimit");
     ReadTsKvQuery.class.getMethod("getOrder");
     ReadTsKvQuery.class.getMethod("getInterval");
+  }
+
+  @Test
+  void valueObjectConstructorsUsedByDaoExist() throws NoSuchMethodException {
+    // The DAOs construct these ThingsBoard value objects on the read/remove paths. The SPI-method
+    // and getter pins above do NOT cover constructors, so a src/provided stub whose ctor arg
+    // order/shape drifts from ThingsBoard v4.3.1.2 would still compile (the DAO binds against the
+    // stub), pass every stub-backed unit test and Docker IT (the ITs also compile the TB types
+    // against the stub), and only surface as a NoSuchMethodError against the real ThingsBoard
+    // runtime. Pin the exact ctor parameter types each call site depends on so drift breaks the
+    // build here instead. Verified against ThingsBoard v4.3.1.2 (commit c37fb509).
+
+    // IoTDBTableBaseDao.kvEntry — one DataEntry subtype per IoTDB value channel.
+    assertCtor(BooleanDataEntry.class, String.class, Boolean.class);
+    assertCtor(LongDataEntry.class, String.class, Long.class);
+    assertCtor(DoubleDataEntry.class, String.class, Double.class);
+    assertCtor(StringDataEntry.class, String.class, String.class);
+    assertCtor(JsonDataEntry.class, String.class, String.class);
+
+    // IoTDBTableLatestDao / IoTDBTableTimeseriesDao — latest + raw-read entries and the nullEntry
+    // sentinel all build BasicTsKvEntry(ts, kvEntry).
+    assertCtor(BasicTsKvEntry.class, long.class, KvEntry.class);
+
+    // IoTDBTableAttributesDao — attribute rows map to BaseAttributeKvEntry(kv, ts, version).
+    assertCtor(BaseAttributeKvEntry.class, KvEntry.class, long.class, Long.class);
+
+    // IoTDBTableLatestDao.removeLatest — three distinct removing-result shapes.
+    assertCtor(TsKvLatestRemovingResult.class, String.class, boolean.class);
+    assertCtor(TsKvLatestRemovingResult.class, TsKvEntry.class, Long.class);
+    assertCtor(TsKvLatestRemovingResult.class, String.class, boolean.class, Long.class);
+
+    // IoTDBTableTimeseriesDao — raw read result; its first ctor arg is query.getId(), so couple the
+    // pinned int first-param to TsKvQuery.getId()'s return type (a drift there is exactly the kind
+    // of
+    // stub-vs-real mismatch this test exists to catch).
+    assertCtor(ReadTsKvQueryResult.class, int.class, List.class, long.class);
+    assertEquals(
+        int.class,
+        TsKvQuery.class.getMethod("getId").getReturnType(),
+        "ReadTsKvQueryResult(int,..) first arg is query.getId(); its return type must stay int");
+
+    // Static factories the DAO invokes (not constructors): pin the erased of(Object, Object) shape.
+    // TbPair is a vendored ThingsBoard stub; Pair is the real Commons-Lang type at runtime.
+    TbPair.class.getMethod("of", Object.class, Object.class);
+    Pair.class.getMethod("of", Object.class, Object.class);
+  }
+
+  /**
+   * Asserts that {@code type} declares a constructor with exactly the given ordered parameter
+   * types. {@code getDeclaredConstructor} throws {@link NoSuchMethodException} if no constructor
+   * matches the exact parameter types, pinning the value-object constructor shape the DAO relies on
+   * so a silent drift in the compile-only surface ({@code src/provided}) fails the build.
+   */
+  private static void assertCtor(Class<?> type, Class<?>... expectedParams)
+      throws NoSuchMethodException {
+    type.getDeclaredConstructor(expectedParams);
   }
 }
