@@ -69,7 +69,7 @@ Click the `New Dashboard` icon on the top right, and select `Add an empty panel`
 
 <img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/add%20empty%20panel.png?raw=true">
 
-Grafana plugin supports SQL: Full Customized mode and SQL: Drop-down List mode, and the default mode is SQL: Full Customized mode.
+Grafana plugin supports SQL: Full Customized mode and SQL: Drop-down List mode for the tree model, and SQL: Table Model mode for the table model. The default mode is SQL: Full Customized mode.
 
 <img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/grafana_input_style.png?raw=true">
 
@@ -118,6 +118,35 @@ Tip: Statements like `select * from root.xx.**` are not recommended because thos
 Select a time series in the TIME-SERIES selection box, select a function in the FUNCTION option, and enter the contents in the SAMPLING INTERVAL、SLIDING STEP、LEVEL、FILL input boxes, where TIME-SERIES is a required item and the rest are non required items.
 
 <img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/grafana_input2.png?raw=true">
+
+##### SQL: Table Model
+
+Queries IoTDB's table model (IoTDB 2.x) through the REST interface `/rest/table/v1/query`. Enter a standard SQL statement in the SQL input box, for example:
+
+```sql
+SELECT time, device_id, temperature FROM table1 WHERE $__timeFilter(time)
+```
+
+DATABASE input box: the database to run the statement against. Optional when every table reference in the statement is fully qualified (`database.table`).
+
+SQL input box: a single table-model SELECT statement. The following macros are expanded by the plugin before the statement is sent:
+
+| Macro | Expands to |
+| ----- | ---------- |
+| `$__timeFilter(col)` | `(col >= <panel start> AND col <= <panel end>)`; `col` defaults to `time` when omitted |
+| `$__timeFrom`, `$__timeFrom()` | the panel range start as an epoch integer |
+| `$__timeTo`, `$__timeTo()` | the panel range end as an epoch integer |
+
+FORMAT option:
+
+* `Time series` (default): rows are sorted by the first TIMESTAMP column, and a result that contains tag/string columns next to numeric columns is pivoted into one series per tag combination — so a query returning several devices renders as separate lines in a time-series panel. Note that the pivot requires timestamps without nulls; results are sorted by the plugin, so an `ORDER BY` clause is not needed.
+* `Table`: rows are returned exactly as the server sent them (use this with the table panel, or when your `ORDER BY` should be preserved).
+
+Result columns are typed from the response's `data_types`: TIMESTAMP columns become Grafana time fields, INT32/INT64 become integers, FLOAT/DOUBLE become floats, BOOLEAN becomes booleans, and TEXT/STRING/DATE/BLOB render as strings.
+
+If the server runs with a non-default `timestamp_precision` (`us` or `ns`), set the same value in the data source's `time precision` option — it controls both how TIMESTAMP values are interpreted and what the time macros expand to.
+
+The REST service caps query results at `rest_query_default_row_size_limit` rows (10000 by default, configurable on the server); a query exceeding it returns an error message rather than truncated data.
 
 #### Support for variables and template functions
 

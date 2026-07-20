@@ -126,6 +126,13 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
       if (query.fillClauses) {
         query.fillClauses = getTemplateSrv().replace(query.fillClauses, scopedVars);
       }
+    } else if (query.sqlType === 'SQL: Table Model') {
+      if (query.sql) {
+        query.sql = getTemplateSrv().replace(query.sql, scopedVars);
+      }
+      if (query.database) {
+        query.database = getTemplateSrv().replace(query.database, scopedVars);
+      }
     }
     return query;
   }

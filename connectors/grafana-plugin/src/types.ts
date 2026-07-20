@@ -33,6 +33,13 @@ export interface IoTDBQuery extends DataQuery {
   limitAll?: LimitAll;
   options: Array<Array<SelectableValue<string>>>;
   hide: boolean;
+
+  // Table-model mode: a standard SQL statement run against `database`,
+  // rendered either as time series (long results are pivoted into one series
+  // per tag combination) or as a plain table.
+  database?: string;
+  sql?: string;
+  format?: string;
 }
 
 export interface GroupBy {
@@ -58,6 +65,10 @@ export interface LimitAll {
 export interface IoTDBOptions extends DataSourceJsonData {
   url: string;
   username: string;
+  // Mirrors the server's timestamp_precision property (ms / us / ns, ms when
+  // unset). The table-model mode uses it to interpret TIMESTAMP values and to
+  // expand the time macros.
+  timestampPrecision?: string;
 }
 
 /**

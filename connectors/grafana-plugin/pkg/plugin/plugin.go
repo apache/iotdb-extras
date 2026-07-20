@@ -70,16 +70,17 @@ func ApacheIoTDBDatasource(ctx context.Context, d backend.DataSourceInstanceSett
 	if password, exists := d.DecryptedSecureJSONData["password"]; exists {
 		authorization = "Basic " + base64.StdEncoding.EncodeToString([]byte(dm.Username+":"+password))
 	}
-	return &IoTDBDataSource{CallResourceHandler: iotdbResourceHandler(authorization, httpClient), Username: dm.Username, Ulr: dm.Url, httpClient: httpClient}, nil
+	return &IoTDBDataSource{CallResourceHandler: iotdbResourceHandler(authorization, httpClient), Username: dm.Username, Ulr: dm.Url, TimestampPrecision: dm.TimestampPrecision, httpClient: httpClient}, nil
 }
 
 // SampleDatasource is an example datasource which can respond to data queries, reports
 // its health and has streaming skills.
 type IoTDBDataSource struct {
 	backend.CallResourceHandler
-	Username   string
-	Ulr        string
-	httpClient *http.Client
+	Username           string
+	Ulr                string
+	TimestampPrecision string
+	httpClient         *http.Client
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
@@ -113,6 +114,9 @@ func (d *IoTDBDataSource) QueryData(ctx context.Context, req *backend.QueryDataR
 type dataSourceModel struct {
 	Username string `json:"username"`
 	Url      string `json:"url"`
+	// TimestampPrecision mirrors the server's timestamp_precision property
+	// (ms, us or ns; ms when unset). Used by the table-model mode.
+	TimestampPrecision string `json:"timestampPrecision"`
 }
 
 type groupBy struct {
@@ -134,6 +138,9 @@ type queryParam struct {
 	FillClauses  string   `json:"fillClauses"`
 	GroupBy      groupBy  `json:"groupBy"`
 	Hide         bool     `json:"hide"`
+	Database     string   `json:"database"`
+	Sql          string   `json:"sql"`
+	Format       string   `json:"format"`
 }
 
 type QueryDataReq struct {
@@ -200,6 +207,10 @@ func verifyQuery(query backend.DataQuery) (qp *queryParam, errMsg string) {
 				return nil, "Input error, FROM is required"
 			}
 		}
+	} else if qp.SqlType == TableModelSqlType {
+		if strings.TrimSpace(qp.Sql) == "" {
+			return nil, "Input error, SQL is required"
+		}
 	} else {
 		return nil, "none"
 	}
@@ -230,6 +241,10 @@ func (d *IoTDBDataSource) query(cxt context.Context, pCtx backend.PluginContext,
 
 	qp.StartTime = query.TimeRange.From.UnixNano() / 1000000
 	qp.EndTime = query.TimeRange.To.UnixNano() / 1000000
+
+	if qp.SqlType == TableModelSqlType {
+		return d.queryTableModel(cxt, qp, authorization)
+	}
 
 	if qp.SqlType == "SQL: Drop-down List" {
 		qp.Control = ""

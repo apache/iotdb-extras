@@ -15,13 +15,19 @@
  * limitations under the License.
  */
 import React, { ChangeEvent, PureComponent } from 'react';
-import { InlineField, Input, SecretInput } from '@grafana/ui';
-import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
+import { InlineField, Input, SecretInput, Select } from '@grafana/ui';
+import { DataSourcePluginOptionsEditorProps, SelectableValue } from '@grafana/data';
 import { IoTDBOptions, IoTDBSecureJsonData } from './types';
 
 interface Props extends DataSourcePluginOptionsEditorProps<IoTDBOptions, IoTDBSecureJsonData> {}
 
 interface State {}
+
+const timestampPrecisions: Array<SelectableValue<string>> = [
+  { label: 'ms', value: 'ms' },
+  { label: 'us', value: 'us' },
+  { label: 'ns', value: 'ns' },
+];
 
 export class ConfigEditor extends PureComponent<Props, State> {
   onURLChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -38,6 +44,15 @@ export class ConfigEditor extends PureComponent<Props, State> {
     const jsonData = {
       ...options.jsonData,
       username: event.target.value,
+    };
+    onOptionsChange({ ...options, jsonData });
+  };
+
+  onTimestampPrecisionChange = (option: SelectableValue<string>) => {
+    const { onOptionsChange, options } = this.props;
+    const jsonData = {
+      ...options.jsonData,
+      timestampPrecision: option.value ?? 'ms',
     };
     onOptionsChange({ ...options, jsonData });
   };
@@ -99,6 +114,18 @@ export class ConfigEditor extends PureComponent<Props, State> {
             width={40}
             onReset={this.onResetPassword}
             onChange={this.onPasswordChange}
+          />
+        </InlineField>
+        <InlineField
+          label="time precision"
+          labelWidth={12}
+          tooltip="Must match the server's timestamp_precision property (ms by default). Used by the SQL: Table Model mode to interpret TIMESTAMP values and expand the $__timeFilter / $__timeFrom / $__timeTo macros."
+        >
+          <Select
+            options={timestampPrecisions}
+            value={timestampPrecisions.find((o) => o.value === (jsonData.timestampPrecision ?? 'ms'))}
+            onChange={this.onTimestampPrecisionChange}
+            width={40}
           />
         </InlineField>
       </div>
