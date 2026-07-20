@@ -51,7 +51,106 @@ class IoTDBTableContextStartupTest {
           assertFalse(context.containsBeanDefinition("ioTDBTableTimeseriesDao"));
           assertFalse(context.containsBeanDefinition("ioTDBTableLatestDao"));
           assertFalse(context.containsBeanDefinition("ioTDBTableLabelDao"));
+          // Path-3 stretch: the attribute DAO is inert by default (no attributes selector set).
+          assertFalse(context.containsBeanDefinition("ioTDBTableAttributesDao"));
         });
+  }
+
+  // The attribute selector is INDEPENDENT of the timeseries selectors: when ONLY
+  // database.attributes.type=iotdb-table is set (and cluster_mode is acknowledged) the attribute
+  // DAO + its own pool/bootstrap activate, while the timeseries DAO stays absent.
+  @Test
+  void attributesSelectorAlone_activatesAttributesDaoAndPoolIndependentOfTs() {
+    contextRunner
+        .withPropertyValues(
+            "database.attributes.type=iotdb-table",
+            "iotdb.attributes.cluster_mode=disabled",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              assertTrue(context.containsBean(SESSION_POOL_BEAN_NAME));
+              assertTrue(context.containsBeanDefinition("ioTDBTableAttributesDao"));
+              assertTrue(context.getBean(IoTDBTableAttributesDao.class) != null);
+              // No timeseries DAO: the ts selector is unset.
+              assertFalse(context.containsBeanDefinition("ioTDBTableTimeseriesDao"));
+              assertTrue(context.getBeansOfType(TimeseriesDao.class).isEmpty());
+            });
+  }
+
+  // Uppercase, trimmed attribute selector still activates (case-insensitive condition).
+  @Test
+  void attributesSelectorUppercase_stillActivatesAttributesDao() {
+    contextRunner
+        .withPropertyValues(
+            "database.attributes.type=IOTDB-TABLE",
+            "iotdb.attributes.cluster_mode=sticky-routing",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              assertTrue(context.containsBean(SESSION_POOL_BEAN_NAME));
+              assertTrue(context.containsBeanDefinition("ioTDBTableAttributesDao"));
+            });
+  }
+
+  // The timeseries selectors alone must NOT activate the attribute DAO (independent routing).
+  @Test
+  void tsSelectorAlone_doesNotActivateAttributesDao() {
+    contextRunner
+        .withPropertyValues(
+            "database.ts.type=iotdb-table",
+            "iotdb.ts.experimental-raw-only=true",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(context -> assertFalse(context.containsBeanDefinition("ioTDBTableAttributesDao")));
+  }
+
+  // Both selectors ON together: the timeseries and attribute DAOs activate side by side and SHARE a
+  // SINGLE named session pool (deduped via @ConditionalOnMissingBean(name=...)), rather than each
+  // inner @Configuration spinning up its own competing pool. This is the cross-selector path the
+  // per-config pool javadoc asserts in prose; pin it here.
+  @Test
+  void bothSelectors_activateBothDaosSharingOneSessionPool() {
+    contextRunner
+        .withPropertyValues(
+            "database.ts.type=iotdb-table",
+            "iotdb.ts.experimental-raw-only=true",
+            "database.attributes.type=iotdb-table",
+            "iotdb.attributes.cluster_mode=disabled",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              // exactly ONE shared pool, not one per inner @Configuration
+              assertTrue(
+                  context.getBeanNamesForType(ITableSessionPool.class).length == 1,
+                  "both selectors must share a single session pool");
+              assertTrue(context.containsBean(SESSION_POOL_BEAN_NAME));
+              // both DAOs are present, wired against that one pool
+              assertTrue(context.getBean(IoTDBTableTimeseriesDao.class) != null);
+              assertTrue(context.getBean(IoTDBTableAttributesDao.class) != null);
+            });
   }
 
   @Test

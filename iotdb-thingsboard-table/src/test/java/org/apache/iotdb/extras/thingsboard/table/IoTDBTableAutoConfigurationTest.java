@@ -27,15 +27,19 @@ import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.kv.DeleteTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
+import org.thingsboard.server.common.data.kv.TsKvLatestRemovingResult;
 import org.thingsboard.server.dao.timeseries.TimeseriesDao;
+import org.thingsboard.server.dao.timeseries.TimeseriesLatestDao;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -79,6 +83,35 @@ class IoTDBTableAutoConfigurationTest {
               assertTrue(context.getBean(SESSION_POOL_BEAN_NAME, ITableSessionPool.class) != null);
               assertTrue(context.containsBean("ioTDBTableTimeseriesDao"));
               assertTrue(context.getBean(IoTDBTableTimeseriesDao.class) != null);
+            });
+  }
+
+  @Test
+  void autoConfigDiscovery_withLatestSelector_createsLatestDaoAndDoesNotFailFast() {
+    contextRunner
+        .withPropertyValues(
+            "database.ts.type=iotdb-table",
+            "database.ts_latest.type=iotdb-table",
+            "iotdb.ts.experimental-raw-only=true",
+            "iotdb.ts_latest.cluster_mode=disabled",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              // All three selectors on: our own latest DAO activates and the conflict guard, seeing
+              // only our IoTDB DAO, must NOT fail startup.
+              assertTrue(
+                  context.getStartupFailure() == null,
+                  "context should start when the only latest DAO is the IoTDB one");
+              assertTrue(
+                  context.containsBeanDefinition(
+                      IoTDBTableConfiguration.IOTDB_TABLE_LATEST_DAO_BEAN_NAME));
+              assertTrue(context.getBean(IoTDBTableLatestDao.class) != null);
             });
   }
 
@@ -243,6 +276,65 @@ class IoTDBTableAutoConfigurationTest {
             });
   }
 
+  @Test
+  void hostProvidedTimeseriesLatestDao_failsFastWhenLatestBackendEnabled() {
+    contextRunner
+        .withUserConfiguration(HostTimeseriesLatestDaoConfiguration.class)
+        .withPropertyValues(
+            "database.ts.type=iotdb-table",
+            "database.ts_latest.type=iotdb-table",
+            "iotdb.ts.experimental-raw-only=true",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              Throwable failure = context.getStartupFailure();
+              assertTrue(failure != null, "context should fail on conflicting TimeseriesLatestDao");
+              assertTrue(
+                  failureContains(
+                      failure,
+                      "database.ts_latest.type=iotdb-table with the IoTDB timeseries backend "
+                          + "enabled, but a non-IoTDB TimeseriesLatestDao bean "
+                          + "'hostTimeseriesLatestDao' is present; remove it or unset the IoTDB "
+                          + "latest selector"),
+                  "startup failure should explain the conflicting TimeseriesLatestDao bean: "
+                      + failure);
+            });
+  }
+
+  @Test
+  void hostProvidedTimeseriesLatestDaoUsingModuleBeanName_failsFastWhenLatestBackendEnabled() {
+    contextRunner
+        .withUserConfiguration(HostNamedTimeseriesLatestDaoConfiguration.class)
+        .withPropertyValues(
+            "database.ts.type=iotdb-table",
+            "database.ts_latest.type=iotdb-table",
+            "iotdb.ts.experimental-raw-only=true",
+            "iotdb.host=localhost",
+            "iotdb.port=6667",
+            "iotdb.username=root",
+            "iotdb.password=root",
+            "iotdb.session-pool-size=8",
+            "iotdb.connection-timeout-ms=5000",
+            "iotdb.schema.bootstrap=false")
+        .run(
+            context -> {
+              Throwable failure = context.getStartupFailure();
+              assertTrue(
+                  failure != null,
+                  "context should fail on a host TimeseriesLatestDao using the module bean name");
+              assertTrue(
+                  failureContains(failure, "non-IoTDB TimeseriesLatestDao bean"),
+                  "startup failure should explain the conflicting TimeseriesLatestDao bean: "
+                      + failure);
+            });
+  }
+
   private static boolean failureContains(Throwable failure, String expected) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
       String message = cause.getMessage();
@@ -299,6 +391,82 @@ class IoTDBTableAutoConfigurationTest {
 
     @Override
     public void cleanup(long systemTtl) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  @Configuration
+  static class HostTimeseriesLatestDaoConfiguration {
+    @Bean
+    TimeseriesLatestDao hostTimeseriesLatestDao() {
+      return new NoopTimeseriesLatestDao();
+    }
+  }
+
+  @Configuration
+  static class HostNamedTimeseriesLatestDaoConfiguration {
+    @Bean(name = IoTDBTableConfiguration.IOTDB_TABLE_LATEST_DAO_BEAN_NAME)
+    TimeseriesLatestDao ioTDBTableLatestDao() {
+      return new NoopTimeseriesLatestDao();
+    }
+  }
+
+  /** Minimal host-supplied {@link TimeseriesLatestDao} used only to trigger the conflict guard. */
+  private static final class NoopTimeseriesLatestDao implements TimeseriesLatestDao {
+    @Override
+    public ListenableFuture<Optional<TsKvEntry>> findLatestOpt(
+        TenantId tenantId, EntityId entityId, String key) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<TsKvEntry> findLatest(
+        TenantId tenantId, EntityId entityId, String key) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<List<TsKvEntry>> findAllLatest(TenantId tenantId, EntityId entityId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<Long> saveLatest(
+        TenantId tenantId, EntityId entityId, TsKvEntry tsKvEntry) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<TsKvLatestRemovingResult> removeLatest(
+        TenantId tenantId, EntityId entityId, DeleteTsKvQuery query) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<String> findAllKeysByDeviceProfileId(
+        TenantId tenantId, DeviceProfileId deviceProfileId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<String> findAllKeysByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<List<String>> findAllKeysByEntityIdsAsync(
+        TenantId tenantId, List<EntityId> entityIds) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<TsKvEntry> findLatestByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<List<TsKvEntry>> findLatestByEntityIdsAsync(
+        TenantId tenantId, List<EntityId> entityIds) {
       throw new UnsupportedOperationException();
     }
   }

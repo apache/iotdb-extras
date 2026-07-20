@@ -19,14 +19,31 @@
 package org.apache.iotdb.extras.thingsboard.table;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
+import org.thingsboard.server.common.data.AttributeScope;
+import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.kv.AttributeKvEntry;
+import org.thingsboard.server.common.data.kv.BaseAttributeKvEntry;
+import org.thingsboard.server.common.data.kv.BasicTsKvEntry;
+import org.thingsboard.server.common.data.kv.BooleanDataEntry;
 import org.thingsboard.server.common.data.kv.DeleteTsKvQuery;
+import org.thingsboard.server.common.data.kv.DoubleDataEntry;
+import org.thingsboard.server.common.data.kv.JsonDataEntry;
+import org.thingsboard.server.common.data.kv.KvEntry;
+import org.thingsboard.server.common.data.kv.LongDataEntry;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
+import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
+import org.thingsboard.server.common.data.kv.TsKvLatestRemovingResult;
+import org.thingsboard.server.common.data.kv.TsKvQuery;
+import org.thingsboard.server.common.data.util.TbPair;
+import org.thingsboard.server.dao.attributes.AttributesDao;
 import org.thingsboard.server.dao.timeseries.TimeseriesDao;
+import org.thingsboard.server.dao.timeseries.TimeseriesLatestDao;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -34,8 +51,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -159,6 +179,171 @@ class StrategyFContractTest {
   }
 
   @Test
+  void timeseriesLatestDaoSpiMethodsMatchExpectedSignatures() throws NoSuchMethodException {
+    // IoTDBTableLatestDao implements TimeseriesLatestDao; pin the exact SPI shapes it depends on so
+    // a silent drift in the compile-only surface fails the build. Verified against ThingsBoard
+    // v4.3.1.2 (commit c37fb509); findLatestByEntityIds/findLatestByEntityIdsAsync are new in
+    // v4.3.1.2 relative to v4.3.1.1.
+    assertLatestSpiMethod(
+        "findLatestOpt",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, String.class});
+    assertLatestSpiMethod(
+        "findLatest",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, String.class});
+    assertLatestSpiMethod(
+        "findAllLatest", ListenableFuture.class, new Class<?>[] {TenantId.class, EntityId.class});
+    assertLatestSpiMethod(
+        "saveLatest",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, TsKvEntry.class});
+    assertLatestSpiMethod(
+        "removeLatest",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, EntityId.class, DeleteTsKvQuery.class});
+    assertLatestSpiMethod(
+        "findAllKeysByDeviceProfileId",
+        List.class,
+        new Class<?>[] {TenantId.class, DeviceProfileId.class});
+    assertLatestSpiMethod(
+        "findAllKeysByEntityIds", List.class, new Class<?>[] {TenantId.class, List.class});
+    assertLatestSpiMethod(
+        "findAllKeysByEntityIdsAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class});
+    assertLatestSpiMethod(
+        "findLatestByEntityIds", List.class, new Class<?>[] {TenantId.class, List.class});
+    assertLatestSpiMethod(
+        "findLatestByEntityIdsAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class});
+
+    // The DAO is a genuine TimeseriesLatestDao implementation.
+    assertTrue(TimeseriesLatestDao.class.isAssignableFrom(IoTDBTableLatestDao.class));
+    // The interface declares exactly the 10 pinned methods (catches additive drift too).
+    assertEquals(10, TimeseriesLatestDao.class.getDeclaredMethods().length);
+  }
+
+  /**
+   * Asserts that {@link TimeseriesLatestDao} declares a method with exactly the given name, return
+   * type and ordered parameter types, pinning the v4.3.1.2 SPI surface this module consumes.
+   */
+  private static void assertLatestSpiMethod(
+      String name, Class<?> expectedReturn, Class<?>[] expectedParams)
+      throws NoSuchMethodException {
+    Method method = TimeseriesLatestDao.class.getMethod(name, expectedParams);
+    assertEquals(
+        expectedReturn,
+        method.getReturnType(),
+        "TimeseriesLatestDao." + name + " return type drifted from the pinned SPI expectation");
+    assertArrayEquals(
+        expectedParams,
+        method.getParameterTypes(),
+        "TimeseriesLatestDao." + name + " parameter types drifted from the pinned SPI expectation");
+  }
+
+  @Test
+  void attributesDaoSpiMethodsMatchExpectedSignatures() throws NoSuchMethodException {
+    // IoTDBTableAttributesDao implements AttributesDao; pin all 14 v4.3.1.2 SPI signatures so a
+    // silent change to the local compile-only surface (src/provided) breaks the build. Verified
+    // against ThingsBoard v4.3.1.2 (commit c37fb509).
+    assertAttributesSpiMethod(
+        "find",
+        Optional.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, String.class});
+    assertAttributesSpiMethod(
+        "find",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, Collection.class});
+    assertAttributesSpiMethod(
+        "findAll",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "save",
+        ListenableFuture.class,
+        new Class<?>[] {
+          TenantId.class, EntityId.class, AttributeScope.class, AttributeKvEntry.class
+        });
+    assertAttributesSpiMethod(
+        "removeAll",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, List.class});
+    assertAttributesSpiMethod(
+        "removeAllWithVersions",
+        List.class,
+        new Class<?>[] {TenantId.class, EntityId.class, AttributeScope.class, List.class});
+    assertAttributesSpiMethod(
+        "findNextBatch", List.class, new Class<?>[] {UUID.class, int.class, int.class, int.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByDeviceProfileId",
+        List.class,
+        new Class<?>[] {TenantId.class, DeviceProfileId.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByEntityIds", List.class, new Class<?>[] {TenantId.class, List.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByEntityIdsAndScope",
+        List.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "findAllKeysByEntityIdsAndScopeAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "findLatestByEntityIdsAndScope",
+        List.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "findLatestByEntityIdsAndScopeAsync",
+        ListenableFuture.class,
+        new Class<?>[] {TenantId.class, List.class, AttributeScope.class});
+    assertAttributesSpiMethod(
+        "removeAllByEntityId", List.class, new Class<?>[] {TenantId.class, EntityId.class});
+
+    // The DAO is a genuine AttributesDao implementation.
+    assertTrue(AttributesDao.class.isAssignableFrom(IoTDBTableAttributesDao.class));
+    // The interface declares exactly the 14 pinned methods (catches additive drift too).
+    assertEquals(14, AttributesDao.class.getDeclaredMethods().length);
+  }
+
+  @Test
+  void attributeValueObjectGettersUsedByDaoExist() throws NoSuchMethodException {
+    // The DAO maps each row into a BaseAttributeKvEntry(KvEntry, ts, version) and reads back these
+    // value-object getters; lock them down so a stub edit that drops one fails the build.
+    AttributeKvEntry.class.getMethod("getLastUpdateTs");
+    AttributeKvEntry.class.getMethod("getVersion");
+    AttributeKvEntry.class.getMethod("getKey");
+    AttributeKvEntry.class.getMethod("getDataType");
+    AttributeKvEntry.class.getMethod("getValue");
+
+    // AttributeScope round-trips by name()/valueOf(String); the custom valueOf(int) is part of the
+    // verified surface too.
+    assertEquals(AttributeScope.SERVER_SCOPE, AttributeScope.valueOf("SERVER_SCOPE"));
+    assertEquals(AttributeScope.SERVER_SCOPE, AttributeScope.valueOf(2));
+    AttributeScope.class.getMethod("name");
+    AttributeScope.class.getMethod("valueOf", int.class);
+  }
+
+  /**
+   * Asserts that {@link AttributesDao} declares a method with exactly the given name, return type
+   * and ordered parameter types, pinning the v4.3.1.2 SPI surface this module consumes.
+   */
+  private static void assertAttributesSpiMethod(
+      String name, Class<?> expectedReturn, Class<?>[] expectedParams)
+      throws NoSuchMethodException {
+    Method method = AttributesDao.class.getMethod(name, expectedParams);
+    assertEquals(
+        expectedReturn,
+        method.getReturnType(),
+        "AttributesDao." + name + " return type drifted from the pinned SPI expectation");
+    assertArrayEquals(
+        expectedParams,
+        method.getParameterTypes(),
+        "AttributesDao." + name + " parameter types drifted from the pinned SPI expectation");
+  }
+
+  @Test
   void readTsKvQueryResultSurfaceUsedByDaoExists() throws NoSuchMethodException {
     // The raw read path constructs ReadTsKvQueryResult(queryId, entries, lastTs) and reads back the
     // queryId/lastEntryTs; ReadTsKvQuery exposes the query shape the DAO reads. Lock those down.
@@ -172,5 +357,61 @@ class StrategyFContractTest {
     ReadTsKvQuery.class.getMethod("getLimit");
     ReadTsKvQuery.class.getMethod("getOrder");
     ReadTsKvQuery.class.getMethod("getInterval");
+  }
+
+  @Test
+  void valueObjectConstructorsUsedByDaoExist() throws NoSuchMethodException {
+    // The DAOs construct these ThingsBoard value objects on the read/remove paths. The SPI-method
+    // and getter pins above do NOT cover constructors, so a src/provided stub whose ctor arg
+    // order/shape drifts from ThingsBoard v4.3.1.2 would still compile (the DAO binds against the
+    // stub), pass every stub-backed unit test and Docker IT (the ITs also compile the TB types
+    // against the stub), and only surface as a NoSuchMethodError against the real ThingsBoard
+    // runtime. Pin the exact ctor parameter types each call site depends on so drift breaks the
+    // build here instead. Verified against ThingsBoard v4.3.1.2 (commit c37fb509).
+
+    // IoTDBTableBaseDao.kvEntry — one DataEntry subtype per IoTDB value channel.
+    assertCtor(BooleanDataEntry.class, String.class, Boolean.class);
+    assertCtor(LongDataEntry.class, String.class, Long.class);
+    assertCtor(DoubleDataEntry.class, String.class, Double.class);
+    assertCtor(StringDataEntry.class, String.class, String.class);
+    assertCtor(JsonDataEntry.class, String.class, String.class);
+
+    // IoTDBTableLatestDao / IoTDBTableTimeseriesDao — latest + raw-read entries and the nullEntry
+    // sentinel all build BasicTsKvEntry(ts, kvEntry).
+    assertCtor(BasicTsKvEntry.class, long.class, KvEntry.class);
+
+    // IoTDBTableAttributesDao — attribute rows map to BaseAttributeKvEntry(kv, ts, version).
+    assertCtor(BaseAttributeKvEntry.class, KvEntry.class, long.class, Long.class);
+
+    // IoTDBTableLatestDao.removeLatest — three distinct removing-result shapes.
+    assertCtor(TsKvLatestRemovingResult.class, String.class, boolean.class);
+    assertCtor(TsKvLatestRemovingResult.class, TsKvEntry.class, Long.class);
+    assertCtor(TsKvLatestRemovingResult.class, String.class, boolean.class, Long.class);
+
+    // IoTDBTableTimeseriesDao — raw read result; its first ctor arg is query.getId(), so couple the
+    // pinned int first-param to TsKvQuery.getId()'s return type (a drift there is exactly the kind
+    // of
+    // stub-vs-real mismatch this test exists to catch).
+    assertCtor(ReadTsKvQueryResult.class, int.class, List.class, long.class);
+    assertEquals(
+        int.class,
+        TsKvQuery.class.getMethod("getId").getReturnType(),
+        "ReadTsKvQueryResult(int,..) first arg is query.getId(); its return type must stay int");
+
+    // Static factories the DAO invokes (not constructors): pin the erased of(Object, Object) shape.
+    // TbPair is a vendored ThingsBoard stub; Pair is the real Commons-Lang type at runtime.
+    TbPair.class.getMethod("of", Object.class, Object.class);
+    Pair.class.getMethod("of", Object.class, Object.class);
+  }
+
+  /**
+   * Asserts that {@code type} declares a constructor with exactly the given ordered parameter
+   * types. {@code getDeclaredConstructor} throws {@link NoSuchMethodException} if no constructor
+   * matches the exact parameter types, pinning the value-object constructor shape the DAO relies on
+   * so a silent drift in the compile-only surface ({@code src/provided}) fails the build.
+   */
+  private static void assertCtor(Class<?> type, Class<?>... expectedParams)
+      throws NoSuchMethodException {
+    type.getDeclaredConstructor(expectedParams);
   }
 }

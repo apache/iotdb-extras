@@ -24,7 +24,6 @@ import org.apache.iotdb.isession.pool.ITableSessionPool;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -35,16 +34,10 @@ import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.kv.Aggregation;
 import org.thingsboard.server.common.data.kv.BasicTsKvEntry;
-import org.thingsboard.server.common.data.kv.BooleanDataEntry;
 import org.thingsboard.server.common.data.kv.DataType;
 import org.thingsboard.server.common.data.kv.DeleteTsKvQuery;
-import org.thingsboard.server.common.data.kv.DoubleDataEntry;
-import org.thingsboard.server.common.data.kv.JsonDataEntry;
-import org.thingsboard.server.common.data.kv.KvEntry;
-import org.thingsboard.server.common.data.kv.LongDataEntry;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
-import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
 import org.thingsboard.server.dao.timeseries.TimeseriesDao;
 
@@ -53,16 +46,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Historical telemetry DAO for the IoTDB Table Mode backend.
@@ -88,12 +72,7 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
   private static final String TABLE_NAME = IoTDBTableTimeseriesWriter.TABLE_NAME;
 
   private final IoTDBTableTimeseriesWriter timeseriesWriter;
-  private final ThreadPoolExecutor readExecutor;
-  private final Set<ReadTask<?>> readTasks = ConcurrentHashMap.newKeySet();
-  private final AtomicBoolean accepting = new AtomicBoolean(true);
-  private final AtomicBoolean destroyed = new AtomicBoolean(false);
   private final long defaultTtlSeconds;
-  private final long shutdownDrainTimeoutMs;
 
   public IoTDBTableTimeseriesDao(
       @Qualifier(IoTDBTableConfiguration.IOTDB_TABLE_SESSION_POOL_BEAN_NAME)
@@ -106,9 +85,7 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
         config.getDefaultTtlMs() > 0L
             ? TimeUnit.MILLISECONDS.toSeconds(config.getDefaultTtlMs())
             : 0L;
-    this.shutdownDrainTimeoutMs = config.getTs().getSave().getShutdownDrainTimeoutMs();
     int readThreads = config.getTs().getRead().getThreads();
-    int readQueueCapacity = config.getTs().getRead().getQueueCapacity();
     int flushThreads = config.getTs().getSave().getFlushThreads();
     if (readThreads + flushThreads > config.getSessionPoolSize()) {
       log.warn(
@@ -117,15 +94,13 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
           readThreads + flushThreads,
           config.getSessionPoolSize());
     }
-    this.readExecutor =
-        new ThreadPoolExecutor(
-            readThreads,
-            readThreads,
-            0L,
-            TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(readQueueCapacity),
-            readThreadFactory(),
-            new ThreadPoolExecutor.AbortPolicy());
+    initReadExecutor(
+        readThreads,
+        config.getTs().getRead().getQueueCapacity(),
+        config.getTs().getSave().getShutdownDrainTimeoutMs(),
+        "iotdb-table-timeseries-read-worker-",
+        "IoTDB Table Mode timeseries read queue is full",
+        "IoTDB Table Mode timeseries DAO is shutting down");
   }
 
   @Override
@@ -236,19 +211,7 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
     if (!destroyed.compareAndSet(false, true)) {
       return;
     }
-    accepting.set(false);
-    IoTDBTableDaoShuttingDownException failure = shuttingDownException();
-    for (Runnable dropped : readExecutor.shutdownNow()) {
-      failDroppedReadTask(dropped, failure);
-    }
-    try {
-      readExecutor.awaitTermination(shutdownDrainTimeoutMs, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    for (ReadTask<?> task : readTasks) {
-      task.fail(failure);
-    }
+    shutdownReadExecutor();
     timeseriesWriter.destroy();
   }
 
@@ -348,90 +311,12 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
     return aggregation == null ? Aggregation.NONE : aggregation;
   }
 
-  private KvEntry kvEntry(String key, TypedKvValue value) {
-    if (value.booleanValue() != null) {
-      return new BooleanDataEntry(key, value.booleanValue());
-    }
-    if (value.longValue() != null) {
-      return new LongDataEntry(key, value.longValue());
-    }
-    if (value.doubleValue() != null) {
-      return new DoubleDataEntry(key, value.doubleValue());
-    }
-    if (value.stringValue() != null) {
-      return new StringDataEntry(key, value.stringValue());
-    }
-    if (value.jsonValue() != null) {
-      return new JsonDataEntry(key, value.jsonValue());
-    }
-    throw new IllegalArgumentException("Telemetry row does not contain a typed value");
-  }
-
   private static String sqlOrder(String order) {
     String normalized = Objects.requireNonNull(order, "order").trim().toUpperCase(Locale.ROOT);
     if (!"ASC".equals(normalized) && !"DESC".equals(normalized)) {
       throw new IllegalArgumentException("Unsupported IoTDB Table Mode read order: " + order);
     }
     return normalized;
-  }
-
-  private static String sqlString(String value) {
-    return "'" + Objects.requireNonNull(value, "value").replace("'", "''") + "'";
-  }
-
-  private <T> ListenableFuture<T> submitReadTask(Callable<T> callable) {
-    if (!accepting.get()) {
-      return Futures.immediateFailedFuture(shuttingDownException());
-    }
-    ReadTask<T> task = new ReadTask<>(callable);
-    readTasks.add(task);
-    try {
-      readExecutor.execute(task);
-    } catch (RejectedExecutionException e) {
-      if (!accepting.get() || readExecutor.isShutdown()) {
-        task.fail(shuttingDownException());
-      } else {
-        task.fail(
-            new IoTDBTableReadQueueFullException(
-                "IoTDB Table Mode timeseries read queue is full", e));
-      }
-      readTasks.remove(task);
-      return task.future();
-    }
-    if (!accepting.get() && readExecutor.remove(task)) {
-      task.fail(shuttingDownException());
-      readTasks.remove(task);
-    }
-    return task.future();
-  }
-
-  private void failDroppedReadTask(Runnable dropped, IoTDBTableDaoShuttingDownException failure) {
-    if (dropped instanceof ReadTask<?> task) {
-      task.fail(failure);
-      readTasks.remove(task);
-    }
-  }
-
-  private IoTDBTableDaoShuttingDownException shuttingDownException() {
-    return new IoTDBTableDaoShuttingDownException(
-        "IoTDB Table Mode timeseries DAO is shutting down");
-  }
-
-  private static String requireTelemetryKey(String key) {
-    if (key == null || key.trim().isEmpty()) {
-      throw new IllegalArgumentException("Telemetry key must not be blank");
-    }
-    return key;
-  }
-
-  private static ThreadFactory readThreadFactory() {
-    AtomicInteger sequence = new AtomicInteger();
-    return runnable -> {
-      Thread thread =
-          new Thread(runnable, "iotdb-table-timeseries-read-worker-" + sequence.incrementAndGet());
-      thread.setDaemon(true);
-      return thread;
-    };
   }
 
   private int dataPointDays(TsKvEntry tsKvEntry, long ttl) {
@@ -460,33 +345,5 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
   private Object requiredValue(Optional<?> value, DataType dataType) {
     return value.orElseThrow(
         () -> new IllegalArgumentException("Missing value for telemetry data type " + dataType));
-  }
-
-  private final class ReadTask<T> implements Runnable {
-    private final Callable<T> callable;
-    private final SettableFuture<T> future = SettableFuture.create();
-
-    private ReadTask(Callable<T> callable) {
-      this.callable = Objects.requireNonNull(callable, "callable");
-    }
-
-    @Override
-    public void run() {
-      try {
-        future.set(callable.call());
-      } catch (Throwable t) {
-        future.setException(t);
-      } finally {
-        readTasks.remove(this);
-      }
-    }
-
-    private ListenableFuture<T> future() {
-      return future;
-    }
-
-    private void fail(Throwable t) {
-      future.setException(t);
-    }
   }
 }

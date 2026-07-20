@@ -38,11 +38,17 @@ import java.util.regex.Pattern;
  *
  * <p>On a fresh IoTDB the {@code telemetry} / {@code entity_attributes} tables (and their database)
  * do not exist, so the very first write would fail. This initializer runs once the session pool
- * bean is up, reads {@code schema-iotdb-table.sql} from the classpath, and executes its statements.
- * Every DDL statement uses {@code CREATE ... IF NOT EXISTS}, so a re-run returns SUCCESS without
+ * bean is up, reads a schema SQL resource from the classpath, and executes its statements. Every
+ * DDL statement uses {@code CREATE ... IF NOT EXISTS}, so a re-run returns SUCCESS without
  * throwing. As defense-in-depth for racy or partial schema states, an "already exists" failure is
  * also recognized by its structured IoTDB status code (with a message-substring fallback) and
  * tolerated rather than propagated, keeping the bootstrap idempotent.
+ *
+ * <p>The schema resource is parameterized ({@link #SCHEMA_RESOURCE} default, overridable via the
+ * 3-arg constructor) so a SECOND bootstrap bean can load {@code schema-iotdb-table-latest.sql} (the
+ * {@code telemetry_latest} overlay) without re-running the base schema. Each resource is
+ * self-contained ({@code CREATE DATABASE IF NOT EXISTS} + {@code USE} + {@code CREATE TABLE IF NOT
+ * EXISTS}), so multiple bootstrap beans are order-independent and idempotent.
  *
  * <p>Gated behind {@code iotdb.schema.bootstrap} (default {@code true}) so operators who manage the
  * schema out-of-band can disable it; see the module README.
@@ -51,6 +57,7 @@ import java.util.regex.Pattern;
 public class IoTDBTableSchemaBootstrap implements InitializingBean {
 
   static final String SCHEMA_RESOURCE = "schema-iotdb-table.sql";
+  static final String LATEST_SCHEMA_RESOURCE = "schema-iotdb-table-latest.sql";
   private static final String DEFAULT_SCHEMA_DATABASE = "thingsboard";
 
   /**
@@ -64,10 +71,17 @@ public class IoTDBTableSchemaBootstrap implements InitializingBean {
 
   private final ITableSessionPool tableSessionPool;
   private final IoTDBTableConfig config;
+  private final String schemaResource;
 
   public IoTDBTableSchemaBootstrap(ITableSessionPool tableSessionPool, IoTDBTableConfig config) {
+    this(tableSessionPool, config, SCHEMA_RESOURCE);
+  }
+
+  public IoTDBTableSchemaBootstrap(
+      ITableSessionPool tableSessionPool, IoTDBTableConfig config, String schemaResource) {
     this.tableSessionPool = Objects.requireNonNull(tableSessionPool, "tableSessionPool");
     this.config = Objects.requireNonNull(config, "config");
+    this.schemaResource = Objects.requireNonNull(schemaResource, "schemaResource");
   }
 
   @Override
@@ -116,10 +130,10 @@ public class IoTDBTableSchemaBootstrap implements InitializingBean {
 
   private String loadSchema(String database) throws IOException {
     try (InputStream stream =
-        IoTDBTableSchemaBootstrap.class.getClassLoader().getResourceAsStream(SCHEMA_RESOURCE)) {
+        IoTDBTableSchemaBootstrap.class.getClassLoader().getResourceAsStream(schemaResource)) {
       if (stream == null) {
         throw new IllegalStateException(
-            "IoTDB Table Mode schema resource not found on classpath: " + SCHEMA_RESOURCE);
+            "IoTDB Table Mode schema resource not found on classpath: " + schemaResource);
       }
       String schema = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
       // Strip block and line comments so split-on-';' never executes a comment fragment.
