@@ -18,26 +18,28 @@
 package plugin
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/hex"
 	"errors"
-	"io"
-	"net/http"
+	"fmt"
+	"net"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/apache/iotdb-client-go/v2/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
-// TableModelSqlType is the QueryEditor mode that sends standard table-model SQL
-// straight to IoTDB's table REST interface, as opposed to the tree-model modes
-// ("SQL: Full Customized" / "SQL: Drop-down List") that build root.* paths.
+// TableModelSqlType is the QueryEditor mode that runs standard table-model SQL
+// through the native Go client (apache/iotdb-client-go), as opposed to the
+// tree-model modes ("SQL: Full Customized" / "SQL: Drop-down List") that build
+// root.* paths and go through the REST /grafana endpoints.
 const TableModelSqlType = "SQL: Table Model"
 
 // Result formats for the table-model mode. Time series (the default) sorts
@@ -49,31 +51,17 @@ const (
 	tableFormatTable      = "Table"
 )
 
-// tableQueryPath is IoTDB's table-model query endpoint (see the /rest/table/v1
-// RestApi). It accepts a standard SQL statement plus an optional database
-// context and returns a column-major QueryDataSet.
-const tableQueryPath = "/rest/table/v1/query"
-
-// tableQueryReq is the request body for tableQueryPath. Field names match the
-// generated table/v1 SQL model (database / sql / row_limit).
-type tableQueryReq struct {
-	Database string `json:"database,omitempty"`
-	Sql      string `json:"sql"`
-	RowLimit *int   `json:"row_limit,omitempty"`
-}
-
-// tableQueryDataSet mirrors the table/v1 QueryDataSet response. Its values are
-// ROW-major (values[row][col]) because the table endpoint transposes before
-// serializing, unlike the tree-model endpoints. snake_case JSON. On failure
-// IoTDB returns an ExecutionStatus instead, whose code/message are captured
-// here so a non-zero code surfaces as an error.
-type tableQueryDataSet struct {
-	ColumnNames []string        `json:"column_names"`
-	DataTypes   []string        `json:"data_types"`
-	Values      [][]interface{} `json:"values"`
-	Code        int32           `json:"code"`
-	Message     string          `json:"message"`
-}
+// Connection settings for the native client. The RPC endpoint is the
+// datasource's "rpc address" option, or the URL's host with the default RPC
+// port when unset. The pool is created lazily on the first table-model query
+// so datasources that only use the tree model never open an RPC connection.
+const (
+	defaultRPCPort            = "6667"
+	tablePoolMaxSize          = 8
+	tableConnectTimeoutMs     = 10000
+	tableWaitSessionTimeoutMs = 60000
+	defaultQueryTimeoutMs     = int64(60000)
+)
 
 // timeFilterRe matches Grafana's $__timeFilter(column) macro; the column is
 // optional and defaults to "time". One level of nested parentheses is allowed
@@ -87,19 +75,13 @@ var (
 	timeToRe   = regexp.MustCompile(`\$__timeTo\b(?:\s*\(\s*\))?`)
 )
 
-// timestampUnits maps the datasource's timestampPrecision option (which must
-// match the server's timestamp_precision property) to conversion factors:
-// unitsPerMs scales the panel's epoch-ms range into server units for the time
-// macros, nsPerUnit scales raw TIMESTAMP values into nanoseconds for Grafana.
-func timestampUnits(precision string) (unitsPerMs int64, nsPerUnit int64) {
-	switch strings.TrimSpace(strings.ToLower(precision)) {
-	case "us":
-		return 1000, int64(time.Microsecond)
-	case "ns":
-		return 1000000, 1
-	default: // ms is IoTDB's default timestamp_precision
-		return 1, int64(time.Millisecond)
-	}
+// formatTimeLiteral renders a panel-range bound as an ISO 8601 UTC timestamp
+// literal (e.g. 2020-09-13T12:26:40.000+00:00). The server parses such a
+// literal in its own configured timestamp precision, so the expansion works
+// unchanged on ms, us and ns servers — unlike a bare epoch integer, which the
+// server would interpret in raw server units.
+func formatTimeLiteral(ms int64) string {
+	return time.UnixMilli(ms).UTC().Format("2006-01-02T15:04:05.000") + "+00:00"
 }
 
 // expandTableMacros rewrites the Grafana time macros a dashboard author can put
@@ -109,12 +91,11 @@ func timestampUnits(precision string) (unitsPerMs int64, nsPerUnit int64) {
 //	$__timeFrom[()]         -> <from>
 //	$__timeTo[()]           -> <to>
 //
-// Bounds are epoch values in the server's timestamp precision (milliseconds
-// unless the datasource says otherwise), matching how IoTDB compares integer
-// literals against TIMESTAMP columns.
-func expandTableMacros(sql string, start int64, end int64) string {
-	from := strconv.FormatInt(start, 10)
-	to := strconv.FormatInt(end, 10)
+// Bounds are ISO 8601 UTC timestamp literals, which IoTDB compares against
+// TIMESTAMP columns independently of the server's timestamp precision.
+func expandTableMacros(sql string, startMs int64, endMs int64) string {
+	from := formatTimeLiteral(startMs)
+	to := formatTimeLiteral(endMs)
 	sql = timeFilterRe.ReplaceAllStringFunc(sql, func(m string) string {
 		col := strings.TrimSpace(timeFilterRe.FindStringSubmatch(m)[1])
 		if col == "" {
@@ -127,64 +108,167 @@ func expandTableMacros(sql string, start int64, end int64) string {
 	return sql
 }
 
-// queryTableModel runs a table-model SQL query against IoTDB's table REST
-// endpoint and turns the column-major QueryDataSet into a Grafana data frame.
-func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam, authorization string) backend.DataResponse {
+// quoteTableIdentifier wraps a table-model identifier in double quotes
+// (doubling any embedded quote), the relational grammar's quoted-identifier
+// form, so a database name survives the USE statement verbatim.
+func quoteTableIdentifier(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+// tableQueryDataSet is the plugin-internal carrier for a fetched table-model
+// result: column names and IoTDB type names as reported by the client, plus
+// row-major cell values (values[row][col]) holding the client's native Go
+// representations (time.Time for TIMESTAMP/DATE, string for TEXT/STRING,
+// []byte for BLOB, bool/int32/int64/float32/float64 for the scalars, nil for
+// null).
+type tableQueryDataSet struct {
+	ColumnNames []string
+	DataTypes   []string
+	Values      [][]interface{}
+}
+
+// tableResultSet is the slice of the native client's SessionDataSet the fetch
+// path needs; narrowing it to an interface keeps fetchTableDataSet testable
+// without a live server. Column indexes are 1-based, matching the client.
+type tableResultSet interface {
+	Next() (bool, error)
+	GetColumnNames() []string
+	GetColumnTypes() []string
+	GetObjectByIndex(columnIndex int32) (interface{}, error)
+	Close() error
+}
+
+// fetchTableDataSet drains a result set into a tableQueryDataSet. The caller
+// owns closing the result set.
+func fetchTableDataSet(rs tableResultSet) (*tableQueryDataSet, error) {
+	names := rs.GetColumnNames()
+	types := rs.GetColumnTypes()
+	dataSet := &tableQueryDataSet{ColumnNames: names, DataTypes: types, Values: [][]interface{}{}}
+	for {
+		hasNext, err := rs.Next()
+		if err != nil {
+			return nil, err
+		}
+		if !hasNext {
+			return dataSet, nil
+		}
+		row := make([]interface{}, len(names))
+		for i := range names {
+			value, err := rs.GetObjectByIndex(int32(i) + 1)
+			if err != nil {
+				return nil, err
+			}
+			row[i] = value
+		}
+		dataSet.Values = append(dataSet.Values, row)
+	}
+}
+
+// tableRPCEndpoint resolves the host and port of the IoTDB RPC service the
+// native client connects to: the datasource's "rpc address" option when set
+// (host or host:port), otherwise the datasource URL's host with the default
+// RPC port.
+func (d *IoTDBDataSource) tableRPCEndpoint() (string, string, error) {
+	if addr := strings.TrimSpace(d.RPCAddress); addr != "" {
+		if host, port, err := net.SplitHostPort(addr); err == nil {
+			return host, port, nil
+		}
+		return strings.Trim(addr, "[]"), defaultRPCPort, nil
+	}
+	raw := strings.TrimSpace(d.Ulr)
+	if u, err := url.Parse(raw); err == nil && u.Hostname() != "" {
+		return u.Hostname(), defaultRPCPort, nil
+	}
+	// A bare host[:restPort] without a scheme parses as opaque; retry with one.
+	if u, err := url.Parse("http://" + raw); err == nil && u.Hostname() != "" {
+		return u.Hostname(), defaultRPCPort, nil
+	}
+	return "", "", errors.New("cannot derive the IoTDB RPC host from the datasource URL; please set the rpc address option")
+}
+
+// getTablePool lazily creates the shared native-client session pool for this
+// datasource instance. Pool construction does not connect; connection errors
+// surface on GetSession.
+func (d *IoTDBDataSource) getTablePool() (*client.TableSessionPool, error) {
+	d.tablePoolMu.Lock()
+	defer d.tablePoolMu.Unlock()
+	if d.tablePool != nil {
+		return d.tablePool, nil
+	}
+	host, port, err := d.tableRPCEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	poolConfig := &client.PoolConfig{
+		Host:     host,
+		Port:     port,
+		UserName: d.Username,
+		Password: d.password,
+	}
+	pool := client.NewTableSessionPool(poolConfig, tablePoolMaxSize, tableConnectTimeoutMs, tableWaitSessionTimeoutMs, false)
+	d.tablePool = &pool
+	return d.tablePool, nil
+}
+
+// queryTableModel runs a table-model SQL query through the native client and
+// turns the result set into a Grafana data frame.
+func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) backend.DataResponse {
 	response := backend.DataResponse{}
 
-	// The panel range arrives in epoch ms; the server compares integer time
-	// literals (and returns TIMESTAMP values) in its own configured precision.
-	unitsPerMs, nsPerUnit := timestampUnits(d.TimestampPrecision)
+	sql := expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime)
 
-	sql := expandTableMacros(qp.Sql, qp.StartTime*unitsPerMs, qp.EndTime*unitsPerMs)
-	reqBody := tableQueryReq{Database: qp.Database, Sql: sql}
-	qpJson, err := json.Marshal(reqBody)
+	pool, err := d.getTablePool()
+	if err != nil {
+		response.Error = err
+		return response
+	}
+	session, err := pool.GetSession()
+	if err != nil {
+		response.Error = fmt.Errorf("cannot connect to the IoTDB RPC service: %w", err)
+		log.DefaultLogger.Error("Cannot connect to the IoTDB RPC service", "err", err)
+		return response
+	}
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			log.DefaultLogger.Error("Failed to return session to the pool", "err", closeErr)
+		}
+	}()
+
+	if database := strings.TrimSpace(qp.Database); database != "" {
+		if err := session.ExecuteNonQueryStatement("USE " + quoteTableIdentifier(database)); err != nil {
+			response.Error = err
+			return response
+		}
+	}
+
+	timeout := defaultQueryTimeoutMs
+	if deadline, ok := ctx.Deadline(); ok {
+		if ms := time.Until(deadline).Milliseconds(); ms > 0 {
+			timeout = ms
+		}
+	}
+	resultSet, err := session.ExecuteQueryStatement(sql, &timeout)
+	if err != nil {
+		response.Error = err
+		return response
+	}
+	defer func() {
+		if closeErr := resultSet.Close(); closeErr != nil {
+			log.DefaultLogger.Error("Failed to close the result set", "err", closeErr)
+		}
+	}()
+
+	dataSet, err := fetchTableDataSet(resultSet)
 	if err != nil {
 		response.Error = err
 		return response
 	}
 
-	dataSourceUrl := DataSourceUrlHandler(d.Ulr)
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, dataSourceUrl+tableQueryPath, bytes.NewReader(qpJson))
-	if err != nil {
-		response.Error = err
-		return response
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Add("Authorization", authorization)
-
-	rsp, err := d.httpClient.Do(request)
-	if err != nil {
-		response.Error = errors.New("Data source is not working properly")
-		log.DefaultLogger.Error("Data source is not working properly", "err", err)
-		return response
-	}
-	defer rsp.Body.Close()
-
-	body, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		response.Error = errors.New("Data source is not working properly")
-		log.DefaultLogger.Error("Failed to read response body", "err", err)
-		return response
-	}
-
-	dataSet, err := parseTableQueryResponse(body)
-	if err != nil {
-		response.Error = err
-		log.DefaultLogger.Error("Parsing JSON error", "err", err)
-		return response
-	}
-	if dataSet.Code > 0 {
-		response.Error = errors.New(dataSet.Message)
-		log.DefaultLogger.Error(dataSet.Message)
-		return response
-	}
-
-	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format, nsPerUnit))
+	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format))
 	return response
 }
 
-// buildTableResponseFrame turns a decoded dataset into the response frame,
+// buildTableResponseFrame turns a fetched dataset into the response frame,
 // honoring the query's format. In the default Time series format the rows are
 // sorted ascending by the first TIMESTAMP column and a long-shaped result
 // (time + string tag columns + value columns) is pivoted into one labeled
@@ -192,14 +276,14 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam, a
 // lines instead of one interleaved series; when the pivot does not apply (or
 // fails, e.g. on a null timestamp) the plain frame is returned. The Table
 // format preserves the server's row order untouched.
-func buildTableResponseFrame(dataSet *tableQueryDataSet, format string, nsPerUnit int64) *data.Frame {
+func buildTableResponseFrame(dataSet *tableQueryDataSet, format string) *data.Frame {
 	// Anything that is not explicitly the Table format gets the default
 	// time-series treatment, including queries saved before FORMAT existed.
 	isTimeSeries := !strings.EqualFold(format, tableFormatTable)
 	if isTimeSeries {
 		sortRowsByFirstTimestamp(dataSet)
 	}
-	frame := buildTableFrame(dataSet, nsPerUnit)
+	frame := buildTableFrame(dataSet)
 	if isTimeSeries && frame.TimeSeriesSchema().Type == data.TimeSeriesTypeLong {
 		if wide, err := data.LongToWide(frame, nil); err == nil {
 			frame = wide
@@ -228,38 +312,23 @@ func sortRowsByFirstTimestamp(dataSet *tableQueryDataSet) {
 		if okA != okB {
 			return okA
 		}
-		return okA && va < vb
+		return okA && va.Before(vb)
 	})
 }
 
-func rowTimeAt(row []interface{}, col int) (int64, bool) {
+func rowTimeAt(row []interface{}, col int) (time.Time, bool) {
 	if col >= len(row) {
-		return 0, false
+		return time.Time{}, false
 	}
-	return toInt64(row[col])
+	t, ok := row[col].(time.Time)
+	return t, ok
 }
 
-// parseTableQueryResponse unmarshals a table-model query response, surfacing an
-// error object (code/message) as a Go error when the request did not succeed.
-// It decodes with UseNumber so that INT64/TIMESTAMP values beyond 2^53 keep
-// their precision (a plain interface{} decode would coerce them to float64).
-func parseTableQueryResponse(body []byte) (*tableQueryDataSet, error) {
-	var dataSet tableQueryDataSet
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
-	if err := decoder.Decode(&dataSet); err != nil {
-		return nil, errors.New("Parsing JSON error")
-	}
-	return &dataSet, nil
-}
-
-// buildTableFrame converts a row-major QueryDataSet into a Grafana frame, one
-// typed field per column driven by the response's data_types (so we no longer
-// have to guess types the way the tree-model path does). The endpoint returns
-// values row-major (values[row][col]); each output field gathers a single
-// column across all rows, so every field ends up the same length (the row
-// count) that Grafana requires.
-func buildTableFrame(dataSet *tableQueryDataSet, nsPerUnit int64) *data.Frame {
+// buildTableFrame converts the row-major dataset into a Grafana frame, one
+// typed field per column driven by the reported data types; each field gathers
+// a single column across all rows, so every field ends up the same length (the
+// row count) that Grafana requires.
+func buildTableFrame(dataSet *tableQueryDataSet) *data.Frame {
 	frame := data.NewFrame("response")
 	rowCount := len(dataSet.Values)
 	for col := 0; col < len(dataSet.ColumnNames); col++ {
@@ -274,24 +343,25 @@ func buildTableFrame(dataSet *tableQueryDataSet, nsPerUnit int64) *data.Frame {
 				columnValues[row] = dataSet.Values[row][col]
 			}
 		}
-		frame.Fields = append(frame.Fields, buildTableField(name, dataType, columnValues, nsPerUnit))
+		frame.Fields = append(frame.Fields, buildTableField(name, dataType, columnValues))
 	}
 	return frame
 }
 
-// buildTableField turns one column's raw JSON values into a typed, nullable
-// Grafana field selected by the IoTDB data type. Numbers arrive as json.Number
-// (the body is decoded with UseNumber), so integer, timestamp and float columns
-// are coerced through toInt64 / toFloat64. TIMESTAMP values are raw epoch
-// ticks in the server's precision; nsPerUnit scales them to nanoseconds.
-func buildTableField(name string, dataType string, values []interface{}, nsPerUnit int64) *data.Field {
+// buildTableField turns one column's native client values into a typed,
+// nullable Grafana field selected by the IoTDB data type. The client already
+// converts TIMESTAMP (and DATE) values to time.Time using the server-reported
+// timestamp precision, so no unit handling happens here. DATE and BLOB render
+// as strings (yyyy-MM-dd and 0x-prefixed hex), matching the REST behavior the
+// mode previously had.
+func buildTableField(name string, dataType string, values []interface{}) *data.Field {
 	switch strings.ToUpper(dataType) {
 	case "TIMESTAMP":
 		out := make([]*time.Time, len(values))
 		for i, v := range values {
-			if ticks, ok := toInt64(v); ok {
-				t := time.Unix(0, ticks*nsPerUnit)
-				out[i] = &t
+			if t, ok := v.(time.Time); ok {
+				value := t
+				out[i] = &value
 			}
 		}
 		return data.NewField(name, nil, out)
@@ -322,75 +392,83 @@ func buildTableField(name string, dataType string, values []interface{}, nsPerUn
 			}
 		}
 		return data.NewField(name, nil, out)
+	case "DATE":
+		out := make([]*string, len(values))
+		for i, v := range values {
+			if t, ok := v.(time.Time); ok {
+				value := t.Format("2006-01-02")
+				out[i] = &value
+			}
+		}
+		return data.NewField(name, nil, out)
+	case "BLOB":
+		out := make([]*string, len(values))
+		for i, v := range values {
+			if b, ok := v.([]byte); ok {
+				value := "0x" + hex.EncodeToString(b)
+				out[i] = &value
+			}
+		}
+		return data.NewField(name, nil, out)
 	default:
-		// TEXT, STRING, BLOB and anything unrecognised render as strings.
+		// TEXT, STRING and anything unrecognised render as strings.
 		out := make([]*string, len(values))
 		for i, v := range values {
 			if v == nil {
 				continue
 			}
-			if s, ok := v.(string); ok {
-				value := s
-				out[i] = &value
-			} else {
-				value := toString(v)
-				out[i] = &value
-			}
+			value := toString(v)
+			out[i] = &value
 		}
 		return data.NewField(name, nil, out)
 	}
 }
 
-// toInt64 coerces a JSON-decoded numeric value to int64. encoding/json decodes
-// numbers into float64 by default; json.Number is handled too for callers that
-// opt into it.
+// toInt64 coerces the client's integer representations (INT32 -> int32,
+// INT64 -> int64) to int64.
 func toInt64(v interface{}) (int64, bool) {
 	switch n := v.(type) {
-	case float64:
-		return int64(n), true
-	case json.Number:
-		if i, err := n.Int64(); err == nil {
-			return i, true
-		}
-		if f, err := n.Float64(); err == nil {
-			return int64(f), true
-		}
 	case int64:
 		return n, true
+	case int32:
+		return int64(n), true
 	}
 	return 0, false
 }
 
-// toFloat64 coerces a JSON-decoded numeric value to float64, handling both the
-// float64 (plain decode) and json.Number (UseNumber decode) representations.
+// toFloat64 coerces the client's floating representations (FLOAT -> float32,
+// DOUBLE -> float64) to float64.
 func toFloat64(v interface{}) (float64, bool) {
 	switch n := v.(type) {
 	case float64:
 		return n, true
-	case json.Number:
-		if f, err := n.Float64(); err == nil {
-			return f, true
-		}
+	case float32:
+		return float64(n), true
 	}
 	return 0, false
 }
 
-// toString renders a non-string scalar for a text column without losing it.
+// toString renders a value for a text column without losing it, whatever the
+// client handed over.
 func toString(v interface{}) string {
 	switch value := v.(type) {
 	case string:
 		return value
-	case float64:
-		return strconv.FormatFloat(value, 'f', -1, 64)
+	case []byte:
+		return "0x" + hex.EncodeToString(value)
+	case time.Time:
+		return value.UTC().Format(time.RFC3339Nano)
 	case bool:
 		return strconv.FormatBool(value)
-	case json.Number:
-		return value.String()
+	case int32:
+		return strconv.FormatInt(int64(value), 10)
+	case int64:
+		return strconv.FormatInt(value, 10)
+	case float32:
+		return strconv.FormatFloat(float64(value), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(value, 'f', -1, 64)
 	default:
-		b, err := json.Marshal(v)
-		if err != nil {
-			return ""
-		}
-		return string(b)
+		return fmt.Sprintf("%v", v)
 	}
 }

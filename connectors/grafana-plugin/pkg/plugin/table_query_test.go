@@ -18,18 +18,22 @@
 package plugin
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
-// msNs is the TIMESTAMP tick-to-nanosecond factor for a default (ms) server.
-const msNs = int64(time.Millisecond)
+func ts(ms int64) time.Time {
+	return time.UnixMilli(ms).UTC()
+}
 
 func TestExpandTableMacros(t *testing.T) {
-	const from int64 = 1000
-	const to int64 = 2000
+	const from int64 = 1600000000000 // 2020-09-13T12:26:40.000+00:00
+	const to int64 = 1600000001000   // 2020-09-13T12:26:41.000+00:00
+	const fromLit = "2020-09-13T12:26:40.000+00:00"
+	const toLit = "2020-09-13T12:26:41.000+00:00"
 
 	cases := []struct {
 		name string
@@ -39,37 +43,37 @@ func TestExpandTableMacros(t *testing.T) {
 		{
 			name: "timeFilter with explicit column",
 			in:   "SELECT time, s0 FROM db.t WHERE $__timeFilter(time)",
-			want: "SELECT time, s0 FROM db.t WHERE (time >= 1000 AND time <= 2000)",
+			want: "SELECT time, s0 FROM db.t WHERE (time >= " + fromLit + " AND time <= " + toLit + ")",
 		},
 		{
 			name: "timeFilter defaults to time column when empty",
 			in:   "SELECT * FROM db.t WHERE $__timeFilter()",
-			want: "SELECT * FROM db.t WHERE (time >= 1000 AND time <= 2000)",
+			want: "SELECT * FROM db.t WHERE (time >= " + fromLit + " AND time <= " + toLit + ")",
 		},
 		{
 			name: "timeFrom and timeTo",
 			in:   "SELECT * FROM db.t WHERE time >= $__timeFrom AND time <= $__timeTo",
-			want: "SELECT * FROM db.t WHERE time >= 1000 AND time <= 2000",
-		},
-		{
-			name: "no macros is unchanged",
-			in:   "SELECT * FROM db.t",
-			want: "SELECT * FROM db.t",
+			want: "SELECT * FROM db.t WHERE time >= " + fromLit + " AND time <= " + toLit,
 		},
 		{
 			name: "function form timeFrom and timeTo",
 			in:   "SELECT * FROM db.t WHERE time >= $__timeFrom() AND time <= $__timeTo( )",
-			want: "SELECT * FROM db.t WHERE time >= 1000 AND time <= 2000",
+			want: "SELECT * FROM db.t WHERE time >= " + fromLit + " AND time <= " + toLit,
 		},
 		{
 			name: "timeFilter with one nested paren level",
 			in:   "SELECT * FROM db.t WHERE $__timeFilter(cast(x))",
-			want: "SELECT * FROM db.t WHERE (cast(x) >= 1000 AND cast(x) <= 2000)",
+			want: "SELECT * FROM db.t WHERE (cast(x) >= " + fromLit + " AND cast(x) <= " + toLit + ")",
 		},
 		{
 			name: "longer identifier is not mangled",
 			in:   "SELECT $__timeFromage FROM db.t",
 			want: "SELECT $__timeFromage FROM db.t",
+		},
+		{
+			name: "no macros is unchanged",
+			in:   "SELECT * FROM db.t",
+			want: "SELECT * FROM db.t",
 		},
 	}
 
@@ -83,39 +87,94 @@ func TestExpandTableMacros(t *testing.T) {
 	}
 }
 
-func TestParseTableQueryResponseError(t *testing.T) {
-	body := []byte(`{"code":500,"message":"boom"}`)
-	ds, err := parseTableQueryResponse(body)
+func TestQuoteTableIdentifier(t *testing.T) {
+	if got := quoteTableIdentifier("test"); got != `"test"` {
+		t.Fatalf("plain identifier = %q", got)
+	}
+	if got := quoteTableIdentifier(`we"ird`); got != `"we""ird"` {
+		t.Fatalf("embedded quote = %q", got)
+	}
+}
+
+// fakeResultSet implements tableResultSet over an in-memory row list, standing
+// in for the native client's SessionDataSet (1-based column indexes).
+type fakeResultSet struct {
+	names  []string
+	types  []string
+	rows   [][]interface{}
+	cursor int
+	err    error
+	closed bool
+}
+
+func (f *fakeResultSet) Next() (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	if f.cursor >= len(f.rows) {
+		return false, nil
+	}
+	f.cursor++
+	return true, nil
+}
+
+func (f *fakeResultSet) GetColumnNames() []string { return f.names }
+func (f *fakeResultSet) GetColumnTypes() []string { return f.types }
+
+func (f *fakeResultSet) GetObjectByIndex(columnIndex int32) (interface{}, error) {
+	return f.rows[f.cursor-1][columnIndex-1], nil
+}
+
+func (f *fakeResultSet) Close() error {
+	f.closed = true
+	return nil
+}
+
+func TestFetchTableDataSet(t *testing.T) {
+	rs := &fakeResultSet{
+		names: []string{"time", "device", "value"},
+		types: []string{"TIMESTAMP", "STRING", "DOUBLE"},
+		rows: [][]interface{}{
+			{ts(1000), "d1", float64(1.5)},
+			{ts(2000), nil, float64(2.5)}, // null cell passes through
+		},
+	}
+	dataSet, err := fetchTableDataSet(rs)
 	if err != nil {
-		t.Fatalf("unexpected parse error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if ds.Code != 500 || ds.Message != "boom" {
-		t.Fatalf("error status not parsed: code=%d message=%q", ds.Code, ds.Message)
+	if len(dataSet.Values) != 2 || len(dataSet.ColumnNames) != 3 {
+		t.Fatalf("unexpected shape: %d rows, %d columns", len(dataSet.Values), len(dataSet.ColumnNames))
+	}
+	if dataSet.Values[0][1] != "d1" || dataSet.Values[1][1] != nil {
+		t.Fatalf("cells not carried over: %#v", dataSet.Values)
+	}
+	if tv, ok := dataSet.Values[1][0].(time.Time); !ok || !tv.Equal(ts(2000)) {
+		t.Fatalf("time cell = %#v, want %v", dataSet.Values[1][0], ts(2000))
 	}
 }
 
-func TestParseTableQueryResponseInvalidJSON(t *testing.T) {
-	if _, err := parseTableQueryResponse([]byte("not json")); err == nil {
-		t.Fatalf("expected an error for malformed JSON")
+func TestFetchTableDataSetPropagatesError(t *testing.T) {
+	rs := &fakeResultSet{names: []string{"a"}, types: []string{"INT64"}, err: errors.New("broken pipe")}
+	if _, err := fetchTableDataSet(rs); err == nil {
+		t.Fatalf("expected the iteration error to propagate")
 	}
 }
 
-// TestBuildTableFrameRowMajor pins the response orientation: the table endpoint
-// serialises values ROW-major (values[row][col]), so a field must gather a
-// single column across every row. The two-row fixture below mirrors the shape
-// asserted by IoTDB's own IoTDBRestServiceIT.testQuery and would fail if the
-// values were read column-major.
-func TestBuildTableFrameRowMajor(t *testing.T) {
+// TestBuildTableFrameRowOrientation pins the fetch orientation contract: the
+// dataset rows are row-major (values[row][col]), so a field must gather a
+// single column across every row, with the client's native Go value types.
+func TestBuildTableFrameRowOrientation(t *testing.T) {
 	ds := &tableQueryDataSet{
 		ColumnNames: []string{"time", "i", "d", "b", "s"},
 		DataTypes:   []string{"TIMESTAMP", "INT64", "DOUBLE", "BOOLEAN", "TEXT"},
 		Values: [][]interface{}{
-			{float64(1600000000000), float64(42), float64(3.5), true, "hello"},  // row 0
-			{float64(1600000001000), float64(43), float64(4.5), false, "world"}, // row 1
+			{ts(1600000000000), int64(42), float64(3.5), true, "hello"},
+			{ts(1600000001000), int64(43), float64(4.5), false, "world"},
 		},
 	}
 
-	frame := buildTableFrame(ds, msNs)
+	frame := buildTableFrame(ds)
 	if len(frame.Fields) != 5 {
 		t.Fatalf("expected 5 fields, got %d", len(frame.Fields))
 	}
@@ -125,59 +184,48 @@ func TestBuildTableFrameRowMajor(t *testing.T) {
 		}
 	}
 
-	// time column across both rows -> *time.Time
-	if v, ok := frame.Fields[0].At(0).(*time.Time); !ok || v == nil ||
-		!v.Equal(time.Unix(0, 1600000000000*int64(time.Millisecond))) {
-		t.Fatalf("time[0] = %#v", frame.Fields[0].At(0))
-	}
-	if v, ok := frame.Fields[0].At(1).(*time.Time); !ok || v == nil ||
-		!v.Equal(time.Unix(0, 1600000001000*int64(time.Millisecond))) {
+	if v, ok := frame.Fields[0].At(1).(*time.Time); !ok || v == nil || !v.Equal(ts(1600000001000)) {
 		t.Fatalf("time[1] = %#v", frame.Fields[0].At(1))
 	}
-	// int column
 	if v := frame.Fields[1].At(0).(*int64); *v != 42 {
 		t.Fatalf("i[0] = %d, want 42", *v)
 	}
-	if v := frame.Fields[1].At(1).(*int64); *v != 43 {
-		t.Fatalf("i[1] = %d, want 43", *v)
-	}
-	// double column
 	if v := frame.Fields[2].At(1).(*float64); *v != 4.5 {
 		t.Fatalf("d[1] = %v, want 4.5", *v)
 	}
-	// boolean column
 	if v := frame.Fields[3].At(1).(*bool); *v != false {
 		t.Fatalf("b[1] = %v, want false", *v)
 	}
-	// text column
 	if v := frame.Fields[4].At(1).(*string); *v != "world" {
 		t.Fatalf("s[1] = %q, want world", *v)
 	}
 }
 
-// TestParseAndBuildPreservesInt64Precision decodes a real JSON body end-to-end
-// and checks that an INT64 above 2^53 is not corrupted (which a plain float64
-// decode would do). 9007199254740993 == 2^53 + 1 is not representable in
-// float64, so this fails unless the decoder preserves integer precision.
-func TestParseAndBuildPreservesInt64Precision(t *testing.T) {
-	body := []byte(`{"column_names":["v"],"data_types":["INT64"],"values":[[9007199254740993]]}`)
-
-	ds, err := parseTableQueryResponse(body)
-	if err != nil {
-		t.Fatalf("unexpected parse error: %v", err)
+// TestBuildTableFieldNativeTypeCoercions pins the client-type mapping: INT32
+// widens to int64, FLOAT widens to float64, an INT64 above 2^53 stays exact
+// (native int64, no float roundtrip), DATE renders as yyyy-MM-dd and BLOB as
+// 0x-prefixed hex — the same rendering the REST transport produced.
+func TestBuildTableFieldNativeTypeCoercions(t *testing.T) {
+	if v := buildTableField("i", "INT32", []interface{}{int32(7)}).At(0).(*int64); *v != 7 {
+		t.Fatalf("INT32 = %d, want 7", *v)
 	}
-	frame := buildTableFrame(ds, msNs)
-	if len(frame.Fields) != 1 || frame.Fields[0].Len() != 1 {
-		t.Fatalf("unexpected frame shape: %d fields", len(frame.Fields))
+	if v := buildTableField("f", "FLOAT", []interface{}{float32(1.5)}).At(0).(*float64); *v != 1.5 {
+		t.Fatalf("FLOAT = %v, want 1.5", *v)
 	}
-	got := frame.Fields[0].At(0).(*int64)
-	if got == nil || *got != 9007199254740993 {
-		t.Fatalf("int64 precision lost: got %v, want 9007199254740993", got)
+	if v := buildTableField("big", "INT64", []interface{}{int64(9007199254740993)}).At(0).(*int64); *v != 9007199254740993 {
+		t.Fatalf("INT64 precision lost: %d", *v)
+	}
+	date := time.Date(2025, 7, 14, 0, 0, 0, 0, time.UTC)
+	if v := buildTableField("e", "DATE", []interface{}{date}).At(0).(*string); *v != "2025-07-14" {
+		t.Fatalf("DATE = %q, want 2025-07-14", *v)
+	}
+	if v := buildTableField("d", "BLOB", []interface{}{[]byte{0xca, 0xfe, 0xba, 0xbe}}).At(0).(*string); *v != "0xcafebabe" {
+		t.Fatalf("BLOB = %q, want 0xcafebabe", *v)
 	}
 }
 
 func TestBuildTableFieldNullsBecomeNilPointers(t *testing.T) {
-	f := buildTableField("i", "INT64", []interface{}{float64(1), nil, float64(3)}, msNs)
+	f := buildTableField("i", "INT64", []interface{}{int64(1), nil, int64(3)})
 	if f.Len() != 3 {
 		t.Fatalf("expected 3 values, got %d", f.Len())
 	}
@@ -190,7 +238,7 @@ func TestBuildTableFieldNullsBecomeNilPointers(t *testing.T) {
 }
 
 func TestBuildTableFieldUnknownTypeRendersString(t *testing.T) {
-	f := buildTableField("x", "SOMETHING_NEW", []interface{}{float64(7), "raw", nil}, msNs)
+	f := buildTableField("x", "SOMETHING_NEW", []interface{}{int64(7), "raw", nil})
 	if f.Len() != 3 {
 		t.Fatalf("expected 3 values, got %d", f.Len())
 	}
@@ -206,18 +254,17 @@ func TestBuildTableFieldUnknownTypeRendersString(t *testing.T) {
 }
 
 // TestBuildTableFrameRaggedRowIsSafe checks that a row shorter than the column
-// header (a missing trailing cell) does not panic and yields equal-length,
-// null-padded fields.
+// header does not panic and yields equal-length, null-padded fields.
 func TestBuildTableFrameRaggedRowIsSafe(t *testing.T) {
 	ds := &tableQueryDataSet{
 		ColumnNames: []string{"time", "s0"},
 		DataTypes:   []string{"TIMESTAMP", "TEXT"},
 		Values: [][]interface{}{
-			{float64(1), "a"}, // full row
-			{float64(2)},      // ragged: missing s0
+			{ts(1), "a"},
+			{ts(2)}, // ragged: missing s0
 		},
 	}
-	frame := buildTableFrame(ds, msNs)
+	frame := buildTableFrame(ds)
 	if len(frame.Fields) != 2 {
 		t.Fatalf("expected 2 fields, got %d", len(frame.Fields))
 	}
@@ -229,50 +276,6 @@ func TestBuildTableFrameRaggedRowIsSafe(t *testing.T) {
 	}
 }
 
-// TestTimestampUnits pins the precision option's conversion factors: the
-// panel's ms range must be scaled INTO server units for the macros, and raw
-// TIMESTAMP ticks must be scaled into nanoseconds for rendering.
-func TestTimestampUnits(t *testing.T) {
-	cases := []struct {
-		precision  string
-		unitsPerMs int64
-		nsPerUnit  int64
-	}{
-		{"", 1, int64(time.Millisecond)},
-		{"ms", 1, int64(time.Millisecond)},
-		{"us", 1000, int64(time.Microsecond)},
-		{"ns", 1000000, 1},
-		{" NS ", 1000000, 1},
-		{"garbage", 1, int64(time.Millisecond)},
-	}
-	for _, c := range cases {
-		unitsPerMs, nsPerUnit := timestampUnits(c.precision)
-		if unitsPerMs != c.unitsPerMs || nsPerUnit != c.nsPerUnit {
-			t.Fatalf("timestampUnits(%q) = (%d, %d), want (%d, %d)",
-				c.precision, unitsPerMs, nsPerUnit, c.unitsPerMs, c.nsPerUnit)
-		}
-	}
-}
-
-// TestBuildTableFieldTimestampPrecision renders the same instant sent by a
-// us- and an ns-precision server. With the old hard-coded ms conversion the
-// microsecond value would land in January 1970, off by 1000x.
-func TestBuildTableFieldTimestampPrecision(t *testing.T) {
-	want := time.Unix(0, 1600000000000*int64(time.Millisecond)) // 2020-09-13T12:26:40Z
-
-	_, usNs := timestampUnits("us")
-	f := buildTableField("time", "TIMESTAMP", []interface{}{float64(1600000000000000)}, usNs)
-	if v, ok := f.At(0).(*time.Time); !ok || v == nil || !v.Equal(want) {
-		t.Fatalf("us tick rendered as %#v, want %v", f.At(0), want)
-	}
-
-	_, nsNs := timestampUnits("ns")
-	f = buildTableField("time", "TIMESTAMP", []interface{}{float64(1600000000000000000)}, nsNs)
-	if v, ok := f.At(0).(*time.Time); !ok || v == nil || !v.Equal(want) {
-		t.Fatalf("ns tick rendered as %#v, want %v", f.At(0), want)
-	}
-}
-
 // TestBuildTableResponseFrameLongToWide pins the multi-device path: a long
 // result (time + tag + value), even arriving unsorted, must come back as one
 // labeled series per tag value so a time-series panel draws separate lines.
@@ -281,14 +284,14 @@ func TestBuildTableResponseFrameLongToWide(t *testing.T) {
 		ColumnNames: []string{"time", "device", "temperature"},
 		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
 		Values: [][]interface{}{
-			{float64(2000), "d2", float64(22.5)},
-			{float64(1000), "d1", float64(11.0)},
-			{float64(1000), "d2", float64(21.0)},
-			{float64(2000), "d1", float64(12.0)},
+			{ts(2000), "d2", float64(22.5)},
+			{ts(1000), "d1", float64(11.0)},
+			{ts(1000), "d2", float64(21.0)},
+			{ts(2000), "d1", float64(12.0)},
 		},
 	}
 
-	frame := buildTableResponseFrame(ds, "", msNs)
+	frame := buildTableResponseFrame(ds, "")
 	if len(frame.Fields) != 3 {
 		t.Fatalf("expected time + one series per device (3 fields), got %d", len(frame.Fields))
 	}
@@ -327,17 +330,17 @@ func TestBuildTableResponseFrameTableFormatPreservesOrder(t *testing.T) {
 		ColumnNames: []string{"time", "device", "temperature"},
 		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
 		Values: [][]interface{}{
-			{float64(2000), "d2", float64(22.5)},
-			{float64(1000), "d1", float64(11.0)},
+			{ts(2000), "d2", float64(22.5)},
+			{ts(1000), "d1", float64(11.0)},
 		},
 	}
 
-	frame := buildTableResponseFrame(ds, tableFormatTable, msNs)
+	frame := buildTableResponseFrame(ds, tableFormatTable)
 	if len(frame.Fields) != 3 {
 		t.Fatalf("expected 3 plain fields, got %d", len(frame.Fields))
 	}
 	first, ok := frame.Fields[0].At(0).(*time.Time)
-	if !ok || first == nil || !first.Equal(time.Unix(0, 2000*msNs)) {
+	if !ok || first == nil || !first.Equal(ts(2000)) {
 		t.Fatalf("row order changed: first time = %#v, want t=2000ms", frame.Fields[0].At(0))
 	}
 	if _, ok := frame.Fields[1].At(0).(*string); !ok {
@@ -353,16 +356,44 @@ func TestBuildTableResponseFrameNullTimeFallsBack(t *testing.T) {
 		ColumnNames: []string{"time", "device", "temperature"},
 		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
 		Values: [][]interface{}{
-			{float64(1000), "d1", float64(11.0)},
+			{ts(1000), "d1", float64(11.0)},
 			{nil, "d2", float64(21.0)},
 		},
 	}
 
-	frame := buildTableResponseFrame(ds, tableFormatTimeSeries, msNs)
+	frame := buildTableResponseFrame(ds, tableFormatTimeSeries)
 	if len(frame.Fields) != 3 {
 		t.Fatalf("expected plain 3-field fallback frame, got %d fields", len(frame.Fields))
 	}
 	if frame.TimeSeriesSchema().Type != data.TimeSeriesTypeLong {
 		t.Fatalf("fallback frame should still be the long-shaped original")
+	}
+}
+
+func TestTableRPCEndpoint(t *testing.T) {
+	cases := []struct {
+		name       string
+		rpcAddress string
+		url        string
+		wantHost   string
+		wantPort   string
+	}{
+		{name: "derived from http url", url: "http://192.168.1.10:18080", wantHost: "192.168.1.10", wantPort: "6667"},
+		{name: "derived from url with trailing slash", url: "http://iotdb.example.com:18080/", wantHost: "iotdb.example.com", wantPort: "6667"},
+		{name: "derived from bare host and rest port", url: "192.168.1.10:18080", wantHost: "192.168.1.10", wantPort: "6667"},
+		{name: "explicit host and port", rpcAddress: "10.0.0.5:7777", url: "http://x:18080", wantHost: "10.0.0.5", wantPort: "7777"},
+		{name: "explicit bare host gets default port", rpcAddress: "10.0.0.5", url: "http://x:18080", wantHost: "10.0.0.5", wantPort: "6667"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			d := &IoTDBDataSource{Ulr: c.url, RPCAddress: c.rpcAddress}
+			host, port, err := d.tableRPCEndpoint()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if host != c.wantHost || port != c.wantPort {
+				t.Fatalf("endpoint = %s:%s, want %s:%s", host, port, c.wantHost, c.wantPort)
+			}
+		})
 	}
 }

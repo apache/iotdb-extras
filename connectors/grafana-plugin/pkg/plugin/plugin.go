@@ -28,8 +28,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/apache/iotdb-client-go/v2/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
@@ -70,17 +72,24 @@ func ApacheIoTDBDatasource(ctx context.Context, d backend.DataSourceInstanceSett
 	if password, exists := d.DecryptedSecureJSONData["password"]; exists {
 		authorization = "Basic " + base64.StdEncoding.EncodeToString([]byte(dm.Username+":"+password))
 	}
-	return &IoTDBDataSource{CallResourceHandler: iotdbResourceHandler(authorization, httpClient), Username: dm.Username, Ulr: dm.Url, TimestampPrecision: dm.TimestampPrecision, httpClient: httpClient}, nil
+	password := d.DecryptedSecureJSONData["password"]
+	return &IoTDBDataSource{CallResourceHandler: iotdbResourceHandler(authorization, httpClient), Username: dm.Username, Ulr: dm.Url, RPCAddress: dm.RPCAddress, password: password, httpClient: httpClient}, nil
 }
 
 // SampleDatasource is an example datasource which can respond to data queries, reports
 // its health and has streaming skills.
 type IoTDBDataSource struct {
 	backend.CallResourceHandler
-	Username           string
-	Ulr                string
-	TimestampPrecision string
-	httpClient         *http.Client
+	Username   string
+	Ulr        string
+	RPCAddress string
+	password   string
+	httpClient *http.Client
+
+	// Native-client session pool for the table-model mode, created lazily by
+	// getTablePool on the first table query.
+	tablePoolMu sync.Mutex
+	tablePool   *client.TableSessionPool
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
@@ -89,6 +98,12 @@ type IoTDBDataSource struct {
 func (d *IoTDBDataSource) Dispose() {
 	// Clean up datasource instance resources.
 	d.httpClient.CloseIdleConnections()
+	d.tablePoolMu.Lock()
+	defer d.tablePoolMu.Unlock()
+	if d.tablePool != nil {
+		d.tablePool.Close()
+		d.tablePool = nil
+	}
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -114,9 +129,10 @@ func (d *IoTDBDataSource) QueryData(ctx context.Context, req *backend.QueryDataR
 type dataSourceModel struct {
 	Username string `json:"username"`
 	Url      string `json:"url"`
-	// TimestampPrecision mirrors the server's timestamp_precision property
-	// (ms, us or ns; ms when unset). Used by the table-model mode.
-	TimestampPrecision string `json:"timestampPrecision"`
+	// RPCAddress is the IoTDB RPC endpoint (host or host:port) the native
+	// client used by the table-model mode connects to. When empty, the URL's
+	// host with the default RPC port 6667 is used.
+	RPCAddress string `json:"rpcAddress"`
 }
 
 type groupBy struct {
@@ -243,7 +259,7 @@ func (d *IoTDBDataSource) query(cxt context.Context, pCtx backend.PluginContext,
 	qp.EndTime = query.TimeRange.To.UnixNano() / 1000000
 
 	if qp.SqlType == TableModelSqlType {
-		return d.queryTableModel(cxt, qp, authorization)
+		return d.queryTableModel(cxt, qp)
 	}
 
 	if qp.SqlType == "SQL: Drop-down List" {

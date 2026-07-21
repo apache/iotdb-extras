@@ -65,10 +65,10 @@ export interface LimitAll {
 export interface IoTDBOptions extends DataSourceJsonData {
   url: string;
   username: string;
-  // Mirrors the server's timestamp_precision property (ms / us / ns, ms when
-  // unset). The table-model mode uses it to interpret TIMESTAMP values and to
-  // expand the time macros.
-  timestampPrecision?: string;
+  // The IoTDB RPC endpoint (host or host:port) used by the table-model mode's
+  // native client. When empty, the URL's host with the default RPC port 6667
+  // is used.
+  rpcAddress?: string;
 }
 
 /**

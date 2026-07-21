@@ -121,11 +121,13 @@ Select a time series in the TIME-SERIES selection box, select a function in the 
 
 ##### SQL: Table Model
 
-Queries IoTDB's table model (IoTDB 2.x) through the REST interface `/rest/table/v1/query`. Enter a standard SQL statement in the SQL input box, for example:
+Queries IoTDB's table model (IoTDB 2.x) through the native Go client ([apache/iotdb-client-go](https://github.com/apache/iotdb-client-go)). Enter a standard SQL statement in the SQL input box, for example:
 
 ```sql
 SELECT time, device_id, temperature FROM table1 WHERE $__timeFilter(time)
 ```
+
+Unlike the tree-model modes, which go through the REST service, this mode connects to the IoTDB RPC port (6667 by default). The data source's `rpc address` option sets that endpoint explicitly; when it is left empty, the URL's host with port 6667 is used.
 
 DATABASE input box: the database to run the statement against. Optional when every table reference in the statement is fully qualified (`database.table`).
 
@@ -134,19 +136,19 @@ SQL input box: a single table-model SELECT statement. The following macros are e
 | Macro | Expands to |
 | ----- | ---------- |
 | `$__timeFilter(col)` | `(col >= <panel start> AND col <= <panel end>)`; `col` defaults to `time` when omitted |
-| `$__timeFrom`, `$__timeFrom()` | the panel range start as an epoch integer |
-| `$__timeTo`, `$__timeTo()` | the panel range end as an epoch integer |
+| `$__timeFrom`, `$__timeFrom()` | the panel range start as an ISO 8601 UTC timestamp literal |
+| `$__timeTo`, `$__timeTo()` | the panel range end as an ISO 8601 UTC timestamp literal |
+
+The macros expand to ISO 8601 timestamp literals (e.g. `2020-09-13T12:26:40.000+00:00`), which the server interprets in its own configured `timestamp_precision` — so time filtering works unchanged on `ms`, `us` and `ns` servers, and TIMESTAMP values are likewise converted by the client using the server-reported precision.
 
 FORMAT option:
 
 * `Time series` (default): rows are sorted by the first TIMESTAMP column, and a result that contains tag/string columns next to numeric columns is pivoted into one series per tag combination — so a query returning several devices renders as separate lines in a time-series panel. Note that the pivot requires timestamps without nulls; results are sorted by the plugin, so an `ORDER BY` clause is not needed.
 * `Table`: rows are returned exactly as the server sent them (use this with the table panel, or when your `ORDER BY` should be preserved).
 
-Result columns are typed from the response's `data_types`: TIMESTAMP columns become Grafana time fields, INT32/INT64 become integers, FLOAT/DOUBLE become floats, BOOLEAN becomes booleans, and TEXT/STRING/DATE/BLOB render as strings.
+Result columns are typed from the result set's data types: TIMESTAMP columns become Grafana time fields, INT32/INT64 become integers, FLOAT/DOUBLE become floats, BOOLEAN becomes booleans, and TEXT/STRING/DATE/BLOB render as strings.
 
-If the server runs with a non-default `timestamp_precision` (`us` or `ns`), set the same value in the data source's `time precision` option — it controls both how TIMESTAMP values are interpreted and what the time macros expand to.
-
-The REST service caps query results at `rest_query_default_row_size_limit` rows (10000 by default, configurable on the server); a query exceeding it returns an error message rather than truncated data.
+There is no server-imposed row cap on this path; add a `LIMIT` clause when querying wide time ranges over dense data to bound the result size.
 
 #### Support for variables and template functions
 
