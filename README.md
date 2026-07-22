@@ -61,7 +61,9 @@ This repository includes:
 
 5. **MyBatis Generator**: Code generation tools for database access
 
-6. **Examples**: Sample applications and code examples demonstrating the use of IoTDB with various technologies
+6. **Metric Scrape**: Standalone Prometheus text exposition scraper for the IoTDB table model
+
+7. **Examples**: Sample applications and code examples demonstrating the use of IoTDB with various technologies
 
 ## Prerequisites
 
@@ -83,7 +85,7 @@ To build the project from source, follow these steps:
 2. Build the project with Maven:
 
    ```bash
-   # Build the entire project (includes distributions,iotdb-collector,mybatis-generator)
+   # Build the entire project (includes distributions,iotdb-collector,metric-scrape,mybatis-generator)
    mvn clean package -DskipTests
 
    # Or build all
@@ -312,6 +314,7 @@ You can also refer to module-specific documentation:
 - [Flink IoTDB Connector](/connectors/flink-iotdb-connector/README.md)
 - [Grafana Plugin](/connectors/grafana-plugin/README.md)
 - [IoTDB Spring Boot Starter](/iotdb-spring-boot-starter/README.md)
+- [Metric Scrape](/metric-scrape/README.md)
 - [Kubernetes Helm Charts](/helm/README.md)
 - [IoTDB Operator](/iotdb-operator/README.md)
 
