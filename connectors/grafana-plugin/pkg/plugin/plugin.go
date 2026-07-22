@@ -227,6 +227,13 @@ func verifyQuery(query backend.DataQuery) (qp *queryParam, errMsg string) {
 		if strings.TrimSpace(qp.Sql) == "" {
 			return nil, "Input error, SQL is required"
 		}
+		// The database is required: every query then USEs it on its pooled
+		// session, so a session's leftover USE state from a previous query
+		// can never influence the result (PooledTableSession.Close only
+		// resets the database when the pool has one configured).
+		if strings.TrimSpace(qp.Database) == "" {
+			return nil, "Input error, DATABASE is required"
+		}
 	} else {
 		return nil, "none"
 	}

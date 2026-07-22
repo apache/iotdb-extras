@@ -129,7 +129,7 @@ SELECT time, device_id, temperature FROM table1 WHERE $__timeFilter(time)
 
 Unlike the tree-model modes, which go through the REST service, this mode connects to the IoTDB RPC port (6667 by default). The data source's `rpc address` option sets that endpoint explicitly; when it is left empty, the URL's host with port 6667 is used.
 
-DATABASE input box: the database to run the statement against. Optional when every table reference in the statement is fully qualified (`database.table`).
+DATABASE input box: the database to run the statement against. Required — every query first runs `USE <database>` on its pooled session, so results stay deterministic regardless of which session the pool hands out. Fully-qualified `database.table` references are still allowed and take precedence over the session database.
 
 SQL input box: a single table-model SELECT statement. The following macros are expanded by the plugin before the statement is sent:
 

@@ -389,7 +389,7 @@ export class QueryEditor extends PureComponent<Props, State> {
                   <QueryInlineField label={'DATABASE'}>
                     <Input
                       value={query.database ?? this.state.database}
-                      placeholder={'database name (optional if the query is fully qualified)'}
+                      placeholder={'database name (required)'}
                       onChange={this.onDatabaseChange}
                     />
                   </QueryInlineField>

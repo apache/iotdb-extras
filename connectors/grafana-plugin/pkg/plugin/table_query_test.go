@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
@@ -367,6 +368,28 @@ func TestBuildTableResponseFrameNullTimeFallsBack(t *testing.T) {
 	}
 	if frame.TimeSeriesSchema().Type != data.TimeSeriesTypeLong {
 		t.Fatalf("fallback frame should still be the long-shaped original")
+	}
+}
+
+// TestVerifyQueryTableModel pins the table-mode input validation: SQL and
+// DATABASE are both required (the latter so every query USEs its database on
+// the pooled session and leftover USE state can never leak between panels).
+func TestVerifyQueryTableModel(t *testing.T) {
+	build := func(body string) backend.DataQuery {
+		return backend.DataQuery{JSON: []byte(body)}
+	}
+
+	if _, msg := verifyQuery(build(`{"sqlType":"SQL: Table Model","sql":"SELECT 1","database":"db1"}`)); msg != "" {
+		t.Fatalf("valid table query rejected: %q", msg)
+	}
+	if _, msg := verifyQuery(build(`{"sqlType":"SQL: Table Model","sql":"  ","database":"db1"}`)); msg != "Input error, SQL is required" {
+		t.Fatalf("blank sql not rejected: %q", msg)
+	}
+	if _, msg := verifyQuery(build(`{"sqlType":"SQL: Table Model","sql":"SELECT 1","database":" "}`)); msg != "Input error, DATABASE is required" {
+		t.Fatalf("blank database not rejected: %q", msg)
+	}
+	if _, msg := verifyQuery(build(`{"sqlType":"SQL: Table Model","sql":"SELECT 1"}`)); msg != "Input error, DATABASE is required" {
+		t.Fatalf("missing database not rejected: %q", msg)
 	}
 }
 
