@@ -26,7 +26,7 @@ import { FromValue } from './componments/FromValue';
 import { WhereValue } from './componments/WhereValue';
 import { ControlValue } from './componments/ControlValue';
 import { FillValue } from './componments/FillValue';
-import { Segment } from '@grafana/ui';
+import { Input, Segment, TextArea } from '@grafana/ui';
 import { toOption } from './functions';
 
 import { GroupByLabel } from './componments/GroupBy';
@@ -46,6 +46,9 @@ interface State {
   isDropDownList: boolean;
   sqlType: string;
   shouldAdd: boolean;
+  database: string;
+  sql: string;
+  format: string;
 }
 
 const selectElement = [
@@ -64,7 +67,8 @@ const selectElement = [
 
 const paths = [''];
 const expressions = [''];
-const selectType = ['SQL: Full Customized', 'SQL: Drop-down List'];
+const selectType = ['SQL: Full Customized', 'SQL: Drop-down List', 'SQL: Table Model'];
+const tableFormats = ['Time series', 'Table'];
 const commonOption: SelectableValue<string> = { label: '*', value: '*' };
 const commonOptionDou: SelectableValue<string> = { label: '**', value: '**' };
 type Props = QueryEditorProps<DataSource, IoTDBQuery, IoTDBOptions>;
@@ -87,6 +91,9 @@ export class QueryEditor extends PureComponent<Props, State> {
     isDropDownList: false,
     sqlType: selectType[0],
     shouldAdd: true,
+    database: '',
+    sql: '',
+    format: tableFormats[0],
   };
 
 
@@ -134,7 +141,26 @@ export class QueryEditor extends PureComponent<Props, State> {
     onChange({ ...query, groupBy: g });
   };
 
-  
+  onDatabaseChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query } = this.props;
+    const database = event.target.value;
+    this.setState({ database });
+    onChange({ ...query, database });
+  };
+
+  onSqlChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const { onChange, query } = this.props;
+    const sql = event.target.value;
+    this.setState({ sql });
+    onChange({ ...query, sql });
+  };
+
+  onFormatChange = ({ value: value = tableFormats[0] }: SelectableValue<string>) => {
+    const { onChange, query } = this.props;
+    this.setState({ format: value });
+    onChange({ ...query, format: value });
+  };
+
   onSelectTypeChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query } = this.props;
     onChange({ ...query });
@@ -175,7 +201,13 @@ export class QueryEditor extends PureComponent<Props, State> {
  
   componentDidMount() {
     if (this.props.query.sqlType) {
-      this.setState({ isDropDownList: this.props.query.isDropDownList, sqlType: this.props.query.sqlType });
+      this.setState({
+        isDropDownList: this.props.query.isDropDownList,
+        sqlType: this.props.query.sqlType,
+        database: this.props.query.database ?? '',
+        sql: this.props.query.sql ?? '',
+        format: this.props.query.format ?? tableFormats[0],
+      });
     } else {
       this.props.query.sqlType = selectType[0];
     }
@@ -231,7 +263,7 @@ export class QueryEditor extends PureComponent<Props, State> {
                       condition: '',
                     });
                     onChange({ ...query, sqlType: value, isDropDownList: false });
-                  } else {
+                  } else if (value === selectType[1]) {
                     this.props.query.sqlType = selectType[1];
                     this.props.query.expression = [''];
                     this.props.query.prefixPath = [''];
@@ -247,6 +279,22 @@ export class QueryEditor extends PureComponent<Props, State> {
                       control: '',
                     });
                     onChange({ ...query, sqlType: value, isDropDownList: true });
+                  } else {
+                    this.props.query.sqlType = selectType[2];
+                    this.props.query.expression = [''];
+                    this.props.query.prefixPath = [''];
+                    this.props.query.condition = '';
+                    this.props.query.control = '';
+                    this.props.query.isDropDownList = false;
+                    this.setState({
+                      isDropDownList: false,
+                      sqlType: selectType[2],
+                      expression: [''],
+                      prefixPath: [''],
+                      condition: '',
+                      control: '',
+                    });
+                    onChange({ ...query, sqlType: value, isDropDownList: false });
                   }
                 }}
                 options={selectType.map(toOption)}
@@ -254,7 +302,7 @@ export class QueryEditor extends PureComponent<Props, State> {
                 className="query-keyword width-10"
               />
             </div>
-            {!this.state.isDropDownList && (
+            {this.state.sqlType === selectType[0] && (
               <>
                 <div className="gf-form">
                   <QueryInlineField label={'SELECT'}>
@@ -330,6 +378,39 @@ export class QueryEditor extends PureComponent<Props, State> {
                     <FillValue
                       fill={fillClauses ? fillClauses : this.state.fillClauses}
                       onChange={this.onFillsChange}
+                    />
+                  </QueryInlineField>
+                </div>
+              </>
+            )}
+            {this.state.sqlType === selectType[2] && (
+              <>
+                <div className="gf-form">
+                  <QueryInlineField label={'DATABASE'}>
+                    <Input
+                      value={query.database ?? this.state.database}
+                      placeholder={'database name (required)'}
+                      onChange={this.onDatabaseChange}
+                    />
+                  </QueryInlineField>
+                </div>
+                <div className="gf-form">
+                  <QueryInlineField label={'SQL'}>
+                    <TextArea
+                      rows={4}
+                      value={query.sql ?? this.state.sql}
+                      placeholder={'SELECT time, s0 FROM my_table WHERE $__timeFilter(time)'}
+                      onChange={this.onSqlChange}
+                    />
+                  </QueryInlineField>
+                </div>
+                <div className="gf-form">
+                  <QueryInlineField label={'FORMAT'}>
+                    <Segment
+                      onChange={this.onFormatChange}
+                      options={tableFormats.map(toOption)}
+                      value={query.format ?? this.state.format}
+                      className="query-keyword width-10"
                     />
                   </QueryInlineField>
                 </div>

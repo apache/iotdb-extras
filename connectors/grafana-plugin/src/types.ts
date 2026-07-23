@@ -33,6 +33,13 @@ export interface IoTDBQuery extends DataQuery {
   limitAll?: LimitAll;
   options: Array<Array<SelectableValue<string>>>;
   hide: boolean;
+
+  // Table-model mode: a standard SQL statement run against `database`,
+  // rendered either as time series (long results are pivoted into one series
+  // per tag combination) or as a plain table.
+  database?: string;
+  sql?: string;
+  format?: string;
 }
 
 export interface GroupBy {
@@ -58,6 +65,10 @@ export interface LimitAll {
 export interface IoTDBOptions extends DataSourceJsonData {
   url: string;
   username: string;
+  // The IoTDB RPC endpoint (host or host:port) used by the table-model mode's
+  // native client. When empty, the URL's host with the default RPC port 6667
+  // is used.
+  rpcAddress?: string;
 }
 
 /**

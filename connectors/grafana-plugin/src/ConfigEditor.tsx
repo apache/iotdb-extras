@@ -42,6 +42,15 @@ export class ConfigEditor extends PureComponent<Props, State> {
     onOptionsChange({ ...options, jsonData });
   };
 
+  onRPCAddressChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onOptionsChange, options } = this.props;
+    const jsonData = {
+      ...options.jsonData,
+      rpcAddress: event.target.value,
+    };
+    onOptionsChange({ ...options, jsonData });
+  };
+
   // Secure field (only sent to the backend)
   onPasswordChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onOptionsChange, options } = this.props;
@@ -99,6 +108,18 @@ export class ConfigEditor extends PureComponent<Props, State> {
             width={40}
             onReset={this.onResetPassword}
             onChange={this.onPasswordChange}
+          />
+        </InlineField>
+        <InlineField
+          label="rpc address"
+          labelWidth={12}
+          tooltip="The IoTDB RPC endpoint (host or host:port) used by the SQL: Table Model mode's native client. Leave empty to use the URL's host with the default RPC port 6667."
+        >
+          <Input
+            onChange={this.onRPCAddressChange}
+            value={jsonData.rpcAddress || ''}
+            placeholder="iotdb-host:6667 (optional)"
+            width={40}
           />
         </InlineField>
       </div>
