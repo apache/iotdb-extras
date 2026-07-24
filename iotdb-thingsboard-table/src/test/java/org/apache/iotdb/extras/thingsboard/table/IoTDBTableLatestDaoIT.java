@@ -729,6 +729,163 @@ class IoTDBTableLatestDaoIT {
     }
   }
 
+  @Test
+  void findAllKeysByEntityIds_returnsDistinctKeysForEntities() throws Exception {
+    TestScope scope =
+        scope(
+            "latest_keys",
+            "55555555-5555-5555-5555-555555555504",
+            "66666666-6666-6666-6666-666666666604");
+    bootstrapSchema(scope.database());
+    // Key discovery now also reads the telemetry_latest overlay, so the overlay table must exist.
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(6);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        saveAll(
+            tsDao,
+            scope,
+            List.of(
+                entry(3000L, "temperature", DataType.DOUBLE, 1.0D),
+                entry(3001L, "temperature", DataType.DOUBLE, 2.0D),
+                entry(3000L, "humidity", DataType.LONG, 50L),
+                entry(3000L, "status", DataType.STRING, "ok")));
+
+        List<String> keys =
+            latestDao.findAllKeysByEntityIds(scope.tenantId(), List.of(scope.entityId()));
+        List<String> sorted = new ArrayList<>(keys);
+        sorted.sort(Comparator.naturalOrder());
+        assertEquals(List.of("humidity", "status", "temperature"), sorted);
+
+        List<String> async =
+            latestDao
+                .findAllKeysByEntityIdsAsync(scope.tenantId(), List.of(scope.entityId()))
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        async.sort(Comparator.naturalOrder());
+        assertEquals(List.of("humidity", "status", "temperature"), async);
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void keyDiscovery_scopesDistinctKeysByEntitySetTenantAndDefersDeviceProfile() throws Exception {
+    TestScope scope =
+        scope(
+            "latest_kscope",
+            "55555555-5555-5555-5555-555555555510",
+            "66666666-6666-6666-6666-666666666610");
+    // A second entity under the SAME tenant with a partly-overlapping key set, and an entity under
+    // a
+    // DIFFERENT tenant whose keys must never leak into the first tenant's discovery.
+    EntityId secondEntity =
+        new TestEntityId(UUID.fromString("66666666-6666-6666-6666-666666666611"), EntityType.ASSET);
+    TenantId otherTenant = new TenantId(UUID.fromString("55555555-5555-5555-5555-555555555599"));
+    EntityId otherTenantEntity =
+        new TestEntityId(
+            UUID.fromString("66666666-6666-6666-6666-666666666699"), EntityType.DEVICE);
+    bootstrapSchema(scope.database());
+    // Key discovery now also reads the telemetry_latest overlay, so the overlay table must exist.
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(8);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // Entity 1 (DEVICE): temperature, humidity. Entity 2 (ASSET, same tenant): humidity, power.
+        // Other-tenant entity: leaked (must be excluded by tenant scoping).
+        saveOne(tsDao, scope.tenantId(), scope.entityId(), 7000L, "temperature", 1.0D);
+        saveOne(tsDao, scope.tenantId(), scope.entityId(), 7000L, "humidity", 40L);
+        saveOne(tsDao, scope.tenantId(), secondEntity, 7000L, "humidity", 41L);
+        saveOne(tsDao, scope.tenantId(), secondEntity, 7000L, "power", 9.9D);
+        saveOne(tsDao, otherTenant, otherTenantEntity, 7000L, "leaked", 7L);
+
+        // Entity-set union across both same-tenant entities -> deduplicated humidity.
+        assertEquals(
+            List.of("humidity", "power", "temperature"),
+            sorted(
+                latestDao.findAllKeysByEntityIds(
+                    scope.tenantId(), List.of(scope.entityId(), secondEntity))));
+
+        // Single-entity scope returns only that entity's keys.
+        assertEquals(
+            List.of("humidity", "temperature"),
+            sorted(latestDao.findAllKeysByEntityIds(scope.tenantId(), List.of(scope.entityId()))));
+        assertEquals(
+            List.of("humidity", "power"),
+            sorted(latestDao.findAllKeysByEntityIds(scope.tenantId(), List.of(secondEntity))));
+
+        // Null deviceProfileId -> tenant-wide distinct keys, never crossing the tenant boundary.
+        List<String> tenantWide =
+            sorted(latestDao.findAllKeysByDeviceProfileId(scope.tenantId(), null));
+        assertEquals(List.of("humidity", "power", "temperature"), tenantWide);
+        assertTrue(!tenantWide.contains("leaked"), "tenant scoping must exclude other-tenant keys");
+
+        // Non-null deviceProfileId stays deferred (telemetry table has no device_profile_id tag);
+        // the structural deferral returns no keys rather than faking profile membership.
+        assertEquals(
+            List.of(),
+            latestDao.findAllKeysByDeviceProfileId(
+                scope.tenantId(),
+                new org.thingsboard.server.common.data.id.DeviceProfileId(
+                    UUID.fromString("44444444-4444-4444-4444-444444444444"))));
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void findAllKeys_includesOverlayOnlyLatestKey() throws Exception {
+    // Regression: a latest-only key written via saveLatest with NO paired tsDao.save() lives ONLY
+    // in
+    // the telemetry_latest overlay. Key discovery unions telemetry + the overlay, so that
+    // overlay-only key must surface in BOTH findAllKeysByEntityIds AND the tenant-wide
+    // findAllKeysByDeviceProfileId(null) path (otherwise key discovery would return a narrower key
+    // universe than findAllLatest).
+    TestScope scope =
+        scope(
+            "lt_keys_ov",
+            "55555555-5555-5555-5555-555555555518",
+            "66666666-6666-6666-6666-666666666618");
+    bootstrapSchema(scope.database());
+    bootstrapLatestSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(2);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao tsDao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      IoTDBTableLatestDao latestDao = new IoTDBTableLatestDao(pool, config);
+      try {
+        // "historical" lands in telemetry; "overlayOnly" is written via saveLatest with no save().
+        saveAll(tsDao, scope, List.of(entry(1000L, "historical", DataType.DOUBLE, 1.0D)));
+        saveLatest(latestDao, scope, entry(2000L, "overlayOnly", DataType.LONG, 9L));
+
+        // Entity-set key discovery unions both tables -> the overlay-only key is present.
+        assertEquals(
+            List.of("historical", "overlayOnly"),
+            sorted(latestDao.findAllKeysByEntityIds(scope.tenantId(), List.of(scope.entityId()))));
+
+        // Tenant-wide (null deviceProfileId) discovery also unions both tables.
+        assertEquals(
+            List.of("historical", "overlayOnly"),
+            sorted(latestDao.findAllKeysByDeviceProfileId(scope.tenantId(), null)));
+      } finally {
+        latestDao.destroy();
+        tsDao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
   private void assertLatest(
       IoTDBTableLatestDao latestDao,
       TestScope scope,
@@ -857,6 +1014,30 @@ class IoTDBTableLatestDaoIT {
     for (ListenableFuture<Integer> future : futures) {
       assertEquals(1, future.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
+  }
+
+  private void saveOne(
+      IoTDBTableTimeseriesDao dao,
+      TenantId tenantId,
+      EntityId entityId,
+      long ts,
+      String key,
+      Object value)
+      throws Exception {
+    DataType dataType =
+        value instanceof Long
+            ? DataType.LONG
+            : value instanceof Double ? DataType.DOUBLE : DataType.STRING;
+    assertEquals(
+        1,
+        dao.save(tenantId, entityId, new TestTsKvEntry(ts, key, dataType, value), 0)
+            .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+  }
+
+  private List<String> sorted(List<String> keys) {
+    List<String> copy = new ArrayList<>(keys);
+    copy.sort(Comparator.naturalOrder());
+    return copy;
   }
 
   private void saveLatest(IoTDBTableLatestDao dao, TestScope scope, TestTsKvEntry entry)

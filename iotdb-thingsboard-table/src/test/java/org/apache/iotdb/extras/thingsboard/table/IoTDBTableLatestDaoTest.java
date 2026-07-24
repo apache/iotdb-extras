@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.kv.BaseDeleteTsKvQuery;
@@ -72,6 +73,8 @@ class IoTDBTableLatestDaoTest {
       new TenantId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
   private static final EntityId ENTITY_ID =
       new TestEntityId(UUID.fromString("22222222-2222-2222-2222-222222222222"), EntityType.DEVICE);
+  private static final EntityId SECOND_ENTITY_ID =
+      new TestEntityId(UUID.fromString("33333333-3333-3333-3333-333333333333"), EntityType.ASSET);
 
   private static final String DERIVED_SQL_PREFIX =
       "SELECT time, bool_v, long_v, double_v, str_v, json_v FROM telemetry "
@@ -734,26 +737,109 @@ class IoTDBTableLatestDaoTest {
     assertTrue(result.isRemoved());
   }
 
-  // ---- key discovery / batch latest: graceful empty (reachable paths must not 500) ----
+  // ---- key discovery: DISTINCT keys unioned across telemetry + the telemetry_latest overlay ----
 
   @Test
-  void findAllKeysByEntityIds_returnsEmptyWithoutThrowing() {
+  void findAllKeysByEntityIds_buildsDistinctKeySqlAndCollectsKeys() throws Exception {
     TestContext context = newContext();
-    assertTrue(context.dao().findAllKeysByEntityIds(TENANT_ID, List.of(ENTITY_ID)).isEmpty());
-    verifyNoSession(context);
+    // Key discovery unions telemetry + the telemetry_latest overlay (two reads); the overlay read
+    // returns no rows here, so the discovered key set stays {temperature, humidity}.
+    stubKeyReads(context.session(), dataSet(keyRow("temperature"), keyRow("humidity")));
+
+    List<String> keys =
+        context.dao().findAllKeysByEntityIds(TENANT_ID, List.of(ENTITY_ID, SECOND_ENTITY_ID));
+
+    assertEquals(List.of("temperature", "humidity"), keys);
+
+    List<String> queries = captureQueries(context.session(), 2);
+    String entityPredicate =
+        "WHERE tenant_id='11111111-1111-1111-1111-111111111111' "
+            + "AND ((entity_type='DEVICE' AND entity_id='22222222-2222-2222-2222-222222222222') "
+            + "OR (entity_type='ASSET' AND entity_id='33333333-3333-3333-3333-333333333333'))";
+    assertTrue(
+        queries.contains("SELECT DISTINCT key FROM telemetry " + entityPredicate),
+        "telemetry key SQL: " + queries);
+    assertTrue(
+        queries.contains("SELECT DISTINCT key FROM telemetry_latest " + entityPredicate),
+        "overlay key SQL: " + queries);
   }
 
   @Test
-  void findAllKeysByEntityIdsAsync_returnsImmediateEmpty() throws Exception {
+  void findAllKeysByEntityIds_emptyListReturnsEmptyAndSkipsQuery() throws Exception {
     TestContext context = newContext();
-    assertTrue(
+
+    assertEquals(List.of(), context.dao().findAllKeysByEntityIds(TENANT_ID, List.of()));
+
+    verify(context.pool(), never()).getSession();
+  }
+
+  @Test
+  void findAllKeysByEntityIdsAsync_runsOnReadExecutor() throws Exception {
+    TestContext context = newContext();
+    // Unions telemetry + the overlay; the overlay read returns no rows, so keys stay {speed}.
+    stubKeyReads(context.session(), dataSet(keyRow("speed")));
+
+    List<String> keys =
         context
             .dao()
             .findAllKeysByEntityIdsAsync(TENANT_ID, List.of(ENTITY_ID))
-            .get(3, TimeUnit.SECONDS)
-            .isEmpty());
-    verifyNoSession(context);
+            .get(3, TimeUnit.SECONDS);
+
+    assertEquals(List.of("speed"), keys);
+    List<String> queries = captureQueries(context.session(), 2);
+    String entityPredicate =
+        "WHERE tenant_id='11111111-1111-1111-1111-111111111111' "
+            + "AND ((entity_type='DEVICE' AND entity_id='22222222-2222-2222-2222-222222222222'))";
+    assertTrue(
+        queries.contains("SELECT DISTINCT key FROM telemetry " + entityPredicate),
+        "telemetry key SQL: " + queries);
+    assertTrue(
+        queries.contains("SELECT DISTINCT key FROM telemetry_latest " + entityPredicate),
+        "overlay key SQL: " + queries);
   }
+
+  @Test
+  void findAllKeysByDeviceProfileId_returnsEmptyDeferred() throws Exception {
+    TestContext context = newContext();
+
+    List<String> keys =
+        context
+            .dao()
+            .findAllKeysByDeviceProfileId(
+                TENANT_ID,
+                new DeviceProfileId(UUID.fromString("44444444-4444-4444-4444-444444444444")));
+
+    assertEquals(List.of(), keys);
+    verify(context.pool(), never()).getSession();
+  }
+
+  @Test
+  void findAllKeysByDeviceProfileId_nullProfileReturnsTenantWideDistinctKeys() throws Exception {
+    TestContext context = newContext();
+    // A null deviceProfileId is the "all profiles" path: return tenant-wide distinct keys, now
+    // unioned across telemetry + the telemetry_latest overlay (mirroring the reference
+    // SqlTimeseriesLatestDao.getKeysByTenantId for the historical side). The overlay read returns
+    // no
+    // rows here, so the discovered key set stays {temperature, humidity}.
+    stubKeyReads(context.session(), dataSet(keyRow("temperature"), keyRow("humidity")));
+
+    List<String> keys = context.dao().findAllKeysByDeviceProfileId(TENANT_ID, null);
+
+    assertEquals(List.of("temperature", "humidity"), keys);
+    List<String> queries = captureQueries(context.session(), 2);
+    assertTrue(
+        queries.contains(
+            "SELECT DISTINCT key FROM telemetry "
+                + "WHERE tenant_id='11111111-1111-1111-1111-111111111111'"),
+        "telemetry tenant SQL: " + queries);
+    assertTrue(
+        queries.contains(
+            "SELECT DISTINCT key FROM telemetry_latest "
+                + "WHERE tenant_id='11111111-1111-1111-1111-111111111111'"),
+        "overlay tenant SQL: " + queries);
+  }
+
+  // ---- batch latest: graceful empty (reachable paths must not 500) ----
 
   @Test
   void findLatestByEntityIds_returnsEmptyWithoutThrowing() {
@@ -877,6 +963,24 @@ class IoTDBTableLatestDaoTest {
     }
   }
 
+  /**
+   * Stubs the two reads key discovery now issues (telemetry + the telemetry_latest overlay): the
+   * telemetry query returns {@code telemetryKeys}, the overlay query returns an empty dataset, so a
+   * test that exercises only the historical keys keeps its original key-set assertion.
+   */
+  private void stubKeyReads(ITableSession session, SessionDataSet telemetryKeys) {
+    try {
+      when(session.executeQueryStatement(anyString()))
+          .thenAnswer(
+              invocation -> {
+                String sql = invocation.getArgument(0);
+                return sql.contains("telemetry_latest") ? dataSet() : telemetryKeys;
+              });
+    } catch (IoTDBConnectionException | StatementExecutionException e) {
+      throw new AssertionError(e);
+    }
+  }
+
   private List<String> captureQueries(ITableSession session, int expected) throws Exception {
     ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
     verify(session, timeout(3000).times(expected)).executeQueryStatement(sql.capture());
@@ -938,6 +1042,13 @@ class IoTDBTableLatestDaoTest {
     Map<String, Object> columns = new HashMap<>();
     columns.put("time", ts);
     columns.put(column, value);
+    return new MockRow(columns);
+  }
+
+  /** A DISTINCT-key discovery row exposing only the {@code key} column. */
+  private MockRow keyRow(String key) {
+    Map<String, Object> columns = new HashMap<>();
+    columns.put("key", key);
     return new MockRow(columns);
   }
 

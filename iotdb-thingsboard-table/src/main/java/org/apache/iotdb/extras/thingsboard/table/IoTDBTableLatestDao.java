@@ -47,10 +47,12 @@ import org.thingsboard.server.dao.timeseries.TimeseriesLatestDao;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
 /**
@@ -146,16 +148,17 @@ import java.util.concurrent.locks.Lock;
  * </ul>
  *
  * <p>The key-discovery SPI methods ({@link #findAllKeysByEntityIds}, {@link
- * #findAllKeysByEntityIdsAsync}; full derived discovery is a follow-up) and the batch {@link
- * #findLatestByEntityIds}/{@link #findLatestByEntityIdsAsync} pair (new in ThingsBoard v4.3.1.2;
- * derived batch read is a follow-up) return an empty list rather than throwing, because they are
- * reachable in normal operation — {@code findAllKeysByEntityIdsAsync}/{@code
- * findLatestByEntityIdsAsync} back the dashboard {@code POST /api/entitiesQuery/find/keys} lookup
- * (DefaultEntityQueryService#fetchTimeseriesKeys), and the sync {@code findAllKeysByEntityIds}
- * backs entity-delete housekeeping — where a thrown {@link UnsupportedOperationException} would
- * surface as an HTTP 500 / a failed cleanup task. This matches the official {@code
- * CassandraBaseTimeseriesLatestDao}, which returns empty for all four, and {@link
- * #findAllKeysByDeviceProfileId}.
+ * #findAllKeysByEntityIdsAsync}) derive the DISTINCT telemetry keys for an entity set from BOTH the
+ * historical {@code telemetry} table AND the {@code telemetry_latest} overlay (the two DISTINCT-key
+ * reads are merged), so key discovery returns the same key universe as {@link #findAllLatest}: a
+ * latest-only key written via {@code saveLatest} with no paired {@code save} lives only in the
+ * overlay and must still be discoverable. {@link #findAllKeysByDeviceProfileId} returns the
+ * tenant-wide DISTINCT keys (again unioned across both tables) for a null device profile (the "all
+ * profiles" path) while returning an empty list for a specific profile (neither table carries
+ * device-profile membership). The batch {@link #findLatestByEntityIds}/{@link
+ * #findLatestByEntityIdsAsync} pair (new in ThingsBoard v4.3.1.2) returns an empty list rather than
+ * throwing, matching the official {@code CassandraBaseTimeseriesLatestDao}; the derived batch read
+ * is a follow-up.
  */
 @Slf4j
 @Repository
@@ -341,32 +344,53 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
   @Override
   public List<String> findAllKeysByDeviceProfileId(
       TenantId tenantId, DeviceProfileId deviceProfileId) {
-    // Config-time UI key enumeration (GET /api/deviceProfile/devices/keys/timeseries,
-    // TENANT_ADMIN). Return empty rather than throwing so the endpoint degrades gracefully instead
-    // of returning 500 — matching the sibling IoTDBTableAttributesDao and the non-relational
-    // ThingsBoard backends (e.g. CassandraBaseTimeseriesLatestDao.findAllKeysByDeviceProfileId
-    // returns an empty list). Tenant-wide DISTINCT-key discovery (the null-deviceProfileId branch)
-    // is a follow-up.
+    Objects.requireNonNull(tenantId, "tenantId");
+    // Mirroring the reference SqlTimeseriesLatestDao: a null deviceProfileId is the "all profiles"
+    // path and must return the tenant-wide distinct keys, which the telemetry table CAN derive.
+    if (deviceProfileId == null) {
+      try {
+        return doFindAllKeysByTenant(tenantId);
+      } catch (RuntimeException e) {
+        throw e;
+      } catch (Exception e) {
+        throw new IllegalStateException("Failed to read latest telemetry keys by tenant", e);
+      }
+    }
+    // Non-null profile lookup stays deferred for a structural reason, not a missing implementation:
+    // the IoTDB Table Mode telemetry table is tagged only by (tenant_id, entity_type, entity_id,
+    // key) -- it carries NO device_profile_id column (see schema-iotdb-table.sql), so the
+    // membership
+    // "which devices belong to profile P" simply does not exist in this store. ThingsBoard's
+    // relational backend answers this by JOINing the time-series keys against the relational device
+    // table (device.device_profile_id), which lives in ThingsBoard's entity database, not in IoTDB.
+    // Faking a tenant-wide or empty-but-pretending answer would silently widen or narrow attribute
+    // discovery, so the honest behaviour is to return no keys for a specific profile and let the
+    // caller's relational path own profile membership. (The null "all profiles" branch above is
+    // fully derivable from the telemetry table and is implemented.)
     return Collections.emptyList();
   }
 
   @Override
   public List<String> findAllKeysByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
-    // Reachable in normal operation (entity-delete housekeeping, TelemetryDeletionTaskProcessor),
-    // so degrade gracefully rather than throw: the official CassandraBaseTimeseriesLatestDao also
-    // returns an empty list. Full derived DISTINCT-key discovery over the telemetry table
-    // is a follow-up.
-    return Collections.emptyList();
+    Objects.requireNonNull(tenantId, "tenantId");
+    Objects.requireNonNull(entityIds, "entityIds");
+    // Synchronous SPI method: it runs on the calling thread (not the read executor), so the checked
+    // session/query failure is surfaced to the caller as an unchecked exception.
+    try {
+      return doFindAllKeysByEntityIds(tenantId, entityIds);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to read latest telemetry keys by entity ids", e);
+    }
   }
 
   @Override
   public ListenableFuture<List<String>> findAllKeysByEntityIdsAsync(
       TenantId tenantId, List<EntityId> entityIds) {
-    // Backs POST /api/entitiesQuery/find/keys (DefaultEntityQueryService#fetchTimeseriesKeys), the
-    // dashboard "available telemetry keys" lookup — a synchronous throw here would surface as an
-    // HTTP 500. Mirror CassandraBaseTimeseriesLatestDao and return an empty future; full derived
-    // DISTINCT-key discovery is a follow-up.
-    return Futures.immediateFuture(Collections.emptyList());
+    Objects.requireNonNull(tenantId, "tenantId");
+    Objects.requireNonNull(entityIds, "entityIds");
+    return submitReadTask(() -> doFindAllKeysByEntityIds(tenantId, entityIds));
   }
 
   @Override
@@ -667,6 +691,74 @@ public class IoTDBTableLatestDao extends IoTDBTableBaseDao
     // B1-lenient like the snapshot read: a same-ts two-type next-older row is treated as no
     // resurrectable prior (fall through to a plain delete) rather than failing the removeLatest.
     return readLatestRowB1Lenient(buildRewriteHistorySql(tenantId, entityId, key, startTs), key);
+  }
+
+  // ---- telemetry key discovery (DISTINCT keys from telemetry + the telemetry_latest overlay) ----
+
+  private List<String> doFindAllKeysByEntityIds(TenantId tenantId, List<EntityId> entityIds)
+      throws Exception {
+    if (entityIds.isEmpty()) {
+      return List.of();
+    }
+    // saveLatest writes ONLY the telemetry_latest overlay, so a latest-only key (no paired save)
+    // never reaches the telemetry table. Mirror doFindAllLatest's two-read style: collect DISTINCT
+    // keys from BOTH tables into a LinkedHashSet (no IoTDB cross-table UNION) so key discovery
+    // returns the same key universe as findAllLatest. The same identity predicate works on both
+    // tables (shared tag columns) and the overlay holds at most one row per identity, so the union
+    // cannot over-report stale keys.
+    Set<String> keys = new LinkedHashSet<>();
+    collectKeys(keys, buildFindAllKeysByEntityIdsSql(TABLE_NAME, tenantId, entityIds));
+    collectKeys(keys, buildFindAllKeysByEntityIdsSql(TABLE_LATEST, tenantId, entityIds));
+    return new ArrayList<>(keys);
+  }
+
+  private List<String> doFindAllKeysByTenant(TenantId tenantId) throws Exception {
+    // Tenant-wide discovery unions both tables for the same reason as the entity-set path above, so
+    // findAllKeysByDeviceProfileId(null) surfaces overlay-only latest keys too.
+    Set<String> keys = new LinkedHashSet<>();
+    collectKeys(keys, buildFindAllKeysByTenantSql(TABLE_NAME, tenantId));
+    collectKeys(keys, buildFindAllKeysByTenantSql(TABLE_LATEST, tenantId));
+    return new ArrayList<>(keys);
+  }
+
+  private void collectKeys(Set<String> into, String sql) throws Exception {
+    try (ITableSession session = tableSessionPool.getSession();
+        SessionDataSet dataSet = session.executeQueryStatement(sql)) {
+      SessionDataSet.DataIterator row = dataSet.iterator();
+      while (row.next()) {
+        into.add(row.getString("key"));
+      }
+    }
+  }
+
+  private String buildFindAllKeysByTenantSql(String table, TenantId tenantId) {
+    return "SELECT DISTINCT key FROM "
+        + table
+        + " WHERE tenant_id="
+        + sqlString(tenantId.getId().toString());
+  }
+
+  private String buildFindAllKeysByEntityIdsSql(
+      String table, TenantId tenantId, List<EntityId> entityIds) {
+    StringBuilder sql =
+        new StringBuilder("SELECT DISTINCT key FROM ")
+            .append(table)
+            .append(" WHERE tenant_id=")
+            .append(sqlString(tenantId.getId().toString()))
+            .append(" AND (");
+    for (int i = 0; i < entityIds.size(); i++) {
+      EntityId entityId = Objects.requireNonNull(entityIds.get(i), "entityId");
+      if (i > 0) {
+        sql.append(" OR ");
+      }
+      sql.append("(entity_type=")
+          .append(sqlString(entityId.getEntityType().name()))
+          .append(" AND entity_id=")
+          .append(sqlString(entityId.getId().toString()))
+          .append(")");
+    }
+    sql.append(")");
+    return sql.toString();
   }
 
   // ---- SQL builders ----

@@ -36,6 +36,7 @@ import org.testcontainers.utility.DockerImageName;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.kv.Aggregation;
 import org.thingsboard.server.common.data.kv.BaseDeleteTsKvQuery;
 import org.thingsboard.server.common.data.kv.BaseReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.DataType;
@@ -60,8 +61,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Integration tests for the IoTDB Table Mode timeseries DAO against a real IoTDB 2.0.8 container:
  * the WRITE path (verified by reading the telemetry table back through raw table-session SQL) plus
- * the RAW (non-aggregated) READ path and the DELETE path exercised through the DAO. The
- * time-bucketed aggregation read path is not implemented and is not exercised here.
+ * the RAW (non-aggregated) READ path, a millisecond time-bucketed aggregation smoke read and the
+ * DELETE path exercised through the DAO.
  */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
@@ -490,6 +491,48 @@ class IoTDBTableTimeseriesDaoIT {
                 .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .get(0);
         assertTrue(readAfterDelete.getData().isEmpty());
+      } finally {
+        dao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void aggregationCountReturnsBucketedResult() throws Exception {
+    TestScope scope =
+        scope(
+            "aggregation_count",
+            "33333333-3333-3333-3333-333333333310",
+            "44444444-4444-4444-4444-444444444410");
+    bootstrapSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(2);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao dao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      try {
+        saveAll(
+            dao,
+            scope,
+            List.of(
+                entry(9000L, "agg", DataType.LONG, 9L), entry(9200L, "agg", DataType.LONG, 11L)));
+
+        ReadTsKvQuery query =
+            new BaseReadTsKvQuery("agg", 9000L, 10000L, 1000L, 10, Aggregation.COUNT, "ASC");
+        ReadTsKvQueryResult result =
+            dao.findAllAsync(scope.tenantId(), scope.entityId(), List.of(query))
+                .get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .get(0);
+
+        // startTs-anchored single bucket [9000,10000) -> ThingsBoard midpoint
+        // 9000 + (10000-9000)/2 = 9500. Typed COUNT of two long_v rows = 2.
+        assertEquals(1, result.getData().size());
+        TsKvEntry bucket = result.getData().get(0);
+        assertEquals(9500L, bucket.getTs());
+        assertEquals(DataType.LONG, bucket.getDataType());
+        assertEquals(Optional.of(2L), bucket.getLongValue());
+        // lastEntryTs = MAX(underlying time) = 9200.
+        assertEquals(9200L, result.getLastEntryTs());
       } finally {
         dao.destroy();
         writer.destroy();
