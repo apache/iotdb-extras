@@ -36,10 +36,16 @@ import org.mockito.ArgumentCaptor;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.kv.Aggregation;
+import org.thingsboard.server.common.data.kv.AggregationParams;
 import org.thingsboard.server.common.data.kv.BaseDeleteTsKvQuery;
 import org.thingsboard.server.common.data.kv.BaseReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.BasicTsKvEntry;
 import org.thingsboard.server.common.data.kv.DataType;
+import org.thingsboard.server.common.data.kv.DoubleDataEntry;
+import org.thingsboard.server.common.data.kv.IntervalType;
+import org.thingsboard.server.common.data.kv.KvEntry;
+import org.thingsboard.server.common.data.kv.LongDataEntry;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.ReadTsKvQueryResult;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
@@ -81,8 +87,8 @@ import static org.mockito.Mockito.when;
 /**
  * Unit tests for the IoTDB Table Mode timeseries DAO: the WRITE path (multi-row Tablet mapping,
  * batch flushing, connection retry, back-pressure rejection and graceful-shutdown drain) plus the
- * RAW (non-aggregated) READ path, the DELETE path and the bounded read thread-pool. The
- * time-bucketed aggregation read path is not implemented and is not exercised here.
+ * RAW (non-aggregated) READ path, the millisecond time-bucketed aggregation READ path, the DELETE
+ * path and the bounded read thread-pool.
  */
 class IoTDBTableTimeseriesDaoTest {
   private static final TenantId TENANT_ID =
@@ -1178,6 +1184,1063 @@ class IoTDBTableTimeseriesDaoTest {
     verify(context.session(), never()).insert(any(Tablet.class));
   }
 
+  @Test
+  void findAllAsync_calendarSumKeepsLongTypeForLongOnlyBucket() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // On the calendar per-bucket path a long-only calendar bucket keeps the LONG SUM type, a mixed
+    // calendar bucket promotes to DOUBLE. WEEK_ISO from startTs=0 yields two buckets.
+    SessionDataSet week0 = aggDataSet(MockAggBucket.sum(0L, 100000000L, 30.0D, null, 2L, 0L));
+    SessionDataSet week1 = aggDataSet(MockAggBucket.sum(0L, 600000000L, 4.0D, 2.5D, 1L, 1L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(week0, week1);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 950400000L, IntervalType.WEEK_ISO, "UTC", Aggregation.SUM);
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(2, data.size());
+    assertInstanceOf(LongDataEntry.class, innerKv(data.get(0)));
+    assertMappedEntry(data.get(0), 172800000L, "k", DataType.LONG, 30L);
+    assertInstanceOf(DoubleDataEntry.class, innerKv(data.get(1)));
+    assertMappedEntry(data.get(1), 648000000L, "k", DataType.DOUBLE, 6.5D);
+  }
+
+  @Test
+  void findAllAsync_calendarMonthBuildsBoundedPerBucketSqlWithoutDateBin() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // startTs=0 (1970-01-01T00:00Z), UTC MONTH buckets: [0,Feb1), [Feb1,Mar1), [Mar1,Apr1).
+    // endTs=Apr1 => endPeriod=Apr1. Three calendar buckets => THREE bounded aggregate queries,
+    // each with NO date_bin / NO GROUP BY, bounded by the calendar boundary, MAX(time) projected.
+    SessionDataSet bucket0 = aggDataSet();
+    SessionDataSet bucket1 = aggDataSet();
+    SessionDataSet bucket2 = aggDataSet();
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(bucket0, bucket1, bucket2);
+
+    ReadTsKvQuery query =
+        calendarQuery("temperature", 0L, 7776000000L, IntervalType.MONTH, "UTC", Aggregation.AVG);
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(query)).get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(3)).executeQueryStatement(sql.capture());
+    List<String> statements = sql.getAllValues();
+    assertEquals(
+        "SELECT AVG(COALESCE(double_v, CAST(long_v AS DOUBLE))) AS agg_num, "
+            + "MAX(time) AS max_ts FROM telemetry "
+            + "WHERE tenant_id='11111111-1111-1111-1111-111111111111' "
+            + "AND entity_type='DEVICE' "
+            + "AND entity_id='22222222-2222-2222-2222-222222222222' "
+            + "AND key='temperature' AND time >= 0 AND time < 2678400000",
+        statements.get(0));
+    assertTrue(
+        statements.get(1).contains("AND time >= 2678400000 AND time < 5097600000"),
+        statements.get(1));
+    assertTrue(
+        statements.get(2).contains("AND time >= 5097600000 AND time < 7776000000"),
+        statements.get(2));
+    for (String statement : statements) {
+      // Calendar buckets are computed in Java; the per-bucket SQL must never use date_bin/GROUP BY.
+      assertFalse(statement.contains("date_bin"), statement);
+      assertFalse(statement.contains("GROUP BY"), statement);
+      assertFalse(statement.contains("LIMIT"), statement);
+    }
+  }
+
+  @Test
+  void findAllAsync_calendarMonthMapsBucketsToCalendarMidpointEntries() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // UTC MONTH from startTs=0: bucket midpoints Jan-mid=1339200000, Feb-mid=3888000000.
+    // The Mar bucket is empty (single-row dataset with NULL agg_num) and must be skipped.
+    // ThingsBoard stamps each entry at the integer calendar-bucket midpoint and reports
+    // lastEntryTs = MAX(underlying ts) across all buckets.
+    SessionDataSet janBucket = aggDataSet(numericBucket(0L, 2000000000L, 11.5D));
+    SessionDataSet febBucket = aggDataSet(numericBucket(0L, 4000000000L, 22.0D));
+    SessionDataSet marBucket = aggDataSet();
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(janBucket, febBucket, marBucket);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 7776000000L, IntervalType.MONTH, "UTC", Aggregation.AVG);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 1339200000L, "k", DataType.DOUBLE, 11.5D);
+    assertMappedEntry(data.get(1), 3888000000L, "k", DataType.DOUBLE, 22.0D);
+    assertEquals(4000000000L, result.getLastEntryTs());
+  }
+
+  @Test
+  void findAllAsync_calendarMonthFirstBucketIsPartialFromMidMonthStart() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // startTs=Jan15 1970 (1209600000) is NOT a month boundary. ThingsBoard's calculateIntervalEnd
+    // advances to the START of the next month (Feb1), so the FIRST bucket is the partial
+    // [Jan15, Feb1) with midpoint 1944000000 (NOT a 30-day fixed-width step). The second bucket is
+    // the full calendar month [Feb1, Mar1) midpoint 3888000000.
+    // SUM over double-valued data: each bucket carries a double partial sum (DoubleDataEntry).
+    SessionDataSet partialBucket =
+        aggDataSet(MockAggBucket.sum(0L, 1500000000L, null, 1.0D, 0L, 1L));
+    SessionDataSet fullBucket = aggDataSet(MockAggBucket.sum(0L, 4000000000L, null, 2.0D, 0L, 1L));
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(partialBucket, fullBucket);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 1209600000L, 5097600000L, IntervalType.MONTH, "UTC", Aggregation.SUM);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(2)).executeQueryStatement(sql.capture());
+    assertTrue(
+        sql.getAllValues().get(0).contains("AND time >= 1209600000 AND time < 2678400000"),
+        sql.getAllValues().get(0));
+    assertTrue(
+        sql.getAllValues().get(1).contains("AND time >= 2678400000 AND time < 5097600000"),
+        sql.getAllValues().get(1));
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 1944000000L, "k", DataType.DOUBLE, 1.0D);
+    assertMappedEntry(data.get(1), 3888000000L, "k", DataType.DOUBLE, 2.0D);
+  }
+
+  @Test
+  void findAllAsync_calendarWeekUsesSundayAlignedBoundaries() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // 1970-01-01 is a Thursday. WEEK (Sunday-start) from startTs=0: the first (partial) bucket runs
+    // to the next Sunday 1970-01-04 (259200000), then full 7-day weeks. Midpoints 129600000 /
+    // 561600000.
+    SessionDataSet week0 = aggDataSet(countBucket(0L, 3L));
+    SessionDataSet week1 = aggDataSet(countBucket(0L, 2L));
+    SessionDataSet week2 = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(week0, week1, week2);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 1468800000L, IntervalType.WEEK, "UTC", Aggregation.COUNT);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(3)).executeQueryStatement(sql.capture());
+    assertTrue(
+        sql.getAllValues().get(0).contains("AND time >= 0 AND time < 259200000"),
+        sql.getAllValues().get(0));
+    assertTrue(
+        sql.getAllValues().get(1).contains("AND time >= 259200000 AND time < 864000000"),
+        sql.getAllValues().get(1));
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 129600000L, "k", DataType.LONG, 3L);
+    assertMappedEntry(data.get(1), 561600000L, "k", DataType.LONG, 2L);
+  }
+
+  @Test
+  void findAllAsync_calendarCountAppliesDominantTypePriority() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // The calendar path reuses the typed-COUNT dominant-column priority (bool > str > json >
+    // long+double). Bucket 0 string wins (countStr=2 despite numeric); bucket 1 numeric only.
+    SessionDataSet strDominant =
+        aggDataSet(MockAggBucket.typedCount(0L, 2000000000L, 0L, 2L, 0L, 9L, 9L));
+    SessionDataSet numericOnly =
+        aggDataSet(MockAggBucket.typedCount(0L, 4000000000L, 0L, 0L, 0L, 4L, 1L));
+    SessionDataSet emptyBucket = aggDataSet();
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(strDominant, numericOnly, emptyBucket);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 7776000000L, IntervalType.MONTH, "UTC", Aggregation.COUNT);
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 1339200000L, "k", DataType.LONG, 2L);
+    assertMappedEntry(data.get(1), 3888000000L, "k", DataType.LONG, 5L);
+  }
+
+  @Test
+  void findAllAsync_calendarEmptyResultFallsBackToStartTsAndIgnoresLimitOrder() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // No data in any calendar bucket: lastEntryTs falls back to startTs and order/limit are ignored
+    // (a DESC + LIMIT 0 calendar query still walks and queries every bucket).
+    SessionDataSet empty0 = aggDataSet();
+    SessionDataSet empty1 = aggDataSet();
+    SessionDataSet empty2 = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(empty0, empty1, empty2);
+
+    ReadTsKvQuery query =
+        new BaseReadTsKvQuery(
+            "k",
+            0L,
+            7776000000L,
+            AggregationParams.calendar(Aggregation.AVG, IntervalType.MONTH, "UTC"),
+            0,
+            "DESC");
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    assertEquals(List.of(), result.getData());
+    assertEquals(0L, result.getLastEntryTs());
+    // One bounded query per calendar bucket (3): the zero limit did not short-circuit.
+    verify(context.session(), times(3)).executeQueryStatement(anyString());
+  }
+
+  @Test
+  void findAllAsync_millisecondsIntervalStillRoutesToDateBinPath() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet groupedDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(groupedDataSet);
+
+    // An explicit MILLISECONDS interval type must keep the single grouped date_bin SQL (one query,
+    // GROUP BY, ORDER BY 1 ASC) and must NOT be routed to the per-bucket calendar path.
+    ReadTsKvQuery query = calendarLikeMilliseconds("k", 0L, 100L, 25L, Aggregation.AVG);
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(query)).get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(1)).executeQueryStatement(sql.capture());
+    String statement = sql.getValue();
+    assertTrue(statement.contains("date_bin(25ms, time, 0) AS bucket_ts"), statement);
+    assertTrue(statement.endsWith("GROUP BY 1 ORDER BY 1 ASC"), statement);
+  }
+
+  @Test
+  void findAllAsync_calendarCountSkipsRealShapedEmptyMiddleBucket() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // UTC MONTH over [0, Apr1=7776000000): three calendar buckets Jan/Feb/Mar. The MIDDLE month
+    // (Feb) is the REAL empty shape IoTDB returns for an empty bounded window: ONE row with every
+    // typed COUNT = 0 and MAX(time) NULL (emptyAggRow). The other two months have data. The
+    // calendar reader's `!isNull(max_ts)` guard skips the empty middle bucket, so the spurious
+    // COUNT=0 LongDataEntry is NOT emitted. Without that guard COUNT would leak a third entry
+    // (count 0) at the Feb midpoint -> 3 entries instead of 2.
+    SessionDataSet janBucket = aggDataSet(countBucket(0L, 3L));
+    SessionDataSet febEmpty = aggDataSet(emptyAggRow(2678400000L));
+    SessionDataSet marBucket = aggDataSet(countBucket(5097600000L, 5L));
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(janBucket, febEmpty, marBucket);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 7776000000L, IntervalType.MONTH, "UTC", Aggregation.COUNT);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    List<TsKvEntry> data = result.getData();
+    // EXACTLY two entries: the empty Feb bucket is SKIPPED, never emitted as count 0.
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 1339200000L, "k", DataType.LONG, 3L); // Jan midpoint
+    assertMappedEntry(data.get(1), 6436800000L, "k", DataType.LONG, 5L); // Mar midpoint
+    // All three calendar buckets were queried (the empty one was queried but dropped in Java).
+    verify(context.session(), times(3)).executeQueryStatement(anyString());
+  }
+
+  @Test
+  void findAllAsync_calendarAvgSkipsRealShapedEmptyMiddleBucket() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // Regression guard that the universal empty-bucket skip did not break the AVG path: the REAL
+    // empty middle bucket here has NULL agg_num AND NULL max_ts (emptyAggRow). The reader skips it
+    // on the `!isNull(max_ts)` guard exactly as it does for COUNT, so AVG returns the two non-empty
+    // months only.
+    SessionDataSet janBucket = aggDataSet(numericBucket(0L, 2000000000L, 11.5D));
+    SessionDataSet febEmpty = aggDataSet(emptyAggRow(2678400000L));
+    SessionDataSet marBucket = aggDataSet(numericBucket(5097600000L, 6000000000L, 22.0D));
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(janBucket, febEmpty, marBucket);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 7776000000L, IntervalType.MONTH, "UTC", Aggregation.AVG);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 1339200000L, "k", DataType.DOUBLE, 11.5D); // Jan midpoint
+    assertMappedEntry(data.get(1), 6436800000L, "k", DataType.DOUBLE, 22.0D); // Mar midpoint
+    // lastEntryTs = MAX(underlying ts) across non-empty buckets; the empty Feb row never updates
+    // it.
+    assertEquals(6000000000L, result.getLastEntryTs());
+    verify(context.session(), times(3)).executeQueryStatement(anyString());
+  }
+
+  @Test
+  void findAllAsync_millisecondsFactoryRoutesToDateBinPath() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet groupedDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(groupedDataSet);
+
+    // Real-TB MILLISECONDS routing: a query built the way ThingsBoard actually builds a fixed-width
+    // aggregation (AggregationParams.milliseconds carries IntervalType.MILLISECONDS + a positive
+    // interval) routes to the date_bin MILLISECONDS path. A null-IntervalType non-NONE aggregation
+    // is NOT a real-TB scenario (real TB always pairs a non-NONE aggregation with a concrete
+    // IntervalType), and getInterval() returns 0L for a null type matching real TB v4.3.1.2, so the
+    // MS path's interval<=0 guard would (correctly) reject it; this test therefore exercises the
+    // REAL milliseconds() factory instead.
+    AggregationParams msParams = AggregationParams.milliseconds(Aggregation.AVG, 25);
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 100L, msParams, 10);
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(query)).get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(1)).executeQueryStatement(sql.capture());
+    String statement = sql.getValue();
+    // MILLISECONDS path with the 25ms interval, anchored at startTs=0.
+    assertTrue(statement.contains("date_bin(25ms, time, 0) AS bucket_ts"), statement);
+    assertTrue(statement.endsWith("GROUP BY 1 ORDER BY 1 ASC"), statement);
+  }
+
+  @Test
+  void findAllAsync_calendarWeekIsoRoutesToBoundedPerBucketSql() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // 1970-01-01 is a Thursday. WEEK_ISO (Monday-start) from startTs=0: first ISO boundary is
+    // Monday
+    // 1970-01-05 (345600000), then the full ISO week to 1970-01-12 (950400000). Two buckets =>
+    // TWO bounded aggregate queries, each with NO date_bin / NO GROUP BY, bounded by the ISO
+    // boundaries from TimeUtils.calculateIntervalEnd. Midpoints 172800000 / 648000000.
+    SessionDataSet week0 = aggDataSet(countBucket(0L, 4L));
+    SessionDataSet week1 = aggDataSet(countBucket(0L, 2L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(week0, week1);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 950400000L, IntervalType.WEEK_ISO, "UTC", Aggregation.COUNT);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(2)).executeQueryStatement(sql.capture());
+    List<String> statements = sql.getAllValues();
+    assertTrue(statements.get(0).contains("AND time >= 0 AND time < 345600000"), statements.get(0));
+    assertTrue(
+        statements.get(1).contains("AND time >= 345600000 AND time < 950400000"),
+        statements.get(1));
+    for (String statement : statements) {
+      assertFalse(statement.contains("date_bin"), statement);
+      assertFalse(statement.contains("GROUP BY"), statement);
+      assertFalse(statement.contains("LIMIT"), statement);
+    }
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 172800000L, "k", DataType.LONG, 4L);
+    assertMappedEntry(data.get(1), 648000000L, "k", DataType.LONG, 2L);
+  }
+
+  @Test
+  void findAllAsync_calendarQuarterRoutesToBoundedPerBucketSql() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // QUARTER from startTs=0 (1970-01-01 = Q1 start): next quarter boundary is 1970-04-01
+    // (7776000000), then 1970-07-01 (15638400000). Two buckets => TWO bounded aggregate queries,
+    // each with NO date_bin / NO GROUP BY, bounded by the quarter boundaries from
+    // TimeUtils.calculateIntervalEnd. Midpoints 3888000000 / 11707200000.
+    // SUM over double-valued data: each quarter carries a double partial sum (DoubleDataEntry).
+    SessionDataSet q0 = aggDataSet(MockAggBucket.sum(0L, 1000000000L, null, 10.0D, 0L, 1L));
+    SessionDataSet q1 = aggDataSet(MockAggBucket.sum(0L, 9000000000L, null, 20.0D, 0L, 1L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(q0, q1);
+
+    ReadTsKvQuery query =
+        calendarQuery("k", 0L, 15638400000L, IntervalType.QUARTER, "UTC", Aggregation.SUM);
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(2)).executeQueryStatement(sql.capture());
+    List<String> statements = sql.getAllValues();
+    assertTrue(
+        statements.get(0).contains("AND time >= 0 AND time < 7776000000"), statements.get(0));
+    assertTrue(
+        statements.get(1).contains("AND time >= 7776000000 AND time < 15638400000"),
+        statements.get(1));
+    for (String statement : statements) {
+      assertFalse(statement.contains("date_bin"), statement);
+      assertFalse(statement.contains("GROUP BY"), statement);
+      assertFalse(statement.contains("LIMIT"), statement);
+    }
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 3888000000L, "k", DataType.DOUBLE, 10.0D);
+    assertMappedEntry(data.get(1), 11707200000L, "k", DataType.DOUBLE, 20.0D);
+  }
+
+  @Test
+  void findAllAsync_avgBuildsStartTsAnchoredBucketedSql() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet emptyDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(emptyDataSet);
+
+    // DESC order + LIMIT 10 are intentionally ignored for aggregation (ThingsBoard contract):
+    // buckets are anchored at startTs=0, MAX(time) is projected for lastEntryTs, and the SQL is
+    // ordered ascending with no LIMIT.
+    ReadTsKvQuery query = new BaseReadTsKvQuery("temperature", 0L, 100L, 25L, 10, Aggregation.AVG);
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(query)).get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000)).executeQueryStatement(sql.capture());
+    assertEquals(
+        "SELECT date_bin(25ms, time, 0) AS bucket_ts, "
+            + "AVG(COALESCE(double_v, CAST(long_v AS DOUBLE))) AS agg_num, "
+            + "MAX(time) AS max_ts FROM telemetry "
+            + "WHERE tenant_id='11111111-1111-1111-1111-111111111111' "
+            + "AND entity_type='DEVICE' "
+            + "AND entity_id='22222222-2222-2222-2222-222222222222' "
+            + "AND key='temperature' AND time >= 0 AND time < 100 "
+            + "GROUP BY 1 ORDER BY 1 ASC",
+        sql.getValue());
+  }
+
+  @Test
+  void findAllAsync_aggregationZeroWidthRangeStillWalksOneBucket() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet emptyDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(emptyDataSet);
+
+    // ThingsBoard clamps endPeriod = max(startTs + 1, endTs); a zero-width [50, 50] aggregation
+    // query
+    // must still scan [50, 51) so a point at startTs is included rather than dropped by time < 50.
+    ReadTsKvQuery query = new BaseReadTsKvQuery("temperature", 50L, 50L, 25L, 10, Aggregation.AVG);
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(query)).get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000)).executeQueryStatement(sql.capture());
+    assertTrue(sql.getValue().contains("AND time >= 50 AND time < 51 "), sql.getValue());
+  }
+
+  @Test
+  void findAllAsync_sumCountMinMaxBuildSql() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet sumCountMinMaxDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(sumCountMinMaxDataSet);
+
+    ReadTsKvQuery sum = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.SUM, "ASC");
+    ReadTsKvQuery count = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.COUNT, "ASC");
+    ReadTsKvQuery min = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.MIN, "ASC");
+    ReadTsKvQuery max = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.MAX, "ASC");
+
+    context
+        .dao()
+        .findAllAsync(TENANT_ID, ENTITY_ID, List.of(sum, count, min, max))
+        .get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(4)).executeQueryStatement(sql.capture());
+    List<String> statements = sql.getAllValues();
+    // SUM projects per-type partial sums (the long partial as SUM(CAST(long_v AS DOUBLE)) -- a
+    // DOUBLE, NEVER CAST(SUM AS INT64) which would THROW an out-of-range error when the long-only
+    // sum
+    // exceeds Long.MAX) + long/double non-null counts so the row mapper can keep a long-only SUM
+    // LONG-typed and promote a mixed bucket to DOUBLE. It also projects MIN(long_v)/MAX(long_v) so
+    // the mapper can bound the long sum and trust the double partial only while count_long
+    // * maxAbs <= 2^53, falling back to an exact Java re-sum otherwise.
+    assertTrue(
+        statements.get(0).contains("SUM(CAST(long_v AS DOUBLE)) AS sum_long")
+            && statements.get(0).contains("SUM(double_v) AS sum_double")
+            && statements.get(0).contains("MIN(long_v) AS min_long")
+            && statements.get(0).contains("MAX(long_v) AS max_long")
+            && statements
+                .get(0)
+                .contains(
+                    "CAST(SUM(CASE WHEN long_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_long")
+            && statements
+                .get(0)
+                .contains(
+                    "CAST(SUM(CASE WHEN double_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_double"),
+        statements.get(0));
+    assertFalse(
+        statements.get(0).contains("SUM(COALESCE(double_v, CAST(long_v AS DOUBLE)))"),
+        statements.get(0));
+    // COUNT projects ThingsBoard's per-type non-null counters (not COUNT(*)).
+    assertTrue(
+        statements
+                .get(1)
+                .contains(
+                    "CAST(SUM(CASE WHEN bool_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_bool")
+            && statements
+                .get(1)
+                .contains(
+                    "CAST(SUM(CASE WHEN str_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_str")
+            && statements
+                .get(1)
+                .contains(
+                    "CAST(SUM(CASE WHEN json_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_json")
+            && statements
+                .get(1)
+                .contains(
+                    "CAST(SUM(CASE WHEN long_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_long")
+            && statements
+                .get(1)
+                .contains(
+                    "CAST(SUM(CASE WHEN double_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_double"),
+        statements.get(1));
+    assertFalse(statements.get(1).contains("COUNT(*)"), statements.get(1));
+    // MIN/MAX project the numeric + string aggregates AND a direct MIN(long_v)/MAX(long_v) channel
+    // AND the long/double non-null counts. The long channel is EXACT for a long-only bucket (it
+    // SELECTs a stored long, no double round-trip); the counts let the row mapper keep a
+    // long-only MIN/MAX LONG-typed and promote a mixed bucket to DOUBLE.
+    assertTrue(
+        statements.get(2).contains("MIN(COALESCE(double_v, CAST(long_v AS DOUBLE))) AS agg_num")
+            && statements.get(2).contains("MIN(long_v) AS min_long")
+            && statements.get(2).contains("MIN(str_v) AS agg_str")
+            && statements
+                .get(2)
+                .contains(
+                    "CAST(SUM(CASE WHEN long_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_long")
+            && statements
+                .get(2)
+                .contains(
+                    "CAST(SUM(CASE WHEN double_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_double"),
+        statements.get(2));
+    assertTrue(
+        statements.get(3).contains("MAX(COALESCE(double_v, CAST(long_v AS DOUBLE))) AS agg_num")
+            && statements.get(3).contains("MAX(long_v) AS max_long")
+            && statements.get(3).contains("MAX(str_v) AS agg_str")
+            && statements
+                .get(3)
+                .contains(
+                    "CAST(SUM(CASE WHEN long_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_long")
+            && statements
+                .get(3)
+                .contains(
+                    "CAST(SUM(CASE WHEN double_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
+                        + "AS count_double"),
+        statements.get(3));
+    for (String statement : statements) {
+      // startTs=0 anchored buckets, MAX(time) for lastEntryTs, ascending, no LIMIT (order/limit
+      // ignored for aggregation).
+      assertTrue(statement.contains("date_bin(30ms, time, 0) AS bucket_ts"), statement);
+      assertTrue(statement.contains("MAX(time) AS max_ts"), statement);
+      assertTrue(statement.endsWith("GROUP BY 1 ORDER BY 1 ASC"), statement);
+      assertFalse(statement.contains("LIMIT"), statement);
+    }
+  }
+
+  @Test
+  void findAllAsync_avgMapsNumericBucketsToMidpointDoubleEntries() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // startTs=0, interval=30, endTs=90 -> bucket starts 0/30/60, all full width.
+    // TB midpoints: [0,30)->15, [30,60)->45, [60,90)->75. lastEntryTs = MAX(time) = 80.
+    SessionDataSet dataSet =
+        aggDataSet(
+            numericBucket(0L, 25L, 11.5D),
+            numericBucket(30L, 55L, 30.0D),
+            numericBucket(60L, 80L, 7.25D));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 90L, 30L, 10, Aggregation.AVG, "ASC");
+    ReadTsKvQueryResult result =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+
+    List<TsKvEntry> data = result.getData();
+    assertEquals(3, data.size());
+    assertMappedEntry(data.get(0), 15L, "k", DataType.DOUBLE, 11.5D);
+    assertMappedEntry(data.get(1), 45L, "k", DataType.DOUBLE, 30.0D);
+    assertMappedEntry(data.get(2), 75L, "k", DataType.DOUBLE, 7.25D);
+    assertEquals(80L, result.getLastEntryTs());
+  }
+
+  @Test
+  void findAllAsync_lastBucketMidpointIsClampedToEndTs() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // startTs=0, interval=30, endTs=50 -> endPeriod = max(1, 50) = 50.
+    // Bucket [0,30): full width -> midpoint 0 + (30-0)/2 = 15.
+    // Bucket [30,50): END-CLAMPED -> bucketEnd = min(30+30, 50) = 50,
+    //                 midpoint 30 + (50-30)/2 = 40 (NOT the full-width 45).
+    SessionDataSet dataSet =
+        aggDataSet(numericBucket(0L, 20L, 1.0D), numericBucket(30L, 45L, 2.0D));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 50L, 30L, 10, Aggregation.AVG, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 15L, "k", DataType.DOUBLE, 1.0D);
+    assertMappedEntry(data.get(1), 40L, "k", DataType.DOUBLE, 2.0D);
+  }
+
+  @Test
+  void findAllAsync_countMapsTypedCountToMidpointLongEntries() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // startTs=0, interval=30, endTs=60 -> bucket starts 0/30 -> TB midpoints 15/45.
+    // Each single-typed (long_v) bucket's typed count equals its row count.
+    SessionDataSet dataSet = aggDataSet(countBucket(0L, 3L), countBucket(30L, 1L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.COUNT, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(2, data.size());
+    assertMappedEntry(data.get(0), 15L, "k", DataType.LONG, 3L);
+    assertMappedEntry(data.get(1), 45L, "k", DataType.LONG, 1L);
+  }
+
+  @Test
+  void findAllAsync_countAppliesThingsBoardDominantTypePriority() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // ThingsBoard reports the FIRST non-zero typed counter in priority order:
+    //   boolean -> string -> json -> (long + double).
+    // Bucket 0: only boolean populated (countBool=4) despite numeric counters set -> boolean wins.
+    // Bucket 1: no boolean, string populated (countStr=2) despite json/long/double -> string wins.
+    // Bucket 2: no bool/str, json populated (countJson=5) despite long/double -> json wins.
+    // Bucket 3: only numeric populated (long=2, double=3) -> long+double=5.
+    SessionDataSet dataSet =
+        aggDataSet(
+            MockAggBucket.typedCount(0L, 0L, 4L, 9L, 9L, 9L, 9L),
+            MockAggBucket.typedCount(30L, 30L, 0L, 2L, 9L, 9L, 9L),
+            MockAggBucket.typedCount(60L, 60L, 0L, 0L, 5L, 9L, 9L),
+            MockAggBucket.typedCount(90L, 90L, 0L, 0L, 0L, 2L, 3L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 120L, 30L, 10, Aggregation.COUNT, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(4, data.size());
+    // startTs=0, interval=30, endTs=120 -> midpoints 15/45/75/105.
+    assertMappedEntry(data.get(0), 15L, "k", DataType.LONG, 4L);
+    assertMappedEntry(data.get(1), 45L, "k", DataType.LONG, 2L);
+    assertMappedEntry(data.get(2), 75L, "k", DataType.LONG, 5L);
+    assertMappedEntry(data.get(3), 105L, "k", DataType.LONG, 5L);
+  }
+
+  @Test
+  void findAllAsync_minMaxPickNumericOrStringPerBucket() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet numericDataSet = aggDataSet(numericBucket(0L, 5.5D), numericBucket(30L, 30.0D));
+    SessionDataSet stringDataSet =
+        aggDataSet(stringBucket(0L, "apple"), stringBucket(30L, "cherry"));
+    when(context.session().executeQueryStatement(anyString()))
+        .thenReturn(numericDataSet, stringDataSet);
+
+    ReadTsKvQuery numeric = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.MIN, "ASC");
+    ReadTsKvQuery string = new BaseReadTsKvQuery("sk", 0L, 60L, 30L, 10, Aggregation.MIN, "ASC");
+    List<ReadTsKvQueryResult> results =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(numeric, string))
+            .get(3, TimeUnit.SECONDS);
+
+    // startTs=0, interval=30, endTs=60 -> bucket starts 0/30 -> TB midpoints 15/45.
+    List<TsKvEntry> numericData = results.get(0).getData();
+    assertEquals(2, numericData.size());
+    assertMappedEntry(numericData.get(0), 15L, "k", DataType.DOUBLE, 5.5D);
+    assertMappedEntry(numericData.get(1), 45L, "k", DataType.DOUBLE, 30.0D);
+
+    List<TsKvEntry> stringData = results.get(1).getData();
+    assertEquals(2, stringData.size());
+    assertMappedEntry(stringData.get(0), 15L, "sk", DataType.STRING, "apple");
+    assertMappedEntry(stringData.get(1), 45L, "sk", DataType.STRING, "cherry");
+  }
+
+  @Test
+  void findAllAsync_sumKeepsLongTypeForLongOnlyBucketAndDoubleForMixed() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // ThingsBoard 4.3.1.2 returns a LONG-typed SUM when only long values participate in a
+    // bucket and a DOUBLE only when a double participates.
+    //   Bucket [0,30):  long-only  -> sum_long=5, no doubles  -> LongDataEntry(5)
+    //   Bucket [30,60): mixed       -> sum_long=4, sum_double=1.5, 1 double row ->
+    // DoubleDataEntry(5.5)
+    SessionDataSet dataSet =
+        aggDataSet(
+            MockAggBucket.sum(0L, 20L, 5.0D, null, 2L, 0L),
+            MockAggBucket.sum(30L, 55L, 4.0D, 1.5D, 1L, 1L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.SUM, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(2, data.size());
+    // Long-only SUM keeps the LONG type.
+    assertInstanceOf(LongDataEntry.class, innerKv(data.get(0)));
+    assertEquals(DataType.LONG, data.get(0).getDataType());
+    assertMappedEntry(data.get(0), 15L, "k", DataType.LONG, 5L);
+    // Mixed bucket promotes to DOUBLE, summing the long and double partials (4 + 1.5 = 5.5).
+    assertInstanceOf(DoubleDataEntry.class, innerKv(data.get(1)));
+    assertEquals(DataType.DOUBLE, data.get(1).getDataType());
+    assertMappedEntry(data.get(1), 45L, "k", DataType.DOUBLE, 5.5D);
+  }
+
+  @Test
+  void findAllAsync_minMaxKeepLongTypeForLongOnlyBucketAndDoubleForMixed() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // Long-only MIN/MAX keep the LONG type; a bucket with any participating double stays
+    // DOUBLE with the SAME numeric value as before.
+    //   Bucket [0,30):  long-only  (countLong=3, countDouble=0) -> LongDataEntry((long) agg_num)
+    //   Bucket [30,60): mixed      (countLong=2, countDouble=1) -> DoubleDataEntry(agg_num)
+    SessionDataSet minDataSet =
+        aggDataSet(
+            MockAggBucket.typedNumeric(0L, 20L, 5.0D, 3L, 0L),
+            MockAggBucket.typedNumeric(30L, 55L, 7.5D, 2L, 1L));
+    SessionDataSet maxDataSet =
+        aggDataSet(
+            MockAggBucket.typedNumeric(0L, 20L, 9.0D, 3L, 0L),
+            MockAggBucket.typedNumeric(30L, 55L, 12.5D, 2L, 1L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(minDataSet, maxDataSet);
+
+    ReadTsKvQuery min = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.MIN, "ASC");
+    ReadTsKvQuery max = new BaseReadTsKvQuery("k", 0L, 60L, 30L, 10, Aggregation.MAX, "ASC");
+    List<ReadTsKvQueryResult> results =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(min, max))
+            .get(3, TimeUnit.SECONDS);
+
+    List<TsKvEntry> minData = results.get(0).getData();
+    assertEquals(2, minData.size());
+    assertInstanceOf(LongDataEntry.class, innerKv(minData.get(0)));
+    assertMappedEntry(minData.get(0), 15L, "k", DataType.LONG, 5L);
+    assertInstanceOf(DoubleDataEntry.class, innerKv(minData.get(1)));
+    assertMappedEntry(minData.get(1), 45L, "k", DataType.DOUBLE, 7.5D);
+
+    List<TsKvEntry> maxData = results.get(1).getData();
+    assertEquals(2, maxData.size());
+    assertInstanceOf(LongDataEntry.class, innerKv(maxData.get(0)));
+    assertMappedEntry(maxData.get(0), 15L, "k", DataType.LONG, 9L);
+    assertInstanceOf(DoubleDataEntry.class, innerKv(maxData.get(1)));
+    assertMappedEntry(maxData.get(1), 45L, "k", DataType.DOUBLE, 12.5D);
+  }
+
+  @Test
+  void findAllAsync_minMaxLongOnlyReadExactLongChannelAbove2Pow53() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // A long-only MIN/MAX must come back EXACT even above 2^53. The stored long is
+    // 9007199254740993 (= 2^53 + 1), which is NOT representable as a double: COALESCE(double_v,
+    // CAST(long_v AS DOUBLE)) would round it to 9007199254740992.0 (agg_num below). The DAO must
+    // read the direct MIN(long_v)/MAX(long_v) channel instead, yielding the exact long. The
+    // (long) getDouble(agg_num) round-trip would return ...992 and FAIL this test.
+    long exact = 9007199254740993L; // 2^53 + 1
+    double roundedAggNum = 9007199254740992.0D; // what the COALESCE->DOUBLE path would expose
+    SessionDataSet minDataSet =
+        aggDataSet(MockAggBucket.minMaxLong(0L, 20L, roundedAggNum, exact, 1L));
+    SessionDataSet maxDataSet =
+        aggDataSet(MockAggBucket.minMaxLong(0L, 20L, roundedAggNum, exact, 1L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(minDataSet, maxDataSet);
+
+    ReadTsKvQuery min = new BaseReadTsKvQuery("k", 0L, 30L, 30L, 10, Aggregation.MIN, "ASC");
+    ReadTsKvQuery max = new BaseReadTsKvQuery("k", 0L, 30L, 30L, 10, Aggregation.MAX, "ASC");
+    List<ReadTsKvQueryResult> results =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(min, max))
+            .get(3, TimeUnit.SECONDS);
+
+    TsKvEntry minEntry = results.get(0).getData().get(0);
+    assertInstanceOf(LongDataEntry.class, innerKv(minEntry));
+    assertEquals(DataType.LONG, minEntry.getDataType());
+    assertEquals(
+        Optional.of(exact), minEntry.getLongValue(), "MIN must be the exact long, not ...992");
+    TsKvEntry maxEntry = results.get(1).getData().get(0);
+    assertInstanceOf(LongDataEntry.class, innerKv(maxEntry));
+    assertEquals(DataType.LONG, maxEntry.getDataType());
+    assertEquals(
+        Optional.of(exact), maxEntry.getLongValue(), "MAX must be the exact long, not ...992");
+  }
+
+  @Test
+  void findAllAsync_sumLongOnlyFastPathWhenBoundWithin2Pow53() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // Fast path: a long-only bucket whose conservative bound count_long * maxAbs stays
+    // within 2^53 is provably exact, so the DAO trusts the DOUBLE-projected sum_long (cast back to
+    // long, lossless within the bound) and does NOT re-query. count_long=3, maxAbs=40 -> 120 <=
+    // 2^53,
+    // fast path. Exactly ONE aggregate query.
+    SessionDataSet dataSet = aggDataSet(MockAggBucket.sumWithBound(0L, 20L, 90.0D, 3L, 20L, 40L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 30L, 30L, 10, Aggregation.SUM, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(1, data.size());
+    assertInstanceOf(LongDataEntry.class, innerKv(data.get(0)));
+    assertMappedEntry(data.get(0), 15L, "k", DataType.LONG, 90L);
+    // Fast path: no raw long_v re-query (exactly one aggregate statement was issued).
+    verify(context.session(), times(1)).executeQueryStatement(anyString());
+  }
+
+  @Test
+  void findAllAsync_sumLongOnlyReSumsExactlyWhenBoundExceeds2Pow53() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // Fallback: a long-only bucket whose bound count_long * maxAbs MAY exceed 2^53 cannot
+    // trust the DOUBLE-accumulated SUM, so the DAO re-queries the raw long_v values and sums them
+    // in
+    // Java as long. Here the two stored values are 9007199254740993 (2^53 + 1) and 1000; their
+    // EXACT
+    // long sum is 9007199254741993. IoTDB's double accumulator would have returned 9007199254741992
+    // (the rounded sum_long we deliberately mock), so trusting it would FAIL. maxAbs =
+    // 9007199254740993
+    // and count_long = 2, so count_long > 2^53 / maxAbs -> the bound check forces the fallback.
+    long bigValue = 9007199254740993L; // 2^53 + 1
+    long exactSum = 9007199254741993L; // bigValue + 1000, exact long arithmetic
+    long roundedDoubleSum =
+        9007199254741992L; // what IoTDB's DOUBLE accumulator would have produced
+    SessionDataSet aggDataSet =
+        aggDataSet(MockAggBucket.sumWithBound(0L, 20L, roundedDoubleSum, 2L, 1000L, bigValue));
+    SessionDataSet rawLong = rawLongDataSet(bigValue, 1000L);
+    when(context.session().executeQueryStatement(anyString()))
+        .thenAnswer(
+            invocation -> {
+              String sql = invocation.getArgument(0);
+              // The aggregate uses GROUP BY; the exact re-sum selects the raw long_v column.
+              return sql.contains("GROUP BY") ? aggDataSet : rawLong;
+            });
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 30L, 30L, 10, Aggregation.SUM, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(1, data.size());
+    assertInstanceOf(LongDataEntry.class, innerKv(data.get(0)));
+    assertEquals(DataType.LONG, data.get(0).getDataType());
+    // EXACT Java re-sum, not the rounded double sum the accumulator would have produced.
+    assertEquals(
+        Optional.of(exactSum),
+        data.get(0).getLongValue(),
+        "long-only SUM > 2^53 must be the exact Java re-sum, not the rounded double sum");
+    // The fallback issued the raw long_v re-query in the same bucket window.
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), times(2)).executeQueryStatement(sql.capture());
+    String reQuery =
+        sql.getAllValues().stream().filter(s -> !s.contains("GROUP BY")).findFirst().orElseThrow();
+    assertTrue(reQuery.contains("SELECT long_v FROM telemetry"), reQuery);
+    assertTrue(reQuery.contains("long_v IS NOT NULL"), reQuery);
+    // The re-query window is the FULL date_bin bucket [startTs, startTs + interval) = [0, 30).
+    assertTrue(reQuery.contains("time >= 0") && reQuery.contains("time < 30"), reQuery);
+  }
+
+  @Test
+  void findAllAsync_sumFallbackClampsFinalBucketReQueryToEndPeriodNotFullWidth() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // Regression for a final, end-clamped MS bucket that triggers the SUM re-sum fallback: the
+    // re-query MUST cover exactly the rows the date_bin aggregate counted ([bucketStart,
+    // endPeriod)),
+    // not the full physical bucket [bucketStart, bucketStart + interval). Query [0, 2500) interval
+    // 1000 -> the last bucket date_bin=2000 is clamped to endPeriod=2500; a full-width [2000, 3000)
+    // re-query would wrongly include rows beyond endTs and over-count the sum.
+    long bigValue = 9007199254740993L; // 2^53 + 1 -> forces the fallback
+    long exactSum = 9007199254741993L; // bigValue + 1000
+    long roundedDoubleSum = 9007199254741992L;
+    SessionDataSet aggDataSet =
+        aggDataSet(MockAggBucket.sumWithBound(2000L, 2400L, roundedDoubleSum, 2L, 1000L, bigValue));
+    SessionDataSet rawLong = rawLongDataSet(bigValue, 1000L);
+    when(context.session().executeQueryStatement(anyString()))
+        .thenAnswer(
+            invocation -> {
+              String sql = invocation.getArgument(0);
+              return sql.contains("GROUP BY") ? aggDataSet : rawLong;
+            });
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 2500L, 1000L, 10, Aggregation.SUM, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(1, data.size());
+    assertEquals(Optional.of(exactSum), data.get(0).getLongValue());
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), times(2)).executeQueryStatement(sql.capture());
+    String reQuery =
+        sql.getAllValues().stream().filter(s -> !s.contains("GROUP BY")).findFirst().orElseThrow();
+    // CLAMPED to endPeriod (2500), matching the aggregate's `time < endPeriod` filter -- NOT the
+    // full-width bucketStart + interval (3000).
+    assertTrue(reQuery.contains("time >= 2000") && reQuery.contains("time < 2500"), reQuery);
+    assertFalse(reQuery.contains("time < 3000"), reQuery);
+  }
+
+  @Test
+  void findAllAsync_avgStaysDoubleForLongOnlyBucket() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    // AVG is ALWAYS DOUBLE in ThingsBoard, even for a long-only bucket.
+    SessionDataSet dataSet = aggDataSet(MockAggBucket.typedNumeric(0L, 20L, 7.0D, 3L, 0L));
+    when(context.session().executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 30L, 30L, 10, Aggregation.AVG, "ASC");
+    List<TsKvEntry> data =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(query))
+            .get(3, TimeUnit.SECONDS)
+            .get(0)
+            .getData();
+
+    assertEquals(1, data.size());
+    assertInstanceOf(DoubleDataEntry.class, innerKv(data.get(0)));
+    assertMappedEntry(data.get(0), 15L, "k", DataType.DOUBLE, 7.0D);
+  }
+
+  @Test
+  void findAllAsync_aggregationSkipsEmptyBucketsAndIgnoresLimit() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet emptyDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(emptyDataSet);
+
+    ReadTsKvQuery noBuckets = new BaseReadTsKvQuery("k", 100L, 400L, 100L, 10, Aggregation.AVG);
+    ReadTsKvQueryResult emptyResult =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(noBuckets))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+    assertEquals(List.of(), emptyResult.getData());
+    // No data matched -> lastEntryTs falls back to startTs (ThingsBoard contract).
+    assertEquals(100L, emptyResult.getLastEntryTs());
+
+    // ThingsBoard ignores the query limit for aggregation: a zero limit must NOT short-circuit;
+    // the aggregate is still issued and returns every non-empty bucket (here: none).
+    ReadTsKvQuery zeroLimit = new BaseReadTsKvQuery("k", 100L, 400L, 100L, 0, Aggregation.AVG);
+    ReadTsKvQueryResult zeroLimitResult =
+        context
+            .dao()
+            .findAllAsync(TENANT_ID, ENTITY_ID, List.of(zeroLimit))
+            .get(3, TimeUnit.SECONDS)
+            .get(0);
+    assertEquals(List.of(), zeroLimitResult.getData());
+    assertEquals(100L, zeroLimitResult.getLastEntryTs());
+    // Both queries issue SQL: limit is not consulted for aggregation.
+    verify(context.session(), times(2)).executeQueryStatement(anyString());
+  }
+
+  @Test
+  void findAllAsync_aggregationWithSubOneIntervalRoutesToRawLikeThingsBoard() throws Exception {
+    // ThingsBoard 4.3.1.2 (AbstractChunkedAggregationTimeseriesDao.findAllAsync) routes to the RAW
+    // findAllWithLimit path when aggregation == NONE OR interval < 1. An AVG query with interval 0
+    // must
+    // therefore return RAW telemetry (a plain typed-column SELECT with ORDER BY time + LIMIT), NOT
+    // be
+    // rejected and NOT build a date_bin aggregation.
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet rawDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(rawDataSet);
+
+    ReadTsKvQuery query = new BaseReadTsKvQuery("k", 0L, 100L, 0L, 10, Aggregation.AVG);
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(query)).get(3, TimeUnit.SECONDS);
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000)).executeQueryStatement(sql.capture());
+    String captured = sql.getValue();
+    assertTrue(
+        captured.contains("SELECT time, bool_v, long_v, double_v, str_v, json_v FROM telemetry"),
+        captured);
+    assertTrue(captured.contains("LIMIT 10"), captured);
+    assertTrue(!captured.contains("date_bin"), captured);
+  }
+
+  @Test
+  void findAllAsync_aggregationEscapesKeyAndIgnoresQueryOrder() throws Exception {
+    TestContext context = newContext(config(10, 1000L, 100), false);
+    SessionDataSet escapeDataSet = aggDataSet();
+    when(context.session().executeQueryStatement(anyString())).thenReturn(escapeDataSet);
+
+    ReadTsKvQuery escaped = new BaseReadTsKvQuery("a'b", 1L, 10L, 5L, 10, Aggregation.SUM, "asc");
+    context.dao().findAllAsync(TENANT_ID, ENTITY_ID, List.of(escaped)).get(3, TimeUnit.SECONDS);
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000)).executeQueryStatement(sql.capture());
+    assertTrue(sql.getValue().contains("key='a''b'"));
+
+    // ThingsBoard ignores the query order for aggregation: an unrecognised order string is NOT
+    // rejected (the aggregate is always emitted ascending), unlike the raw Aggregation.NONE path.
+    ReadTsKvQuery ignoredOrder =
+        new BaseReadTsKvQuery("k", 1L, 10L, 5L, 10, Aggregation.SUM, "sideways");
+    context
+        .dao()
+        .findAllAsync(TENANT_ID, ENTITY_ID, List.of(ignoredOrder))
+        .get(3, TimeUnit.SECONDS);
+    ArgumentCaptor<String> ignoredOrderSql = ArgumentCaptor.forClass(String.class);
+    verify(context.session(), timeout(3000).times(2))
+        .executeQueryStatement(ignoredOrderSql.capture());
+    String emitted = ignoredOrderSql.getAllValues().get(1);
+    assertTrue(emitted.endsWith("GROUP BY 1 ORDER BY 1 ASC"), emitted);
+    assertFalse(emitted.contains("sideways"), emitted);
+  }
+
   private TestContext newContext(IoTDBTableConfig config, boolean startWorker)
       throws IoTDBConnectionException {
     ITableSessionPool pool = mock(ITableSessionPool.class);
@@ -1319,6 +2382,369 @@ class IoTDBTableTimeseriesDaoTest {
 
   private int tbDataPoints(String value) {
     return Math.max(1, (value.length() + 511) / 512);
+  }
+
+  /** Unwraps the inner {@link KvEntry} so a test can assert the concrete data-entry type. */
+  private KvEntry innerKv(TsKvEntry entry) {
+    return assertInstanceOf(BasicTsKvEntry.class, entry).getKv();
+  }
+
+  private SessionDataSet aggDataSet(MockAggBucket... buckets)
+      throws IoTDBConnectionException, StatementExecutionException {
+    SessionDataSet dataSet = mock(SessionDataSet.class);
+    SessionDataSet.DataIterator iterator = mock(SessionDataSet.DataIterator.class);
+    AtomicInteger index = new AtomicInteger(-1);
+    when(dataSet.iterator()).thenReturn(iterator);
+    when(iterator.next()).thenAnswer(invocation -> index.incrementAndGet() < buckets.length);
+    when(iterator.isNull(anyString()))
+        .thenAnswer(invocation -> buckets[index.get()].isNull(invocation.getArgument(0)));
+    // date_bin emits the startTs-anchored bucket START; the DAO derives the TB midpoint in Java.
+    when(iterator.getTimestamp("bucket_ts"))
+        .thenAnswer(invocation -> new Timestamp(buckets[index.get()].bucketStart()));
+    // MAX(time) of the underlying data drives lastEntryTs; default to the bucket start.
+    when(iterator.getTimestamp("max_ts"))
+        .thenAnswer(invocation -> new Timestamp(buckets[index.get()].maxTs()));
+    when(iterator.getDouble("agg_num")).thenAnswer(invocation -> buckets[index.get()].numeric());
+    // sum_long is projected as SUM(CAST(long_v AS DOUBLE)) -- a DOUBLE -- so the DAO reads it via
+    // getDouble.
+    when(iterator.getDouble("sum_long")).thenAnswer(invocation -> buckets[index.get()].sumLong());
+    when(iterator.getDouble("sum_double"))
+        .thenAnswer(invocation -> buckets[index.get()].sumDouble());
+    when(iterator.getString("agg_str")).thenAnswer(invocation -> buckets[index.get()].string());
+    when(iterator.getLong(anyString()))
+        .thenAnswer(invocation -> buckets[index.get()].longColumn(invocation.getArgument(0)));
+    return dataSet;
+  }
+
+  /**
+   * Models the raw {@code SELECT long_v ... AND long_v IS NOT NULL} re-query the SUM mapper issues
+   * for a long-only bucket whose double-accumulated sum may have lost precision. Each supplied
+   * value is one non-null {@code long_v} row; the DAO accumulates them in Java as {@code long}, so
+   * the assertion proves the EXACT long sum (not the rounded double SUM).
+   */
+  private SessionDataSet rawLongDataSet(long... values)
+      throws IoTDBConnectionException, StatementExecutionException {
+    SessionDataSet dataSet = mock(SessionDataSet.class);
+    SessionDataSet.DataIterator iterator = mock(SessionDataSet.DataIterator.class);
+    AtomicInteger index = new AtomicInteger(-1);
+    when(dataSet.iterator()).thenReturn(iterator);
+    when(iterator.next()).thenAnswer(invocation -> index.incrementAndGet() < values.length);
+    when(iterator.isNull("long_v")).thenReturn(false);
+    when(iterator.getLong("long_v")).thenAnswer(invocation -> values[index.get()]);
+    return dataSet;
+  }
+
+  private MockAggBucket numericBucket(long bucketStart, double numeric) {
+    return MockAggBucket.numeric(bucketStart, bucketStart, numeric);
+  }
+
+  private MockAggBucket numericBucket(long bucketStart, long maxTs, double numeric) {
+    return MockAggBucket.numeric(bucketStart, maxTs, numeric);
+  }
+
+  private MockAggBucket stringBucket(long bucketStart, String value) {
+    return MockAggBucket.string(bucketStart, bucketStart, value);
+  }
+
+  /** A COUNT bucket whose value lands entirely in the long_v column (normal single-typed row). */
+  private MockAggBucket countBucket(long bucketStart, long count) {
+    return MockAggBucket.typedCount(bucketStart, bucketStart, 0L, 0L, 0L, count, 0L);
+  }
+
+  /**
+   * The REAL row IoTDB returns for an EMPTY bounded calendar bucket: a single row whose typed COUNT
+   * columns are all 0 and whose MAX(time)/aggregates are NULL (so {@code isNull("max_ts")} is
+   * true). This is what the bounded per-bucket calendar path actually receives for an empty window,
+   * unlike {@code aggDataSet()} (zero rows) which only the GROUP-BY milliseconds path produces.
+   */
+  private MockAggBucket emptyAggRow(long bucketStart) {
+    return MockAggBucket.emptyAggRow(bucketStart);
+  }
+
+  private ReadTsKvQuery calendarQuery(
+      String key,
+      long startTs,
+      long endTs,
+      IntervalType intervalType,
+      String tzId,
+      Aggregation aggregation) {
+    return new BaseReadTsKvQuery(
+        key,
+        startTs,
+        endTs,
+        AggregationParams.calendar(aggregation, intervalType, tzId),
+        100,
+        "ASC");
+  }
+
+  private ReadTsKvQuery calendarLikeMilliseconds(
+      String key, long startTs, long endTs, long interval, Aggregation aggregation) {
+    // Explicit MILLISECONDS IntervalType (with a tz set) must still route to the date_bin path.
+    return new BaseReadTsKvQuery(
+        key,
+        startTs,
+        endTs,
+        AggregationParams.of(
+            aggregation, IntervalType.MILLISECONDS, java.time.ZoneId.of("UTC"), interval),
+        100,
+        "DESC");
+  }
+
+  /**
+   * Mocks one aggregation result row. {@code countBool/countStr/countJson/countLong/countDouble}
+   * model ThingsBoard's per-type {@code SUM(CASE WHEN <col> IS NOT NULL THEN 1 ELSE 0 END)}
+   * counters; the DAO selects the dominant one. {@code maxTs} models {@code MAX(time)} of the
+   * underlying data for {@code lastEntryTs}. {@code emptyAgg} models the row IoTDB returns for an
+   * empty bounded calendar bucket (one row whose {@code MAX(time)} is NULL and whose typed COUNT
+   * columns are all 0); see {@link #emptyAggRow(long)}.
+   */
+  private record MockAggBucket(
+      long bucketStart,
+      long maxTs,
+      Double numeric,
+      String string,
+      Long countBool,
+      Long countStr,
+      Long countJson,
+      Long countLong,
+      Long countDouble,
+      Double sumLong,
+      Double sumDouble,
+      Long minLong,
+      Long maxLong,
+      boolean emptyAgg) {
+
+    private static MockAggBucket numeric(long bucketStart, long maxTs, double numeric) {
+      // AVG/MIN/MAX numeric bucket with no recorded long/double participation; the SUM and
+      // MIN/MAX type-selection columns default to null (so isNull(...) is true), exercising the AVG
+      // and string-fallback paths that do not depend on the typed counts.
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          numeric,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          false);
+    }
+
+    /**
+     * A MIN/MAX/AVG numeric bucket that also records the long/double participation counts, so the
+     * result-type selector (long-only -> LONG, any double -> DOUBLE) can be exercised. {@code
+     * countLong}/{@code countDouble} drive both the COUNT path and the MIN/MAX result type; {@code
+     * numeric} is the MIN/MAX/AVG value read from {@code agg_num}. For a long-only bucket the
+     * direct MIN(long_v)/MAX(long_v) channel is set to {@code (long) numeric} so the exact
+     * long-channel MIN/MAX mapping reads the matching value; for a bucket with a participating
+     * double the long channel is left null because the DOUBLE mapping ignores it.
+     */
+    private static MockAggBucket typedNumeric(
+        long bucketStart, long maxTs, double numeric, long countLong, long countDouble) {
+      Long longChannel = countDouble == 0L ? (long) numeric : null;
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          numeric,
+          null,
+          null,
+          null,
+          null,
+          countLong,
+          countDouble,
+          null,
+          null,
+          longChannel,
+          longChannel,
+          false);
+    }
+
+    /**
+     * A long-only MIN/MAX bucket that proves the EXACT long channel: {@code agg_num} holds the
+     * value IoTDB's {@code COALESCE(double_v, CAST(long_v AS DOUBLE))} would produce (a double,
+     * which silently rounds a long > 2^53), while {@code min_long}/{@code max_long} hold the EXACT
+     * stored long. The DAO must read the long channel, so the entry's long value equals {@code
+     * exactLong} (not the rounded {@code roundedAggNum}). A bucket is long-only (countDouble == 0).
+     */
+    private static MockAggBucket minMaxLong(
+        long bucketStart, long maxTs, double roundedAggNum, long exactLong, long countLong) {
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          roundedAggNum,
+          null,
+          null,
+          null,
+          null,
+          countLong,
+          0L,
+          null,
+          null,
+          exactLong,
+          exactLong,
+          false);
+    }
+
+    /**
+     * A SUM bucket: the DAO reads {@code sum_long}/{@code sum_double} plus the long/double counts
+     * (NOT {@code agg_num}). A long-only bucket records {@code countDouble == 0} and {@code
+     * sumDouble == null}; a bucket with any double records {@code countDouble > 0} and a non-null
+     * {@code sumDouble}. The {@code min_long}/{@code max_long} bound channels default to null (read
+     * as 0), so a long-only bucket built this way always takes the exact-fast-path (maxAbs == 0
+     * proves the double sum lost no bits); use {@link #sumWithBound} to drive the > 2^53 re-sum
+     * fallback.
+     */
+    private static MockAggBucket sum(
+        long bucketStart,
+        long maxTs,
+        Double sumLong,
+        Double sumDouble,
+        long countLong,
+        long countDouble) {
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          null,
+          null,
+          null,
+          null,
+          null,
+          countLong,
+          countDouble,
+          sumLong,
+          sumDouble,
+          null,
+          null,
+          false);
+    }
+
+    /**
+     * A long-only SUM bucket that also records the {@code min_long}/{@code max_long} bound
+     * channels. The DAO computes {@code maxAbs = max(|min_long|, |max_long|)} and trusts the
+     * DOUBLE-accumulated {@code sum_long} only while {@code count_long * maxAbs <= 2^53}; otherwise
+     * it re-queries the raw {@code long_v} values and sums them in Java. Used to drive both the
+     * fast path (small bound) and the re-sum fallback (large bound).
+     */
+    private static MockAggBucket sumWithBound(
+        long bucketStart, long maxTs, double sumLong, long countLong, long minLong, long maxLong) {
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          null,
+          null,
+          null,
+          null,
+          null,
+          countLong,
+          0L,
+          sumLong,
+          null,
+          minLong,
+          maxLong,
+          false);
+    }
+
+    private static MockAggBucket string(long bucketStart, long maxTs, String value) {
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          null,
+          value,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          false);
+    }
+
+    private static MockAggBucket typedCount(
+        long bucketStart,
+        long maxTs,
+        long countBool,
+        long countStr,
+        long countJson,
+        long countLong,
+        long countDouble) {
+      return new MockAggBucket(
+          bucketStart,
+          maxTs,
+          null,
+          null,
+          countBool,
+          countStr,
+          countJson,
+          countLong,
+          countDouble,
+          null,
+          null,
+          null,
+          null,
+          false);
+    }
+
+    /**
+     * Models the REAL row that IoTDB returns for an EMPTY bounded calendar bucket. Unlike {@code
+     * aggDataSet()} with zero rows (which the GROUP-BY milliseconds path produces but the bounded
+     * per-bucket calendar path never does), a single bounded aggregate over a window matching zero
+     * rows still returns ONE row: every typed COUNT is 0 and every other aggregate (AVG/SUM/MIN/MAX
+     * and MAX(time)) is NULL. The calendar reader's empty-bucket guard keys off {@code
+     * isNull("max_ts")} (time is never null, so MAX(time) is NULL iff the window was empty), so
+     * this row MUST report {@code isNull("max_ts") == true} while its typed-COUNT columns read 0.
+     * Without the {@code !isNull(max_ts)} guard, COUNT's {@code LongDataEntry(0)} would leak as a
+     * spurious empty bucket.
+     */
+    private static MockAggBucket emptyAggRow(long bucketStart) {
+      return new MockAggBucket(
+          bucketStart, bucketStart, null, null, 0L, 0L, 0L, 0L, 0L, null, null, null, null, true);
+    }
+
+    private long longColumn(String column) {
+      return switch (column) {
+        case "count_bool" -> orZero(countBool);
+        case "count_str" -> orZero(countStr);
+        case "count_json" -> orZero(countJson);
+        case "count_long" -> orZero(countLong);
+        case "count_double" -> orZero(countDouble);
+        case "min_long" -> orZero(minLong);
+        case "max_long" -> orZero(maxLong);
+        default -> 0L;
+      };
+    }
+
+    private static long orZero(Long value) {
+      return value == null ? 0L : value;
+    }
+
+    private boolean isNull(String column) {
+      return switch (column) {
+        case "agg_num" -> numeric == null;
+        case "agg_str" -> string == null;
+        case "count_bool" -> countBool == null;
+        case "count_str" -> countStr == null;
+        case "count_json" -> countJson == null;
+        case "count_long" -> countLong == null;
+        case "count_double" -> countDouble == null;
+        case "sum_long" -> sumLong == null;
+        case "sum_double" -> sumDouble == null;
+        case "min_long" -> minLong == null;
+        case "max_long" -> maxLong == null;
+          // MAX(time) is NULL iff the bounded window matched zero rows (time is never null). A real
+          // empty calendar bucket (emptyAggRow) returns one row with MAX(time) NULL; every other
+          // bucket has matching data, so its max_ts is non-null.
+        case "max_ts" -> emptyAgg;
+        default -> true;
+      };
+    }
   }
 
   private record MockTelemetryRow(long ts, String valueColumn, Object value) {
