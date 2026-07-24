@@ -363,7 +363,7 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
             aggregatedEntry(
                 aggregation,
                 row,
-                new SumReSumContext(session, tenantId, entityId, key, bucketStart, bucketEnd));
+                new SumReSumContext(tenantId, entityId, key, bucketStart, bucketEnd));
         if (value == null) {
           // Defensive: a bucket with only NULL value columns produces no entry.
           continue;
@@ -448,7 +448,7 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
                 aggregatedEntry(
                     aggregation,
                     row,
-                    new SumReSumContext(session, tenantId, entityId, key, bucketStart, bucketEnd));
+                    new SumReSumContext(tenantId, entityId, key, bucketStart, bucketEnd));
             if (value != null) {
               entries.add(new BasicTsKvEntry(bucketTs, value));
               // The enclosing guard already proved MAX_TS_COLUMN is non-null (an empty bucket was
@@ -820,8 +820,9 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
    * {@code long}, with natural overflow to 2^63 exactly the way ThingsBoard sums longs. Used only
    * when the bucket's values are large enough that IoTDB's DOUBLE SUM accumulator may have lost
    * precision (see {@link #sumIsProvablyExact}); the bounded window {@code [bucketStart,
-   * bucketEnd)} reuses the same tenant/entity/key identity predicate and the same {@code session}
-   * as the aggregate query.
+   * bucketEnd)} reuses the same tenant/entity/key identity predicate as the aggregate query, on its
+   * own pooled {@link ITableSession} so it never opens a second result set on the session that is
+   * iterating the outer aggregate.
    */
   private long exactLongSum(SumReSumContext sumContext) throws Exception {
     String sql =
@@ -841,7 +842,12 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
             + sumContext.bucketEnd()
             + " AND long_v IS NOT NULL";
     long total = 0L;
-    try (SessionDataSet dataSet = sumContext.session().executeQueryStatement(sql)) {
+    // Use a SEPARATE pooled session rather than the one iterating the outer aggregate result set:
+    // IoTDB Table Mode does not guarantee two concurrently open result sets on a single session, so
+    // re-using it could throw or silently close the outer result set and corrupt the remaining
+    // bucket rows. The re-sum is a rare fallback, so the extra pool checkout is negligible.
+    try (ITableSession session = tableSessionPool.getSession();
+        SessionDataSet dataSet = session.executeQueryStatement(sql)) {
       SessionDataSet.DataIterator row = dataSet.iterator();
       while (row.next()) {
         if (!row.isNull("long_v")) {
@@ -890,18 +896,14 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
   }
 
   /**
-   * Carries the identity, bucket bounds and live session a long-only SUM bucket needs to re-query
-   * its raw {@code long_v} values for an exact Java re-sum when the IoTDB DOUBLE accumulator may
-   * have lost precision (see {@link #aggregatedSumEntry}). The same instance also supplies the
-   * telemetry {@code key} every aggregation mapping stamps onto its emitted {@link KvEntry}.
+   * Carries the identity and bucket bounds a long-only SUM bucket needs to re-query its raw {@code
+   * long_v} values for an exact Java re-sum when the IoTDB DOUBLE accumulator may have lost
+   * precision (see {@link #aggregatedSumEntry}); {@link #exactLongSum} runs that re-query on its
+   * own pooled session. The same instance also supplies the telemetry {@code key} every aggregation
+   * mapping stamps onto its emitted {@link KvEntry}.
    */
   private record SumReSumContext(
-      ITableSession session,
-      TenantId tenantId,
-      EntityId entityId,
-      String key,
-      long bucketStart,
-      long bucketEnd) {}
+      TenantId tenantId, EntityId entityId, String key, long bucketStart, long bucketEnd) {}
 
   private static String sqlOrder(String order) {
     String normalized = Objects.requireNonNull(order, "order").trim().toUpperCase(Locale.ROOT);
