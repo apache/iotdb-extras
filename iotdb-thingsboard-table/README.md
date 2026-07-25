@@ -27,7 +27,8 @@
 built on Apache IoTDB Table Mode. It lets a ThingsBoard deployment store
 and serve time-series telemetry through IoTDB's table-session API instead of the
 default Cassandra/SQL backends. It compiles against the reactor's IoTDB 2.0.5
-table-session client; its integration tests run the real write path against an
+table-session client; its integration tests run the real write, read,
+aggregation, latest-telemetry, attribute and retention paths against an
 `apache/iotdb:2.0.8-standalone` server. The module targets ThingsBoard v4.3.1.2. Because
 it compiles with Java 17 language features (records and others), the
 `iotdb-extras` parent reactor builds and tests it only on JDK 17+ through the
@@ -58,17 +59,26 @@ DAO depends on, so any accidental edit to the local surface fails the build.
 
 ## Scope
 
-This initial module delivers an inert-by-default foundation: `IoTDBTableBaseDao`
-(session-pool lifecycle, schema/table bootstrap) and the
-`IoTDBTableTimeseriesDao` write path (`save`), raw read, and delete. To exercise
-it, set both `database.ts.type=iotdb-table` and
-`iotdb.ts.experimental-raw-only=true`. Aggregation, latest telemetry, and
-attribute/label DAOs are outside the current scope.
+The module is an inert-by-default foundation — `IoTDBTableBaseDao` (session-pool
+lifecycle, schema/table bootstrap) — plus three DAOs, each behind its own
+selector:
 
-> **This is an incremental / experimental backend.** Explicitly enabling it
-> routes ThingsBoard historical telemetry through IoTDB Table Mode for **raw read
-> + write + delete only**. **Time-bucketed aggregation is NOT implemented yet**;
-> aggregation, latest telemetry, and attributes are outside the current scope.
+- `IoTDBTableTimeseriesDao`: the historical write path (`save`), raw read,
+  delete, and time-bucketed aggregation — both the fixed-width millisecond
+  `date_bin` path and the timezone-aware calendar path (`WEEK` / `WEEK_ISO` /
+  `MONTH` / `QUARTER`). Enabled by `database.ts.type=iotdb-table` together with
+  `iotdb.ts.experimental-raw-only=true`. That property name predates the
+  aggregation support and is kept for compatibility; it is the opt-in for this
+  backend as a whole, not a raw-only switch.
+- `IoTDBTableLatestDao`: latest telemetry, derived from `telemetry` with a
+  `telemetry_latest` overlay. Enabled by `database.ts_latest.type=iotdb-table`
+  (see the latest-telemetry section below).
+- `IoTDBTableAttributesDao`: entity attributes, **inert by default**. Enabled
+  only by the independent `database.attributes.type=iotdb-table` opt-in.
+
+> **This is an incremental / experimental backend.** Nothing routes through
+> IoTDB Table Mode unless the matching selector is set explicitly; with no
+> selectors set the module does nothing.
 
 ## Entity attributes (inert by default)
 
@@ -188,18 +198,81 @@ is the overlay's own already-stored value is reported without a redundant rewrit
   identity; bounded for normal key sets).
 - **Same-timestamp cross-store type change.** The overlay wins an exact-ts tie,
   continuing the documented same-timestamp (B1) limitation below.
-- **Batch latest read / key discovery deferred (graceful, not throwing).**
-  `findLatestByEntityIds(Async)` (new in v4.3.1.2, full impl is a follow-up) and the
-  key-discovery methods `findAllKeysByEntityIds(Async)` (a follow-up) return an **empty
-  list** rather than throwing, because they are reachable in normal operation (the
-  dashboard `/api/entitiesQuery/find/keys` lookup and entity-delete housekeeping),
-  where a throw would surface as an HTTP 500 / a failed cleanup task. This matches
-  the official `CassandraBaseTimeseriesLatestDao`, which returns empty for all four.
+- **Batch latest read deferred (graceful, not throwing).**
+  `findLatestByEntityIds(Async)` (new in v4.3.1.2) returns an **empty list**
+  rather than throwing, because it is reachable in normal operation and a throw
+  would surface as an HTTP 500. This matches the official
+  `CassandraBaseTimeseriesLatestDao`; the derived batch read is a follow-up.
+  Key discovery (`findAllKeysByEntityIds(Async)` and the tenant-wide variant) is
+  implemented: it collects `DISTINCT key` from **both** `telemetry` and the
+  `telemetry_latest` overlay, so a key that only ever reached the overlay through
+  `saveLatest` is discovered too.
 
 The `telemetry_latest` table is created on startup by a **second** idempotent
 schema bootstrap (`schema-iotdb-table-latest.sql`), registered only when the
 latest selector is active and `iotdb.schema.bootstrap` is not disabled; when the
 latest selector is off the overlay table is never created.
+
+## Retention / TTL
+
+Physical retention is a **table-level** IoTDB property that the operator sets on
+the schema; it is not a per-data-point setting. IoTDB Table Mode expresses TTL as
+a retention window in **milliseconds**, and the accepted forms are narrow:
+
+| Form | Meaning |
+| --- | --- |
+| `TTL=604800000` | A concrete retention: a bare, **unquoted** long literal (milliseconds). |
+| `TTL='INF'` | Never expire. The **quoted** string is the only accepted spelling; this is the form `entity_attributes` and `telemetry_latest` ship with. |
+| `TTL=DEFAULT` | Inherit the database default, which is `INF` on a fresh node. |
+
+Anything else is rejected by IoTDB 2.0.8: an unquoted `TTL=INF` is parsed as an
+identifier (`ttl value must be a LongLiteral, but now is Identifier`), and any
+other quoted value — including a quoted number (`'604800000'`) or a duration
+(`'7d'`) — fails with `ttl value must be 'INF' or a long literal`.
+
+The shipped `schema-iotdb-table.sql` declares `telemetry` with
+`WITH (TTL=DEFAULT)`, so a fresh deployment never expires data until an operator
+chooses otherwise. To set a concrete retention, either edit the schema before the
+first bootstrap:
+
+```sql
+CREATE TABLE telemetry (...) WITH (TTL=604800000);
+```
+
+or change it at runtime on the live table:
+
+```sql
+ALTER TABLE telemetry SET PROPERTIES TTL=604800000;   -- 7 days, in ms
+ALTER TABLE telemetry SET PROPERTIES TTL=DEFAULT;     -- back to the db default
+```
+
+The effective value can be read back from `SHOW TABLES`, which reports it in a
+`TTL(ms)` column, or from `information_schema.tables`, where the column must be
+quoted because its name contains parentheses:
+
+```sql
+SELECT table_name, "ttl(ms)" FROM information_schema.tables WHERE database='thingsboard';
+```
+
+Either way a never-expiring table reads back as `INF` and a concrete retention as
+the millisecond number.
+`IoTDBTableTtlIT` pins both paths against a real IoTDB 2.0.8 container. It
+verifies the TTL **property mechanism** only and deliberately does not assert
+physical row eviction, because eviction is asynchronous and compaction-driven and
+so is not deterministic inside a test.
+
+The `telemetry_latest` overlay is declared `TTL='INF'` on purpose: it holds at
+most one row per identity and is the authority for a latest value, so expiring it
+would silently drop the latest reading while history remained.
+
+- **Phase-1 limitation: the per-save `ttl` argument is not a physical-retention
+  directive.** ThingsBoard's `TimeseriesDao.save(..., long ttl)` carries a
+  per-data-point TTL, but IoTDB Table Mode retention can only be expressed at the
+  table level, so the two cannot be reconciled faithfully. The module therefore
+  uses that argument (together with `iotdb.defaultTtlMs`) **only** for
+  ThingsBoard's storage data-point accounting, and never as an instruction to
+  expire rows. Operators who need physical retention set it on the table as shown
+  above.
 
 ## Known limitations
 
@@ -228,7 +301,7 @@ Key activation and operational flags:
 | Property | Default | Meaning |
 | --- | --- | --- |
 | `database.ts.type` | _(unset)_ | Set to `iotdb-table` as the ThingsBoard historical-timeseries backend selector. |
-| `iotdb.ts.experimental-raw-only` | `false` | Explicit opt-in for this initial raw-only backend. Must be `true` together with `database.ts.type=iotdb-table`; write, raw read, and delete are implemented, while time-bucketed aggregation is outside the current scope. |
+| `iotdb.ts.experimental-raw-only` | `false` | Explicit opt-in for this backend. Must be `true` together with `database.ts.type=iotdb-table`. The name predates the aggregation support and is kept for compatibility: write, raw read, delete **and** time-bucketed aggregation are all served when it is enabled. |
 | `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO. Independent of the timeseries selectors. Unset in a real Phase-1 deployment, so the attribute DAO is inert by default. |
 | `iotdb.attributes.cluster_mode` | _(empty)_ | Required when `database.attributes.type=iotdb-table`. Must be `sticky-routing` (per-identity writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the attribute write path converges only within a single JVM. |
 | `iotdb.ts_latest.cluster_mode` | _(empty)_ | Required when `database.ts_latest.type=iotdb-table` (the latest-overlay DAO is active). Must be `sticky-routing` (per-identity latest writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the latest-overlay write path converges only within a single JVM. This is the symmetric acknowledgement to `iotdb.attributes.cluster_mode`. |
@@ -298,11 +371,14 @@ docker compose -f docker-compose.test.yml down -v
 
 ## Status
 
-Initial module status: `IoTDBTableBaseDao` plus the `IoTDBTableTimeseriesDao`
-write, raw-read, and delete paths are implemented behind
+`IoTDBTableBaseDao` plus the `IoTDBTableTimeseriesDao` write, raw-read, delete
+and time-bucketed aggregation paths are implemented behind
 `database.ts.type=iotdb-table` and `iotdb.ts.experimental-raw-only=true`.
-Without both properties, the module is inert. Aggregation and latest telemetry
-are outside the current scope.
+Without both properties, that DAO is inert. `IoTDBTableLatestDao` (latest
+telemetry, with the `telemetry_latest` overlay and key discovery) is implemented
+behind its own `database.ts_latest.type=iotdb-table` selector. Physical
+retention is a table property the operator sets on the schema; see
+Retention / TTL above.
 
 `IoTDBTableAttributesDao` is **inert by default** and activated only by the independent
 `database.attributes.type=iotdb-table` opt-in (see the Entity attributes section
