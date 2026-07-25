@@ -1737,8 +1737,16 @@ class IoTDBTableTimeseriesDaoTest {
                     "CAST(SUM(CASE WHEN double_v IS NOT NULL THEN 1 ELSE 0 END) AS INT64) "
                         + "AS count_double"),
         statements.get(2));
+    // The numeric MAX is projected as -MIN(-x): IoTDB's grouped max accumulator seeds
+    // FLOAT/DOUBLE state with Double.MIN_VALUE (the smallest POSITIVE value), so MAX over a
+    // bucket whose maximum is zero or negative returns NULL and the bucket would be dropped
+    // (apache/iotdb#18300). The grouped MIN accumulator is unaffected and IEEE-754 negation is
+    // exact, so this is an exact substitute over finite values. The long and string channels are
+    // already correct and keep using MAX.
     assertTrue(
-        statements.get(3).contains("MAX(COALESCE(double_v, CAST(long_v AS DOUBLE))) AS agg_num")
+        statements
+                .get(3)
+                .contains("-1 * MIN(-1 * (COALESCE(double_v, CAST(long_v AS DOUBLE)))) AS agg_num")
             && statements.get(3).contains("MAX(long_v) AS max_long")
             && statements.get(3).contains("MAX(str_v) AS agg_str")
             && statements

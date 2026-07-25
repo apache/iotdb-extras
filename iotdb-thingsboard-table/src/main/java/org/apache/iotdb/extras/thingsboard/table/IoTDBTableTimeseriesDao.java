@@ -652,10 +652,24 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
               + AGG_STR_COLUMN
               + ", "
               + numericCountProjection();
+        // The numeric MAX is projected as -MIN(-x) rather than MAX(x). IoTDB's GROUPED max
+        // accumulator seeds FLOAT/DOUBLE state with Float/Double.MIN_VALUE -- the smallest
+        // POSITIVE value, not the most negative one -- and only marks a group initialized when
+        // `value >= state`, so a bucket whose numeric maximum is zero or negative comes back
+        // NULL. This DAO reads a NULL aggregate as "empty bucket" and skips it, so a MAX
+        // downsampling query over e.g. a sub-zero sensor would silently lose whole buckets
+        // instead of failing. Every release up to and including 2.0.10 is affected; fixed on
+        // master by apache/iotdb#18300, which is not in a released version yet. The grouped MIN
+        // accumulator seeds with MAX_VALUE and is not affected, and IEEE-754 negation is exact,
+        // so -MIN(-x) is an exact substitute for MAX(x) over finite values, on affected and
+        // fixed servers alike. This projection is shared with the calendar path, whose
+        // non-grouped accumulators track an explicit initialized flag rather than a sentinel, so
+        // the substitution is exact there too and an empty bucket still yields NULL. MAX(long_v)
+        // and MAX(str_v) are already correct (true Long.MIN_VALUE seed / flag-based) and stay.
       case MAX ->
-          "MAX("
+          "-1 * MIN(-1 * ("
               + NUMERIC_VALUE
-              + ") AS "
+              + ")) AS "
               + AGG_NUM_COLUMN
               + ", MAX(long_v) AS "
               + MAX_LONG_COLUMN
