@@ -29,5 +29,14 @@ work/
 ci/
 e2e-results/
 
+# e2e test directories
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
 # Editor
 .idea
+
+.eslintcache
