@@ -84,9 +84,13 @@ public class IoTDBTableConfig {
   @Data
   public static class Ts {
     /**
-     * Explicit opt-in for the raw-only backend. This backend currently implements write, raw read,
-     * and delete only; time-bucketed aggregation is outside the current scope, so it is not
-     * production-complete and must be enabled deliberately.
+     * Explicit opt-in for this backend. It implements write, raw read, time-bucketed aggregation
+     * (both the fixed-width millisecond {@code date_bin} path and the timezone-aware calendar
+     * buckets) and delete. The property name predates the aggregation support and is kept for
+     * compatibility. It remains experimental because of a known Phase-1 relaxation: a single {@code
+     * (tenant, entity, key, timestamp)} point whose value type changes across two separate flushes
+     * can leave two non-null typed columns, and a raw read of that one point then fails fast — so
+     * the backend must still be enabled deliberately.
      */
     private boolean experimentalRawOnly = false;
 
