@@ -49,3 +49,31 @@ jobs:
         run: |
           cd connectors/grafana-plugin/
           ./backend-compile.sh
+
+  # The job above exercises the npm path directly. This one exercises the Maven
+  # entrypoint (`mvn -Pwith-grafana-plugin`), which drives the same frontend build
+  # through frontend-maven-plugin. Without it that path is unverified: the module is
+  # not in the `with-all-connectors` profile that compile-check.yml builds, and the
+  # Jenkinsfile's bare `mvn clean install` does not activate `with-grafana-plugin`
+  # either -- so a toolchain change can leave the Maven build broken while every
+  # check is green.
+  maven-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Build through the Maven entrypoint
+        run: mvn clean package -Pwith-grafana-plugin -DskipTests -ntp
