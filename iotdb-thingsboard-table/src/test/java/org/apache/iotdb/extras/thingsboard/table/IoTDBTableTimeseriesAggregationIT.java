@@ -694,6 +694,104 @@ class IoTDBTableTimeseriesAggregationIT {
     }
   }
 
+  @Test
+  void maxKeepsBucketsWhoseValuesAreAllNonPositiveAgainstRealIoTDB() throws Exception {
+    TestScope scope =
+        scope(
+            "agg_nonpositive",
+            "55555555-5555-5555-5555-555555555511",
+            "66666666-6666-6666-6666-666666666611");
+    bootstrapSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(8);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao dao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      try {
+        // Regression for apache/iotdb#18300 against REAL IoTDB. The server's GROUPED max
+        // accumulator seeds FLOAT/DOUBLE state with Double.MIN_VALUE -- the smallest POSITIVE
+        // value -- so on every release up to and including 2.0.10 a bucket whose maximum is zero
+        // or negative makes MAX(<expression>) return NULL. This DAO reads a NULL aggregate as an
+        // empty bucket and skips it, so such buckets used to VANISH from the series: a MAX
+        // downsampling query over a sub-zero sensor silently returned fewer points, with no
+        // error anywhere. The projection computes -MIN(-x) instead, which the unaffected grouped
+        // MIN accumulator evaluates exactly. Every bucket here has a non-positive maximum, so on
+        // the old projection this test fails with "bucket count expected 2 but was 0".
+        //   Bucket [1000,2000): doubles -5.0, -3.0 -> midpoint 1500, MAX = -3.0, MIN = -5.0
+        //   Bucket [2000,3000): doubles  0.0,  0.0 -> midpoint 2500, MAX =  0.0, MIN =  0.0
+        saveAll(
+            dao,
+            scope,
+            List.of(
+                entry(1000L, "np", DataType.DOUBLE, -5.0D),
+                entry(1500L, "np", DataType.DOUBLE, -3.0D),
+                entry(2100L, "np", DataType.DOUBLE, 0.0D),
+                entry(2400L, "np", DataType.DOUBLE, 0.0D)));
+
+        ReadTsKvQueryResult max = aggregate(dao, scope, "np", Aggregation.MAX);
+        assertNumericBuckets(
+            max,
+            new long[] {1500L, 2500L},
+            new DataType[] {DataType.DOUBLE, DataType.DOUBLE},
+            new double[] {-3.0D, 0.0D},
+            2400L);
+
+        // MIN is not affected by the upstream bug; it must be byte-for-byte unchanged.
+        ReadTsKvQueryResult min = aggregate(dao, scope, "np", Aggregation.MIN);
+        assertNumericBuckets(
+            min,
+            new long[] {1500L, 2500L},
+            new DataType[] {DataType.DOUBLE, DataType.DOUBLE},
+            new double[] {-5.0D, 0.0D},
+            2400L);
+      } finally {
+        dao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
+  @Test
+  void maxOverNonPositiveLongOnlyAndMixedBucketsKeepsResultTypeAgainstRealIoTDB() throws Exception {
+    TestScope scope =
+        scope(
+            "agg_nonpositive_types",
+            "55555555-5555-5555-5555-555555555512",
+            "66666666-6666-6666-6666-666666666612");
+    bootstrapSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(8);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao dao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      try {
+        // Same regression across the two typed channels, since they take different code paths:
+        //   Bucket [1000,2000): LONG-ONLY -5, -3 -> midpoint 1500, MAX = -3 kept LONG-typed via
+        //       the direct MAX(long_v) channel (LongBigArray seeds with the true Long.MIN_VALUE,
+        //       so that channel was always correct).
+        //   Bucket [2000,3000): MIXED long -5 + double -3.0 -> midpoint 2500, MAX = -3.0 promoted
+        //       to DOUBLE, which reads the numeric channel and therefore exercises the fix.
+        saveAll(
+            dao,
+            scope,
+            List.of(
+                entry(1000L, "nt", DataType.LONG, -5L),
+                entry(1500L, "nt", DataType.LONG, -3L),
+                entry(2100L, "nt", DataType.LONG, -5L),
+                entry(2400L, "nt", DataType.DOUBLE, -3.0D)));
+
+        ReadTsKvQueryResult max = aggregate(dao, scope, "nt", Aggregation.MAX);
+        assertNumericBuckets(
+            max,
+            new long[] {1500L, 2500L},
+            new DataType[] {DataType.LONG, DataType.DOUBLE},
+            new double[] {-3.0D, -3.0D},
+            2400L);
+      } finally {
+        dao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
   private ReadTsKvQueryResult calendarAggregate(
       IoTDBTableTimeseriesDao dao,
       TestScope scope,
