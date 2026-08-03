@@ -80,7 +80,7 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
   private static final long SECONDS_PER_DAY = 86400L;
   private static final String TABLE_NAME = IoTDBTableTimeseriesWriter.TABLE_NAME;
 
-  // Result-set column aliases for the time-bucketed aggregation read path (design doc §3.3).
+  // Result-set column aliases for the time-bucketed aggregation read path.
   private static final String BUCKET_TS_COLUMN = "bucket_ts";
   private static final String AGG_NUM_COLUMN = "agg_num";
   private static final String AGG_STR_COLUMN = "agg_str";
