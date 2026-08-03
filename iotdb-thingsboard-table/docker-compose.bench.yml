@@ -1,0 +1,66 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# TC-1 ingestion-throughput SMOKE-profile bench stack.
+#
+# This is the smoke profile: a single, clean-volume IoTDB 2.0.8 node for a fast,
+# reproducible local benchmark run. It mirrors docker-compose.test.yml but ships
+# only the IoTDB service on a dedicated fresh volume so each run starts from an
+# empty store. The benchmark IT (IoTDBTableIngestionBenchmarkIT) provisions its
+# own throwaway Testcontainer, so this compose file is only for an out-of-band
+# manual smoke run against a standalone node.
+#
+# The FULL multi-backend profile (Cassandra / PostgreSQL / TimescaleDB on a
+# dedicated host, contributor-run) is later-scope and is not defined here.
+#
+# Do not hardcode passwords or local hostnames; pass IOTDB_USERNAME /
+# IOTDB_PASSWORD via the environment.
+
+services:
+  iotdb:
+    image: apache/iotdb:2.0.8-standalone
+    container_name: iotdb-table-bench
+    environment:
+      IOTDB_USERNAME: ${IOTDB_USERNAME:?set IOTDB_USERNAME}
+      IOTDB_PASSWORD: ${IOTDB_PASSWORD:?set IOTDB_PASSWORD}
+      # Bind the client RPC service to all interfaces so the mapped host port is
+      # reachable from the benchmark client (default 127.0.0.1 only listens on the
+      # container loopback).
+      dn_rpc_address: 0.0.0.0
+    ports:
+      - "${IOTDB_RPC_PORT:-6667}:6667"
+    volumes:
+      # Fresh, dedicated volume so every smoke run starts from an empty store.
+      # Reset between runs with: docker compose -f docker-compose.bench.yml down -v
+      - iotdb-bench-data:/iotdb/data
+    networks:
+      - tb-iotdb-bench
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec ': >/dev/tcp/127.0.0.1/6667'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+networks:
+  tb-iotdb-bench:
+    driver: bridge
+
+volumes:
+  iotdb-bench-data:
