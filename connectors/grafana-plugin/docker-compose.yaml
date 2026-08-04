@@ -1,0 +1,39 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+services:
+  grafana:
+    extends:
+      file: .config/docker-compose-base.yaml
+      service: grafana
+    depends_on:
+      - iotdb
+
+  # A standalone IoTDB for local development, wired to the provisioned
+  # datasource in ./provisioning. The REST port serves the tree-model query
+  # modes; 6667 is the native Thrift port the table-model mode uses.
+  iotdb:
+    image: apache/iotdb:2.0.8-standalone
+    container_name: iotdb
+    environment:
+      - dn_rpc_address=0.0.0.0
+      - enable_rest_service=true
+    ports:
+      - 6667:6667/tcp
+      - 18080:18080/tcp

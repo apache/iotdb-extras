@@ -93,8 +93,7 @@ export const FromValue: FunctionComponent<Props> = ({ prefixPath, onChange }) =>
                     <a
                       className="gf-form-label query-part"
                       onClick={() => {
-                        prefixPath[prefixPath.length] = '';
-                        onChange(prefixPath);
+                        onChange([...prefixPath, '']);
                       }}
                     >
                       <Icon name="plus" />

@@ -93,8 +93,7 @@ export const SelectValue: FunctionComponent<Props> = ({ expressions, onChange })
                     <a
                       className="gf-form-label query-part"
                       onClick={() => {
-                        expressions[expressions.length] = '';
-                        onChange(expressions);
+                        onChange([...expressions, '']);
                       }}
                     >
                       <Icon name="plus" />

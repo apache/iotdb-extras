@@ -26,7 +26,24 @@ Grafana is an open source volume metrics monitoring and visualization tool, whic
 
 We developed the Grafana-Plugin for IoTDB, using the IoTDB REST service to present time series data and providing many visualization methods for time series data.
 
-IoTDB grafana plugin supports grafana version 9.3.0 and above
+### Grafana version compatibility
+
+This plugin requires **Grafana 12.3.0 or later**. Earlier versions, including the
+9.x, 10.x and 11.x releases supported by previous plugin releases, are no longer
+supported.
+
+The floor is not arbitrary. The `@grafana/*` packages this plugin builds against
+are webpack externals: they are resolved from the host Grafana at runtime rather
+than bundled into the plugin. A plugin built against a newer Grafana therefore
+compiles cleanly and then fails inside an older host, with no bundled fallback —
+so a declared floor is only meaningful if something actually boots that version
+and loads the plugin there.
+
+CI does exactly that. The `minimum-grafana-version` job parses the floor out of
+`plugin.json`, boots that Grafana release together with IoTDB, and checks that the
+plugin's frontend loads and that a table-model query returns data through the
+native client. Raising or lowering the declared floor therefore changes what is
+tested, with no separate file to keep in step.
 
 ### How to use Grafana-Plugin
 

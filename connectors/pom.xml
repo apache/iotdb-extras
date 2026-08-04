@@ -38,7 +38,26 @@
                 <inherited>false</inherited>
                 <configuration>
                     <excludes combine.children="append">
-                        <exclude>**/grafana-plugin/**</exclude>
+                        <!-- The grafana-plugin tree is checked by RAT; only generated
+                             and binary content is excluded. .config/ is emitted by
+                             @grafana/create-plugin and marked do-not-edit by the scaffold,
+                             so a header added there is lost on the next regeneration. -->
+                        <exclude>**/grafana-plugin/node/**</exclude>
+                        <exclude>**/grafana-plugin/node_modules/**</exclude>
+                        <exclude>**/grafana-plugin/dist/**</exclude>
+                        <exclude>**/grafana-plugin/coverage/**</exclude>
+                        <exclude>**/grafana-plugin/playwright-report/**</exclude>
+                        <exclude>**/grafana-plugin/test-results/**</exclude>
+                        <exclude>**/grafana-plugin/.config/**</exclude>
+                        <exclude>**/grafana-plugin/package-lock.json</exclude>
+                        <exclude>**/grafana-plugin/CHANGELOG.md</exclude>
+                        <exclude>**/grafana-plugin/LICENSE</exclude>
+                        <exclude>**/grafana-plugin/.nvmrc</exclude>
+                        <exclude>**/grafana-plugin/src/img/**</exclude>
+                        <!-- An empty directory marker cannot carry a header; .eslintcache
+                             is a local lint artifact and is not tracked. -->
+                        <exclude>**/grafana-plugin/**/.gitkeep</exclude>
+                        <exclude>**/grafana-plugin/.eslintcache</exclude>
                     </excludes>
                 </configuration>
             </plugin>
