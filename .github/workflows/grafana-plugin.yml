@@ -77,3 +77,74 @@ jobs:
 
       - name: Build through the Maven entrypoint
         run: mvn clean package -Pwith-grafana-plugin -DskipTests -ntp
+
+  # plugin.json declares a grafanaDependency floor, but the @grafana/* packages are
+  # webpack externals resolved from the host at runtime -- so a plugin built against a
+  # newer Grafana compiles cleanly and then fails inside an older one. This job boots
+  # the exact version parsed out of grafanaDependency and checks that the plugin loads
+  # and answers a table-model query there. Changing the declared floor changes what is
+  # tested; nothing here needs editing.
+  minimum-grafana-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: connectors/grafana-plugin/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: connectors/grafana-plugin/package-lock.json
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Resolve the declared minimum Grafana version
+        id: floor
+        run: |
+          cd connectors/grafana-plugin/
+          version=$(node -e "
+            const dep = require('./src/plugin.json').dependencies.grafanaDependency;
+            const m = /(\d+\.\d+\.\d+)/.exec(dep);
+            if (!m) { console.error('cannot parse grafanaDependency: ' + dep); process.exit(1); }
+            process.stdout.write(m[1]);
+          ")
+          echo "Declared floor: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the plugin
+        run: |
+          cd connectors/grafana-plugin/
+          npm ci
+          npm run build
+          ./backend-compile.sh
+
+      - name: Boot Grafana at the declared minimum and wait for both services
+        env:
+          GRAFANA_VERSION: ${{ steps.floor.outputs.version }}
+          GRAFANA_IMAGE: grafana
+        run: |
+          cd connectors/grafana-plugin/
+          docker compose up -d --build
+          # IoTDB's REST port answers before the native RPC port is ready, so wait on
+          # Grafana's health endpoint and give the datasource a moment to provision.
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then break; fi
+            sleep 5
+          done
+          curl -sf http://localhost:3000/api/health
+
+      - name: Run the compatibility smoke test
+        run: |
+          cd connectors/grafana-plugin/
+          npx playwright install --with-deps chromium
+          npm run e2e -- tests/minimumGrafanaVersion.spec.ts
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: |
+          cd connectors/grafana-plugin/
+          docker compose logs --no-color --tail 200
