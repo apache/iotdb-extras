@@ -30,7 +30,8 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import java.util.Map;
 
-import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SOURCE_PARALLELISM_NUM;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SOURCE_PARALLELISM_NUM_DEFAULT_VALUE;
+import static org.apache.iotdb.collector.config.TaskRuntimeOptions.TASK_SOURCE_PARALLELISM_NUM_KEY;
 
 public abstract class SourceTask extends Task {
 
@@ -45,10 +46,10 @@ public abstract class SourceTask extends Task {
     super(
         taskId,
         attributes,
-        TASK_SOURCE_PARALLELISM_NUM.key(),
-        attributes.containsKey(TASK_SOURCE_PARALLELISM_NUM.key())
-            ? Integer.parseInt(attributes.get(TASK_SOURCE_PARALLELISM_NUM.key()))
-            : TASK_SOURCE_PARALLELISM_NUM.value());
+        TASK_SOURCE_PARALLELISM_NUM_KEY,
+        attributes.containsKey(TASK_SOURCE_PARALLELISM_NUM_KEY)
+            ? Integer.parseInt(attributes.get(TASK_SOURCE_PARALLELISM_NUM_KEY))
+            : TASK_SOURCE_PARALLELISM_NUM_DEFAULT_VALUE);
     this.processorProducer = processorProducer;
     this.taskState = taskState;
   }

@@ -26,8 +26,6 @@ import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.utils.PublicBAOS;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -38,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 
 public class PipeTabletEventPlainBatch extends PipeTabletEventBatch {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(PipeTabletEventPlainBatch.class);
 
   private final List<ByteBuffer> binaryBuffers = new ArrayList<>();
   private final List<ByteBuffer> insertNodeBuffers = new ArrayList<>();
@@ -62,7 +58,7 @@ public class PipeTabletEventPlainBatch extends PipeTabletEventBatch {
     final int bufferSize = buildTabletInsertionBuffer(event);
     totalBufferSize += bufferSize;
     pipe2BytesAccumulated.compute(
-        new Pair<>("", 0L),
+        new Pair<>("", System.currentTimeMillis()),
         (pipeName, bytesAccumulated) ->
             bytesAccumulated == null ? bufferSize : bytesAccumulated + bufferSize);
     return true;

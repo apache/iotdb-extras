@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.collector.plugin.builtin.processor;
 
-import org.apache.iotdb.collector.plugin.builtin.source.iotdb.SubDemoEvent;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeProcessorRuntimeConfiguration;
@@ -27,8 +26,9 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 
-public class SubscriptionProcessor implements PipeProcessor {
+public class TsFileProcessor implements PipeProcessor {
   @Override
   public void validate(PipeParameterValidator pipeParameterValidator) throws Exception {}
 
@@ -39,17 +39,17 @@ public class SubscriptionProcessor implements PipeProcessor {
       throws Exception {}
 
   @Override
-  public void process(TabletInsertionEvent tabletInsertionEvent, EventCollector eventCollector)
+  public void process(TsFileInsertionEvent tsFileInsertionEvent, EventCollector eventCollector)
       throws Exception {
-    eventCollector.collect(tabletInsertionEvent);
+    eventCollector.collect(tsFileInsertionEvent);
   }
 
   @Override
-  public void process(Event event, EventCollector eventCollector) throws Exception {
-    if (event instanceof SubDemoEvent) {
-      process((SubDemoEvent) event, eventCollector);
-    }
-  }
+  public void process(TabletInsertionEvent tabletInsertionEvent, EventCollector eventCollector)
+      throws Exception {}
+
+  @Override
+  public void process(Event event, EventCollector eventCollector) throws Exception {}
 
   @Override
   public void close() throws Exception {}
