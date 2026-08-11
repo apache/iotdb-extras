@@ -25,45 +25,126 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # The Node version comes from the plugin's .nvmrc so it cannot drift away
+      # from the toolchain again; npm caching is keyed on the lockfile.
       - name: Setup Node.js environment
         uses: actions/setup-node@v4
         with:
-          node-version: "14.x"
+          node-version-file: connectors/grafana-plugin/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: connectors/grafana-plugin/package-lock.json
 
       - name: Setup Go environment
         uses: actions/setup-go@v5
         with:
           go-version: "1.21"
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache yarn cache
-        uses: actions/cache@v4
-        id: cache-yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-${{ matrix.node-version }}-nodemodules-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.node-version }}-nodemodules-
-
       - name: Install dependencies and Build and test frontend
         run: |
           cd connectors/grafana-plugin/
-          yarn install --frozen-lockfile
-          yarn build
+          npm ci
+          npm run build
 
       - name: Install dependencies and Build backend
         run: |
           cd connectors/grafana-plugin/
           ./backend-compile.sh
+
+  # The job above exercises the npm path directly. This one exercises the Maven
+  # entrypoint (`mvn -Pwith-grafana-plugin`), which drives the same frontend build
+  # through frontend-maven-plugin. Without it that path is unverified: the module is
+  # not in the `with-all-connectors` profile that compile-check.yml builds, and the
+  # Jenkinsfile's bare `mvn clean install` does not activate `with-grafana-plugin`
+  # either -- so a toolchain change can leave the Maven build broken while every
+  # check is green.
+  maven-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Build through the Maven entrypoint
+        run: mvn clean package -Pwith-grafana-plugin -DskipTests -ntp
+
+  # plugin.json declares a grafanaDependency floor, but the @grafana/* packages are
+  # webpack externals resolved from the host at runtime -- so a plugin built against a
+  # newer Grafana compiles cleanly and then fails inside an older one. This job boots
+  # the exact version parsed out of grafanaDependency and checks that the plugin loads
+  # and answers a table-model query there. Changing the declared floor changes what is
+  # tested; nothing here needs editing.
+  minimum-grafana-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: connectors/grafana-plugin/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: connectors/grafana-plugin/package-lock.json
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Resolve the declared minimum Grafana version
+        id: floor
+        run: |
+          cd connectors/grafana-plugin/
+          version=$(node -e "
+            const dep = require('./src/plugin.json').dependencies.grafanaDependency;
+            const m = /(\d+\.\d+\.\d+)/.exec(dep);
+            if (!m) { console.error('cannot parse grafanaDependency: ' + dep); process.exit(1); }
+            process.stdout.write(m[1]);
+          ")
+          echo "Declared floor: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the plugin
+        run: |
+          cd connectors/grafana-plugin/
+          npm ci
+          npm run build
+          ./backend-compile.sh
+
+      - name: Boot Grafana at the declared minimum and wait for both services
+        env:
+          GRAFANA_VERSION: ${{ steps.floor.outputs.version }}
+          GRAFANA_IMAGE: grafana
+        run: |
+          cd connectors/grafana-plugin/
+          docker compose up -d --build
+          # IoTDB's REST port answers before the native RPC port is ready, so wait on
+          # Grafana's health endpoint and give the datasource a moment to provision.
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then break; fi
+            sleep 5
+          done
+          curl -sf http://localhost:3000/api/health
+
+      - name: Run the compatibility smoke test
+        run: |
+          cd connectors/grafana-plugin/
+          npx playwright install --with-deps chromium
+          npm run e2e -- tests/minimumGrafanaVersion.spec.ts
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: |
+          cd connectors/grafana-plugin/
+          docker compose logs --no-color --tail 200
