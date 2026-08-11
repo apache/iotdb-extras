@@ -18,7 +18,10 @@
 package plugin
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,11 +83,159 @@ func TestExpandTableMacros(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := expandTableMacros(c.in, from, to)
+			got, err := expandTableMacros(c.in, from, to, 0)
+			if err != nil {
+				t.Fatalf("expandTableMacros() unexpected error: %v", err)
+			}
 			if got != c.want {
 				t.Fatalf("expandTableMacros() = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+func TestExpandTableIntervalMacros(t *testing.T) {
+	const from int64 = 1600000000000
+	const to int64 = 1600000001000
+
+	cases := []struct {
+		name      string
+		sql       string
+		interval  int64
+		precision string
+		want      string
+		wantErr   string
+	}{
+		{
+			name:      "expands duration and raw milliseconds together",
+			sql:       "SELECT date_bin($__interval, time) + $__interval_ms AS bucket_time FROM table1",
+			interval:  120000,
+			precision: "ms",
+			want:      "SELECT date_bin(2m, time) + 120000 AS bucket_time FROM table1",
+		},
+		{
+			name:      "separate interval macros do not overlap",
+			sql:       "SELECT $__interval, $__interval_ms",
+			interval:  120000,
+			precision: "ms",
+			want:      "SELECT 2m, 120000",
+		},
+		{name: "milliseconds", sql: "SELECT $__interval", interval: 500, precision: "ms", want: "SELECT 500ms"},
+		{name: "seconds", sql: "SELECT $__interval", interval: 1000, precision: "ms", want: "SELECT 1s"},
+		{name: "minutes", sql: "SELECT $__interval", interval: 120000, precision: "ms", want: "SELECT 2m"},
+		{name: "hours", sql: "SELECT $__interval", interval: 3600000, precision: "ms", want: "SELECT 1h"},
+		{name: "days", sql: "SELECT $__interval", interval: 86400000, precision: "ms", want: "SELECT 1d"},
+		{name: "weeks", sql: "SELECT $__interval", interval: 604800000, precision: "ms", want: "SELECT 1w"},
+		{name: "non exact duration uses milliseconds", sql: "SELECT $__interval", interval: 1500, precision: "ms", want: "SELECT 1500ms"},
+		{name: "microsecond server scales raw timestamp arithmetic", sql: "SELECT $__interval_ms", interval: 120000, precision: "us", want: "SELECT 120000000"},
+		{name: "nanosecond server scales raw timestamp arithmetic", sql: "SELECT $__interval_ms", interval: 120000, precision: "ns", want: "SELECT 120000000000"},
+		{name: "identifier boundaries are preserved", sql: "SELECT $__intervalish, $__interval_ms_extra", interval: 120000, precision: "ms", want: "SELECT $__intervalish, $__interval_ms_extra"},
+		{name: "interval is ignored when no interval macro exists", sql: "SELECT $__timeFrom", interval: 0, precision: "ms", want: "SELECT 2020-09-13T12:26:40.000+00:00"},
+		{name: "zero interval fails", sql: "SELECT $__interval", interval: 0, precision: "ms", wantErr: "Grafana query interval must be positive"},
+		{name: "negative interval fails", sql: "SELECT $__interval_ms", interval: -1, precision: "ms", wantErr: "Grafana query interval must be positive"},
+		{name: "unknown precision fails", sql: "SELECT $__interval_ms", interval: 1000, precision: "ps", wantErr: "unsupported IoTDB timestamp precision"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := expandTableMacrosWithPrecision(tc.sql, from, to, tc.interval, tc.precision)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expandTableMacros() error = %v, want substring %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expandTableMacros() unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("expandTableMacros() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestExpandTableIntervalMacrosWithExplicitOrigin(t *testing.T) {
+	cases := []struct {
+		name string
+		from int64
+		to   int64
+		sql  string
+		want string
+	}{
+		{
+			name: "date bin origin offset by thirty seconds",
+			from: 1600000030000,
+			to:   1600000150000,
+			sql:  "SELECT date_bin($__interval, time, $__timeFrom) AS bucket_time FROM table1",
+			want: "SELECT date_bin(2m, time, 2020-09-13T12:27:10.000+00:00) AS bucket_time FROM table1",
+		},
+		{
+			name: "hop origin offset by forty five seconds",
+			from: 1600000045000,
+			to:   1600000165000,
+			sql:  "SELECT * FROM HOP(DATA => table1, SLIDE => $__interval, SIZE => 1m, ORIGIN => $__timeFrom)",
+			want: "SELECT * FROM HOP(DATA => table1, SLIDE => 2m, SIZE => 1m, ORIGIN => 2020-09-13T12:27:25.000+00:00)",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := expandTableMacros(tc.sql, tc.from, tc.to, 120000)
+			if err != nil {
+				t.Fatalf("expandTableMacros() unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("expandTableMacros() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestQueryParamRuntimeIntervalOverridesJSON(t *testing.T) {
+	qp, msg := verifyQuery(backend.DataQuery{JSON: []byte(`{"sqlType":"SQL: Table Model","sql":"SELECT $__interval_ms","database":"db1","intervalMS":999}`)})
+	if msg != "" {
+		t.Fatalf("valid table query rejected: %q", msg)
+	}
+	if qp.IntervalMS != 0 {
+		t.Fatalf("JSON intervalMS should not populate runtime field: %d", qp.IntervalMS)
+	}
+	serialized, err := json.Marshal(qp)
+	if err != nil {
+		t.Fatalf("marshal query param: %v", err)
+	}
+	if strings.Contains(string(serialized), "intervalMS") {
+		t.Fatalf("runtime intervalMS must not be serialized: %s", serialized)
+	}
+	query := backend.DataQuery{
+		Interval: 120 * time.Second,
+		TimeRange: backend.TimeRange{
+			From: ts(1600000000000),
+			To:   ts(1600000001000),
+		},
+	}
+	applyQueryRuntimeValues(qp, query)
+	if qp.IntervalMS != 120000 || qp.StartTime != 1600000000000 || qp.EndTime != 1600000001000 {
+		t.Fatalf("runtime values = start %d, end %d, interval %d", qp.StartTime, qp.EndTime, qp.IntervalMS)
+	}
+}
+
+func TestQueryTableModelRejectsNonPositiveIntervalBeforeRPC(t *testing.T) {
+	_, expandErr := expandTableMacros("SELECT $__interval", 0, 0, 0)
+	if expandErr == nil || expandErr.Error() != invalidIntervalMacroMessage {
+		t.Fatalf("expandTableMacros() error = %v, want %q", expandErr, invalidIntervalMacroMessage)
+	}
+
+	d := &IoTDBDataSource{Ulr: "http://invalid-host:18080"}
+	response := d.queryTableModel(context.Background(), &queryParam{
+		Sql:        "SELECT $__interval FROM table1",
+		Database:   "db1",
+		IntervalMS: 0,
+	})
+	if response.Error == nil || response.Error.Error() != invalidIntervalMacroMessage {
+		t.Fatalf("queryTableModel() error = %v, want early positive-interval error", response.Error)
+	}
+	if d.tablePool != nil {
+		t.Fatalf("invalid interval should be rejected before creating an RPC pool")
 	}
 }
 
@@ -159,6 +310,54 @@ func TestFetchTableDataSetPropagatesError(t *testing.T) {
 	rs := &fakeResultSet{names: []string{"a"}, types: []string{"INT64"}, err: errors.New("broken pipe")}
 	if _, err := fetchTableDataSet(rs); err == nil {
 		t.Fatalf("expected the iteration error to propagate")
+	}
+}
+
+func TestTimestampPrecisionFromDataSet(t *testing.T) {
+	cases := []struct {
+		name    string
+		dataSet *tableQueryDataSet
+		want    string
+		errText string
+	}{
+		{
+			name: "case insensitive variable and value columns",
+			dataSet: &tableQueryDataSet{
+				ColumnNames: []string{"Value", "Variable"},
+				Values:      [][]interface{}{{[]byte("ms"), []byte("TimestampPrecision")}},
+			},
+			want: "ms",
+		},
+		{
+			name: "unsupported precision",
+			dataSet: &tableQueryDataSet{
+				ColumnNames: []string{"Variable", "Value"},
+				Values:      [][]interface{}{{"TimestampPrecision", "ps"}},
+			},
+			errText: "unsupported IoTDB timestamp precision",
+		},
+		{
+			name: "missing row",
+			dataSet: &tableQueryDataSet{
+				ColumnNames: []string{"Variable", "Value"},
+				Values:      [][]interface{}{{"ClusterName", "defaultCluster"}},
+			},
+			errText: "did not return TimestampPrecision",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := timestampPrecisionFromDataSet(tc.dataSet)
+			if tc.errText != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.errText) {
+					t.Fatalf("timestampPrecisionFromDataSet() error = %v, want substring %q", err, tc.errText)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("timestampPrecisionFromDataSet() = %q, %v; want %q", got, err, tc.want)
+			}
+		})
 	}
 }
 

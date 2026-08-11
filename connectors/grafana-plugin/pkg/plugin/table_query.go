@@ -73,7 +73,14 @@ var timeFilterRe = regexp.MustCompile(`\$__timeFilter\(\s*((?:[^()]|\([^()]*\))*
 var (
 	timeFromRe = regexp.MustCompile(`\$__timeFrom\b(?:\s*\(\s*\))?`)
 	timeToRe   = regexp.MustCompile(`\$__timeTo\b(?:\s*\(\s*\))?`)
+	// These patterns intentionally match the macro prefix. hasStandaloneMacro
+	// and replaceStandaloneMacro reject an identifier byte after the match, so
+	// $__interval_ms is not mistaken for $__interval.
+	intervalRe   = regexp.MustCompile(`\$__interval`)
+	intervalMSRe = regexp.MustCompile(`\$__interval_ms`)
 )
+
+const invalidIntervalMacroMessage = "Grafana query interval must be positive when $__interval or $__interval_ms is used"
 
 // formatTimeLiteral renders a panel-range bound as an ISO 8601 UTC timestamp
 // literal (e.g. 2020-09-13T12:26:40.000+00:00). The server parses such a
@@ -84,16 +91,51 @@ func formatTimeLiteral(ms int64) string {
 	return time.UnixMilli(ms).UTC().Format("2006-01-02T15:04:05.000") + "+00:00"
 }
 
-// expandTableMacros rewrites the Grafana time macros a dashboard author can put
-// in table-model SQL into concrete bounds for the panel's range:
+// expandTableMacros rewrites the Grafana time and interval macros a dashboard
+// author can put in table-model SQL. The precision-aware RPC path calls the
+// internal helper with the server's timestamp precision.
 //
 //	$__timeFilter(col)      -> (col >= <from> AND col <= <to>)
 //	$__timeFrom[()]         -> <from>
 //	$__timeTo[()]           -> <to>
+//	$__interval              -> a fixed-width IoTDB duration literal
+//	$__interval_ms           -> the interval in server timestamp units
 //
 // Bounds are ISO 8601 UTC timestamp literals, which IoTDB compares against
 // TIMESTAMP columns independently of the server's timestamp precision.
-func expandTableMacros(sql string, startMs int64, endMs int64) string {
+func expandTableMacros(sql string, startMs int64, endMs int64, intervalMS int64) (string, error) {
+	return expandTableMacrosWithPrecision(sql, startMs, endMs, intervalMS, "ms")
+}
+
+// expandTableMacrosWithPrecision expands the two Grafana interval macros in
+// addition to the existing time macros. intervalMS is Grafana's runtime
+// suggested step in milliseconds; it is never read from Dashboard JSON.
+// timestampPrecision controls the unit of integer TIMESTAMP arithmetic used by
+// $__interval_ms and must be ms, us, or ns.
+func expandTableMacrosWithPrecision(sql string, startMs int64, endMs int64, intervalMS int64, timestampPrecision string) (string, error) {
+	hasInterval := hasStandaloneMacro(sql, intervalRe)
+	hasIntervalMS := hasStandaloneMacro(sql, intervalMSRe)
+	if (hasInterval || hasIntervalMS) && intervalMS <= 0 {
+		// Defensive validation for direct callers. queryTableModel performs the
+		// authoritative request-path check before acquiring an RPC session.
+		return "", errors.New(invalidIntervalMacroMessage)
+	}
+
+	if hasIntervalMS {
+		scaled, err := scaleIntervalMS(intervalMS, timestampPrecision)
+		if err != nil {
+			return "", err
+		}
+		sql = replaceStandaloneMacro(sql, intervalMSRe, strconv.FormatInt(scaled, 10))
+	}
+	if hasInterval {
+		duration, err := formatIoTDBDuration(intervalMS)
+		if err != nil {
+			return "", err
+		}
+		sql = replaceStandaloneMacro(sql, intervalRe, duration)
+	}
+
 	from := formatTimeLiteral(startMs)
 	to := formatTimeLiteral(endMs)
 	sql = timeFilterRe.ReplaceAllStringFunc(sql, func(m string) string {
@@ -105,7 +147,89 @@ func expandTableMacros(sql string, startMs int64, endMs int64) string {
 	})
 	sql = timeFromRe.ReplaceAllString(sql, from)
 	sql = timeToRe.ReplaceAllString(sql, to)
-	return sql
+	return sql, nil
+}
+
+// hasStandaloneMacro reports whether re has a match that is not followed by an
+// identifier character. Go's regexp package intentionally has no lookahead,
+// so the boundary check is performed while scanning matches.
+func hasStandaloneMacro(sql string, re *regexp.Regexp) bool {
+	for _, match := range re.FindAllStringIndex(sql, -1) {
+		if match[1] == len(sql) || !isSQLIdentifierByte(sql[match[1]]) {
+			return true
+		}
+	}
+	return false
+}
+
+func replaceStandaloneMacro(sql string, re *regexp.Regexp, replacement string) string {
+	matches := re.FindAllStringIndex(sql, -1)
+	if len(matches) == 0 {
+		return sql
+	}
+	var b strings.Builder
+	last := 0
+	for _, match := range matches {
+		if match[1] < len(sql) && isSQLIdentifierByte(sql[match[1]]) {
+			continue
+		}
+		b.WriteString(sql[last:match[0]])
+		b.WriteString(replacement)
+		last = match[1]
+	}
+	b.WriteString(sql[last:])
+	return b.String()
+}
+
+func isSQLIdentifierByte(b byte) bool {
+	return b == '_' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9'
+}
+
+// formatIoTDBDuration uses only fixed-width units accepted by IoTDB and
+// avoids calendar month/year semantics. The largest exact unit is selected.
+func formatIoTDBDuration(intervalMS int64) (string, error) {
+	if intervalMS <= 0 {
+		return "", errors.New("Grafana query interval must be positive")
+	}
+	units := []struct {
+		milliseconds int64
+		suffix       string
+	}{
+		{7 * 24 * 60 * 60 * 1000, "w"},
+		{24 * 60 * 60 * 1000, "d"},
+		{60 * 60 * 1000, "h"},
+		{60 * 1000, "m"},
+		{1000, "s"},
+		{1, "ms"},
+	}
+	for _, unit := range units {
+		if intervalMS%unit.milliseconds == 0 {
+			return strconv.FormatInt(intervalMS/unit.milliseconds, 10) + unit.suffix, nil
+		}
+	}
+	return "", errors.New("cannot format Grafana query interval")
+}
+
+func scaleIntervalMS(intervalMS int64, timestampPrecision string) (int64, error) {
+	if intervalMS <= 0 {
+		return 0, errors.New("Grafana query interval must be positive")
+	}
+	var multiplier int64
+	switch strings.ToLower(strings.TrimSpace(timestampPrecision)) {
+	case "ms":
+		multiplier = 1
+	case "us":
+		multiplier = 1000
+	case "ns":
+		multiplier = 1000000
+	default:
+		return 0, fmt.Errorf("unsupported IoTDB timestamp precision %q", timestampPrecision)
+	}
+	maxInt64 := int64(^uint64(0) >> 1)
+	if intervalMS > maxInt64/multiplier {
+		return 0, fmt.Errorf("Grafana query interval %dms overflows IoTDB %s timestamp units", intervalMS, timestampPrecision)
+	}
+	return intervalMS * multiplier, nil
 }
 
 // quoteTableIdentifier wraps a table-model identifier in double quotes
@@ -215,7 +339,12 @@ func (d *IoTDBDataSource) getTablePool() (*client.TableSessionPool, error) {
 func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) backend.DataResponse {
 	response := backend.DataResponse{}
 
-	sql := expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime)
+	if (hasStandaloneMacro(qp.Sql, intervalRe) || hasStandaloneMacro(qp.Sql, intervalMSRe)) && qp.IntervalMS <= 0 {
+		// This is the authoritative guard: reject invalid Grafana input before
+		// getTablePool can create or acquire an RPC session.
+		response.Error = errors.New(invalidIntervalMacroMessage)
+		return response
+	}
 
 	pool, err := d.getTablePool()
 	if err != nil {
@@ -247,6 +376,19 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 			timeout = ms
 		}
 	}
+	timestampPrecision := "ms"
+	if hasStandaloneMacro(qp.Sql, intervalMSRe) {
+		timestampPrecision, err = readTimestampPrecision(session, &timeout)
+		if err != nil {
+			response.Error = fmt.Errorf("cannot determine IoTDB timestamp precision for $__interval_ms: %w", err)
+			return response
+		}
+	}
+	sql, err := expandTableMacrosWithPrecision(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS, timestampPrecision)
+	if err != nil {
+		response.Error = err
+		return response
+	}
 	resultSet, err := session.ExecuteQueryStatement(sql, &timeout)
 	if err != nil {
 		response.Error = err
@@ -266,6 +408,62 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 
 	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format))
 	return response
+}
+
+func readTimestampPrecision(session client.ITableSession, timeout *int64) (string, error) {
+	resultSet, err := session.ExecuteQueryStatement("SHOW VARIABLES", timeout)
+	if err != nil {
+		return "", err
+	}
+	defer resultSet.Close()
+	dataSet, err := fetchTableDataSet(resultSet)
+	if err != nil {
+		return "", err
+	}
+	return timestampPrecisionFromDataSet(dataSet)
+}
+
+func timestampPrecisionFromDataSet(dataSet *tableQueryDataSet) (string, error) {
+	columnNames := dataSet.ColumnNames
+	variableIndex, valueIndex := -1, -1
+	for i, name := range columnNames {
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "variable":
+			variableIndex = i
+		case "value":
+			valueIndex = i
+		}
+	}
+	if variableIndex < 0 || valueIndex < 0 {
+		return "", fmt.Errorf("SHOW VARIABLES result does not contain Variable and Value columns")
+	}
+	for _, row := range dataSet.Values {
+		if variableIndex >= len(row) || valueIndex >= len(row) {
+			continue
+		}
+		variable := row[variableIndex]
+		if !strings.EqualFold(strings.TrimSpace(sqlScalarString(variable)), "TimestampPrecision") {
+			continue
+		}
+		value := row[valueIndex]
+		precision := strings.ToLower(strings.TrimSpace(sqlScalarString(value)))
+		if precision != "ms" && precision != "us" && precision != "ns" {
+			return "", fmt.Errorf("unsupported IoTDB timestamp precision %q", precision)
+		}
+		return precision, nil
+	}
+	return "", errors.New("SHOW VARIABLES did not return TimestampPrecision")
+}
+
+func sqlScalarString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	default:
+		return fmt.Sprint(v)
+	}
 }
 
 // buildTableResponseFrame turns a fetched dataset into the response frame,
