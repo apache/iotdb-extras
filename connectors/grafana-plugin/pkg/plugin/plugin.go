@@ -157,6 +157,7 @@ type queryParam struct {
 	Database     string   `json:"database"`
 	Sql          string   `json:"sql"`
 	Format       string   `json:"format"`
+	IntervalMS   int64    `json:"-"`
 }
 
 type QueryDataReq struct {
@@ -262,8 +263,7 @@ func (d *IoTDBDataSource) query(cxt context.Context, pCtx backend.PluginContext,
 		return response
 	}
 
-	qp.StartTime = query.TimeRange.From.UnixNano() / 1000000
-	qp.EndTime = query.TimeRange.To.UnixNano() / 1000000
+	applyQueryRuntimeValues(qp, query)
 
 	if qp.SqlType == TableModelSqlType {
 		return d.queryTableModel(cxt, qp)
@@ -356,6 +356,12 @@ func (d *IoTDBDataSource) query(cxt context.Context, pCtx backend.PluginContext,
 
 	response.Frames = append(response.Frames, frame)
 	return response
+}
+
+func applyQueryRuntimeValues(qp *queryParam, query backend.DataQuery) {
+	qp.StartTime = query.TimeRange.From.UnixNano() / 1000000
+	qp.EndTime = query.TimeRange.To.UnixNano() / 1000000
+	qp.IntervalMS = query.Interval.Milliseconds()
 }
 
 func recoverType(m []interface{}) interface{} {
