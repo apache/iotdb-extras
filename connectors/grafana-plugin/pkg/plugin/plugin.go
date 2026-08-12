@@ -157,7 +157,7 @@ type queryParam struct {
 	Database     string   `json:"database"`
 	Sql          string   `json:"sql"`
 	Format       string   `json:"format"`
-	IntervalMS int64 `json:"-"`
+	IntervalMS   int64    `json:"-"`
 }
 
 type QueryDataReq struct {
