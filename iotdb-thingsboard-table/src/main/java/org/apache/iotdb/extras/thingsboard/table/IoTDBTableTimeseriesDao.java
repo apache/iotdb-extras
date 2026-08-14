@@ -389,14 +389,16 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
    * <p>IoTDB 2.0.8's native {@code date_bin} calendar primitive cannot reproduce ThingsBoard's
    * boundaries: it anchors each calendar bucket on the <em>origin's day-of-month</em> (so {@code
    * date_bin(1mo, time, startTs)} from a mid-month {@code startTs} steps day-15 → day-15, not to
-   * the 1st of each month) and it exposes <em>no timezone argument</em> (it computes in the
-   * server's UTC zone only). ThingsBoard instead advances {@code startTs} to the start of the next
-   * calendar unit in {@code tzId} via {@link TimeUtils#calculateIntervalEnd}, so the first bucket
-   * is the partial {@code [startTs, nextCalendarBoundary)} and later buckets are full calendar
-   * units. This path therefore reproduces ThingsBoard exactly the way ThingsBoard itself does: it
-   * walks the calendar boundaries in Java and issues one bounded aggregate query per bucket
-   * (ThingsBoard issues one future per bucket), reusing the very same projection, row mapper and
-   * typed-COUNT logic as the {@code MILLISECONDS} path.
+   * the 1st of each month) and it exposes <em>no timezone argument</em> — its calendar arithmetic
+   * runs in the <em>session's</em> zone, which is fixed when the session pool is built and cannot
+   * be rebound per query, while each {@link ReadTsKvQuery} carries its own {@code tzId}.
+   * ThingsBoard instead advances {@code startTs} to the start of the next calendar unit in {@code
+   * tzId} via {@link TimeUtils#calculateIntervalEnd}, so the first bucket is the partial {@code
+   * [startTs, nextCalendarBoundary)} and later buckets are full calendar units. This path therefore
+   * reproduces ThingsBoard exactly the way ThingsBoard itself does: it walks the calendar
+   * boundaries in Java and issues one bounded aggregate query per bucket (ThingsBoard issues one
+   * future per bucket), reusing the very same projection, row mapper and typed-COUNT logic as the
+   * {@code MILLISECONDS} path.
    *
    * <p>Walking {@code [startTs, endPeriod)} where {@code endPeriod = max(startTs + 1, endTs)}: each
    * iteration takes {@code bucketStart = startPeriod}, {@code bucketEnd = min(calculateIntervalEnd(
