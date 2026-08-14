@@ -90,6 +90,9 @@ type IoTDBDataSource struct {
 	// getTablePool on the first table query.
 	tablePoolMu sync.Mutex
 	tablePool   *client.TableSessionPool
+	// tableQueryRunner is replaceable in tests so queryTableModel's response
+	// behavior can be exercised without a live IoTDB RPC service.
+	tableQueryRunner func(context.Context, *queryParam) (*tableQueryDataSet, error)
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
@@ -158,6 +161,7 @@ type queryParam struct {
 	Sql          string   `json:"sql"`
 	Format       string   `json:"format"`
 	IntervalMS   int64    `json:"-"`
+	LegendFormat string   `json:"legendFormat"`
 }
 
 type QueryDataReq struct {

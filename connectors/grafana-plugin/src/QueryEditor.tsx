@@ -49,6 +49,7 @@ interface State {
   database: string;
   sql: string;
   format: string;
+  legendFormat: string;
 }
 
 const selectElement = [
@@ -94,6 +95,7 @@ export class QueryEditor extends PureComponent<Props, State> {
     database: '',
     sql: '',
     format: tableFormats[0],
+    legendFormat: '',
   };
 
 
@@ -161,6 +163,13 @@ export class QueryEditor extends PureComponent<Props, State> {
     onChange({ ...query, format: value });
   };
 
+  onLegendFormatChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query } = this.props;
+    const legendFormat = event.target.value;
+    this.setState({ legendFormat });
+    onChange({ ...query, legendFormat });
+  };
+
   onSelectTypeChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query } = this.props;
     onChange({ ...query });
@@ -207,6 +216,7 @@ export class QueryEditor extends PureComponent<Props, State> {
         database: this.props.query.database ?? '',
         sql: this.props.query.sql ?? '',
         format: this.props.query.format ?? tableFormats[0],
+        legendFormat: this.props.query.legendFormat ?? '',
       });
     } else {
       this.props.query.sqlType = selectType[0];
@@ -411,6 +421,15 @@ export class QueryEditor extends PureComponent<Props, State> {
                       options={tableFormats.map(toOption)}
                       value={query.format ?? this.state.format}
                       className="query-keyword width-10"
+                    />
+                  </QueryInlineField>
+                </div>
+                <div className="gf-form">
+                  <QueryInlineField label={'LEGEND'}>
+                    <Input
+                      value={query.legendFormat ?? this.state.legendFormat}
+                      placeholder={'{{instance}}'}
+                      onChange={this.onLegendFormatChange}
                     />
                   </QueryInlineField>
                 </div>

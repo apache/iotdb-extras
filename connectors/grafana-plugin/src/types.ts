@@ -40,6 +40,7 @@ export interface IoTDBQuery extends DataQuery {
   database?: string;
   sql?: string;
   format?: string;
+  legendFormat?: string;
 }
 
 export interface GroupBy {

@@ -310,16 +310,39 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 		return response
 	}
 
-	pool, err := d.getTablePool()
+	runner := d.tableQueryRunner
+	if runner == nil {
+		runner = d.executeTableQuery
+	}
+	dataSet, err := runner(ctx, qp)
 	if err != nil {
 		response.Error = err
 		return response
 	}
+
+	if !strings.EqualFold(qp.Format, tableFormatTable) && !hasPlottableValue(dataSet) {
+		// Time Series with no plottable values — zero rows, or rows whose value
+		// columns are all NULL (a HOP/rate query over sparse data returns NULL
+		// windows) — has no frame so Grafana shows "No data" instead of bare
+		// axes. Table format keeps the empty frame so column headers stay visible.
+		return response
+	}
+
+	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format, qp.LegendFormat))
+	return response
+}
+
+// executeTableQuery runs and fetches one table-model query. queryTableModel
+// owns response semantics so the same zero-row path is covered in tests.
+func (d *IoTDBDataSource) executeTableQuery(ctx context.Context, qp *queryParam) (*tableQueryDataSet, error) {
+	pool, err := d.getTablePool()
+	if err != nil {
+		return nil, err
+	}
 	session, err := pool.GetSession()
 	if err != nil {
-		response.Error = fmt.Errorf("cannot connect to the IoTDB RPC service: %w", err)
 		log.DefaultLogger.Error("Cannot connect to the IoTDB RPC service", "err", err)
-		return response
+		return nil, fmt.Errorf("cannot connect to the IoTDB RPC service: %w", err)
 	}
 	defer func() {
 		if closeErr := session.Close(); closeErr != nil {
@@ -329,8 +352,7 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 
 	if database := strings.TrimSpace(qp.Database); database != "" {
 		if err := session.ExecuteNonQueryStatement("USE " + quoteTableIdentifier(database)); err != nil {
-			response.Error = err
-			return response
+			return nil, err
 		}
 	}
 
@@ -342,13 +364,11 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 	}
 	sql, err := expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS)
 	if err != nil {
-		response.Error = err
-		return response
+		return nil, err
 	}
 	resultSet, err := session.ExecuteQueryStatement(sql, &timeout)
 	if err != nil {
-		response.Error = err
-		return response
+		return nil, err
 	}
 	defer func() {
 		if closeErr := resultSet.Close(); closeErr != nil {
@@ -358,12 +378,9 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 
 	dataSet, err := fetchTableDataSet(resultSet)
 	if err != nil {
-		response.Error = err
-		return response
+		return nil, err
 	}
-
-	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format))
-	return response
+	return dataSet, nil
 }
 
 // buildTableResponseFrame turns a fetched dataset into the response frame,
@@ -374,7 +391,7 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 // lines instead of one interleaved series; when the pivot does not apply (or
 // fails, e.g. on a null timestamp) the plain frame is returned. The Table
 // format preserves the server's row order untouched.
-func buildTableResponseFrame(dataSet *tableQueryDataSet, format string) *data.Frame {
+func buildTableResponseFrame(dataSet *tableQueryDataSet, format string, legendFormat string) *data.Frame {
 	// Anything that is not explicitly the Table format gets the default
 	// time-series treatment, including queries saved before FORMAT existed.
 	isTimeSeries := !strings.EqualFold(format, tableFormatTable)
@@ -387,7 +404,39 @@ func buildTableResponseFrame(dataSet *tableQueryDataSet, format string) *data.Fr
 			frame = wide
 		}
 	}
+	if isTimeSeries && !isNoopLegendFormat(legendFormat) {
+		applyLegendFormat(frame, legendFormat)
+	}
 	return frame
+}
+
+// isNumericTableType reports whether a table-model result type carries a
+// plottable numeric value (as opposed to a tag/string, timestamp, or blob).
+func isNumericTableType(dataType string) bool {
+	switch strings.ToUpper(dataType) {
+	case "INT32", "INT64", "FLOAT", "DOUBLE":
+		return true
+	default:
+		return false
+	}
+}
+
+// hasPlottableValue reports whether the dataset has at least one non-null cell
+// in a numeric column. Zero-row datasets and value columns that are entirely
+// NULL both report false, so queryTableModel can collapse either into the
+// "No data" state instead of drawing bare axes.
+func hasPlottableValue(dataSet *tableQueryDataSet) bool {
+	for _, row := range dataSet.Values {
+		for col, cell := range row {
+			if cell == nil {
+				continue
+			}
+			if col < len(dataSet.DataTypes) && isNumericTableType(dataSet.DataTypes[col]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // sortRowsByFirstTimestamp stably sorts the row-major values ascending by the
@@ -569,4 +618,71 @@ func toString(v interface{}) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// legendFormatRe matches Grafana legend format template placeholders like
+// {{instance}} or {{ instance }}; whitespace inside the braces is ignored.
+var legendFormatRe = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
+
+var prometheusLegendLabelAliases = map[string]string{
+	"nodeType":  "node_type",
+	"nodeId":    "node_id",
+	"name":      "label_name",
+	"type":      "label_type",
+	"database":  "database_name",
+	"interface": "interface_name",
+	"id":        "label_id",
+	"rate":      "label_rate",
+	"from":      "source_from",
+	"index":     "label_index",
+}
+
+// autoLegendFormat is Grafana's sentinel for "automatic legend": it must never
+// be applied as a literal series name, or every series would display "__auto".
+const autoLegendFormat = "__auto"
+
+// isNoopLegendFormat reports whether legendFormat should be left alone. An
+// empty format and Grafana's __auto sentinel both mean "do not override series
+// names", so Grafana falls back to its own automatic legend.
+func isNoopLegendFormat(legendFormat string) bool {
+	return legendFormat == "" || legendFormat == autoLegendFormat
+}
+
+// applyLegendFormat resolves the Grafana legendFormat template against
+// each non-time field's labels and sets the field's DisplayNameFromDS
+// so the series show user-friendly names instead of "value {labels...}".
+func applyLegendFormat(frame *data.Frame, legendFormat string) {
+	if isNoopLegendFormat(legendFormat) {
+		return
+	}
+	for _, field := range frame.Fields {
+		if field.Type().Time() {
+			continue
+		}
+		displayName := resolveLegendFormat(legendFormat, field.Labels)
+		if field.Config == nil {
+			field.Config = &data.FieldConfig{}
+		}
+		field.Config.DisplayNameFromDS = displayName
+	}
+}
+
+// resolveLegendFormat replaces {{labelName}} placeholders in format with
+// the corresponding value from labels, matching Grafana's behaviour:
+// optional whitespace inside the braces is ignored, known Prometheus names
+// can resolve from their IoTDB storage aliases, and missing or empty values
+// resolve to the label name itself, as Grafana's truthy-value check does.
+func resolveLegendFormat(format string, labels data.Labels) string {
+	return legendFormatRe.ReplaceAllStringFunc(format, func(match string) string {
+		key := strings.TrimSpace(match[2 : len(match)-2])
+		if value := labels[key]; value != "" {
+			return value
+		}
+		if alias, ok := prometheusLegendLabelAliases[key]; ok {
+			if value := labels[alias]; value != "" {
+				return value
+			}
+		}
+		return key
+	})
 }
