@@ -80,7 +80,19 @@ var (
 	intervalMSRe = regexp.MustCompile(`\$__interval_ms`)
 )
 
+// activeFromRe matches $__activeFrom, the lower bound of the node-liveness
+// window used by table-model template-variable queries. It is a variable-path
+// macro (not a panel-query macro) and is expanded by expandVariableMacros.
+var activeFromRe = regexp.MustCompile(`\$__activeFrom\b`)
+
 const invalidIntervalMacroMessage = "Grafana query interval must be positive when $__interval or $__interval_ms is used"
+
+// nodeActiveTTL is the template-variable liveness window. A node is considered
+// active only if its most recent sample falls within the last nodeActiveTTL.
+// The bridge writes samples with their Prometheus scrape timestamp, so this is
+// "the node produced a scrape within the last nodeActiveTTL"; a node that stops
+// producing samples ages out of the window and disappears from the variable.
+const nodeActiveTTL = 5 * time.Minute
 
 // formatTimeLiteral renders a panel-range bound as an ISO 8601 UTC timestamp
 // literal (e.g. 2020-09-13T12:26:40.000+00:00). The server parses such a
@@ -89,6 +101,26 @@ const invalidIntervalMacroMessage = "Grafana query interval must be positive whe
 // server would interpret in raw server units.
 func formatTimeLiteral(ms int64) string {
 	return time.UnixMilli(ms).UTC().Format("2006-01-02T15:04:05.000") + "+00:00"
+}
+
+// currentTime returns the injectable clock, or the real wall clock when no
+// clock is configured.
+func (d *IoTDBDataSource) currentTime() time.Time {
+	if d.now != nil {
+		return d.now()
+	}
+	return time.Now()
+}
+
+// expandVariableMacros rewrites the template-variable-only macros before a
+// table-model variable query runs. $__activeFrom becomes the "now - TTL"
+// instant rendered as an ISO 8601 UTC timestamp literal — the same literal form
+// panel queries receive for $__timeFrom — so a variable query can restrict its
+// result to recently active nodes without the server evaluating a time
+// function of its own.
+func (d *IoTDBDataSource) expandVariableMacros(sql string) string {
+	from := d.currentTime().Add(-nodeActiveTTL).UnixMilli()
+	return activeFromRe.ReplaceAllString(sql, formatTimeLiteral(from))
 }
 
 // expandTableMacros rewrites the Grafana time and interval macros a dashboard
@@ -310,16 +342,40 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 		return response
 	}
 
-	pool, err := d.getTablePool()
+	sql, err := expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS)
 	if err != nil {
 		response.Error = err
 		return response
 	}
+
+	dataSet, err := d.executeTableStatement(ctx, qp.Database, sql)
+	if err != nil {
+		response.Error = err
+		return response
+	}
+
+	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format))
+	return response
+}
+
+// executeTableStatement runs a table-model SQL statement against the given
+// database on a pooled native-client session and returns the fetched dataset.
+// The database is USEd on the session so a statement's table references resolve
+// against it regardless of any session state left by earlier queries. When
+// tableExecutor is non-nil it is used instead of the real RPC path.
+func (d *IoTDBDataSource) executeTableStatement(ctx context.Context, database, sql string) (*tableQueryDataSet, error) {
+	if d.tableExecutor != nil {
+		return d.tableExecutor(ctx, database, sql)
+	}
+
+	pool, err := d.getTablePool()
+	if err != nil {
+		return nil, err
+	}
 	session, err := pool.GetSession()
 	if err != nil {
-		response.Error = fmt.Errorf("cannot connect to the IoTDB RPC service: %w", err)
 		log.DefaultLogger.Error("Cannot connect to the IoTDB RPC service", "err", err)
-		return response
+		return nil, fmt.Errorf("cannot connect to the IoTDB RPC service: %w", err)
 	}
 	defer func() {
 		if closeErr := session.Close(); closeErr != nil {
@@ -327,10 +383,9 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 		}
 	}()
 
-	if database := strings.TrimSpace(qp.Database); database != "" {
-		if err := session.ExecuteNonQueryStatement("USE " + quoteTableIdentifier(database)); err != nil {
-			response.Error = err
-			return response
+	if db := strings.TrimSpace(database); db != "" {
+		if err := session.ExecuteNonQueryStatement("USE " + quoteTableIdentifier(db)); err != nil {
+			return nil, err
 		}
 	}
 
@@ -340,15 +395,9 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 			timeout = ms
 		}
 	}
-	sql, err := expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS)
-	if err != nil {
-		response.Error = err
-		return response
-	}
 	resultSet, err := session.ExecuteQueryStatement(sql, &timeout)
 	if err != nil {
-		response.Error = err
-		return response
+		return nil, err
 	}
 	defer func() {
 		if closeErr := resultSet.Close(); closeErr != nil {
@@ -356,14 +405,38 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 		}
 	}()
 
-	dataSet, err := fetchTableDataSet(resultSet)
-	if err != nil {
-		response.Error = err
-		return response
-	}
+	return fetchTableDataSet(resultSet)
+}
 
-	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format))
-	return response
+// tableVariableValues runs a table-model template-variable query and returns
+// its single string column as an ordered, NULL-free slice for Grafana's
+// variable dropdown.
+func (d *IoTDBDataSource) tableVariableValues(ctx context.Context, database, sql string) ([]string, error) {
+	dataSet, err := d.executeTableStatement(ctx, database, sql)
+	if err != nil {
+		return nil, err
+	}
+	return tableVariableStrings(dataSet)
+}
+
+// tableVariableStrings extracts the values of the single column a template
+// variable query must project. NULL cells are skipped and non-string cells are
+// rendered with the table-mode string coercion, preserving server order.
+func tableVariableStrings(dataSet *tableQueryDataSet) ([]string, error) {
+	if len(dataSet.ColumnNames) != 1 {
+		return nil, fmt.Errorf("template variable query must project exactly one column, got %d", len(dataSet.ColumnNames))
+	}
+	values := make([]string, 0, len(dataSet.Values))
+	for _, row := range dataSet.Values {
+		if len(row) == 0 {
+			continue
+		}
+		if row[0] == nil {
+			continue
+		}
+		values = append(values, toString(row[0]))
+	}
+	return values, nil
 }
 
 // buildTableResponseFrame turns a fetched dataset into the response frame,

@@ -73,7 +73,17 @@ func ApacheIoTDBDatasource(ctx context.Context, d backend.DataSourceInstanceSett
 		authorization = "Basic " + base64.StdEncoding.EncodeToString([]byte(dm.Username+":"+password))
 	}
 	password := d.DecryptedSecureJSONData["password"]
-	return &IoTDBDataSource{CallResourceHandler: iotdbResourceHandler(authorization, httpClient), Username: dm.Username, Ulr: dm.Url, RPCAddress: dm.RPCAddress, password: password, httpClient: httpClient}, nil
+	ds := &IoTDBDataSource{
+		Username:   dm.Username,
+		Ulr:        dm.Url,
+		RPCAddress: dm.RPCAddress,
+		password:   password,
+		httpClient: httpClient,
+	}
+	// The resource handler is a method so the table-model variable path can
+	// reach the native-client session pool.
+	ds.CallResourceHandler = ds.iotdbResourceHandler(authorization, httpClient)
+	return ds, nil
 }
 
 // SampleDatasource is an example datasource which can respond to data queries, reports
@@ -90,6 +100,16 @@ type IoTDBDataSource struct {
 	// getTablePool on the first table query.
 	tablePoolMu sync.Mutex
 	tablePool   *client.TableSessionPool
+
+	// tableExecutor runs a table-model statement and returns the fetched
+	// dataset. A nil value selects the real RPC executor; tests substitute a
+	// fake to exercise the variable-query path without a live server.
+	tableExecutor func(ctx context.Context, database, sql string) (*tableQueryDataSet, error)
+
+	// now returns the current instant used to compute the node-liveness window
+	// for table-model template-variable queries. A nil value selects time.Now;
+	// tests substitute a fixed clock so the window is deterministic.
+	now func() time.Time
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
