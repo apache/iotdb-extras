@@ -20,20 +20,30 @@ package plugin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/resource/httpadapter"
 )
 
-func iotdbResourceHandler(authorization string, httpClient *http.Client) backend.CallResourceHandler {
+// tableVariablePrefix marks a template-variable query as a table-model query.
+// A variable query of the form "table:<database>:<SQL>" is executed through the
+// IoTDB table-model RPC client instead of the legacy tree-model REST endpoint.
+const tableVariablePrefix = "table:"
+
+// iotdbResourceHandler wires the plugin resource endpoints. It is a method so
+// the table-model variable path can reach the datasource's native-client
+// session pool.
+func (d *IoTDBDataSource) iotdbResourceHandler(authorization string, httpClient *http.Client) backend.CallResourceHandler {
 	mux := http.NewServeMux()
 
-	mux.Handle("/getVariables", getVariables(authorization, httpClient))
-	mux.Handle("/getNodes", getNodes(authorization, httpClient))
+	mux.Handle("/getVariables", d.getVariables(authorization, httpClient))
+	mux.Handle("/getNodes", d.getNodes(authorization, httpClient))
 
 	return httpadapter.New(mux)
 }
@@ -43,7 +53,6 @@ type queryReq struct {
 }
 type nodeReq struct {
 	Data []string `json:"data"`
-	Url  string   `json:"url"`
 }
 
 type queryResp struct {
@@ -51,22 +60,41 @@ type queryResp struct {
 	Message string `json:"message"`
 }
 
-func getVariables(authorization string, httpClient *http.Client) http.Handler {
+func (d *IoTDBDataSource) getVariables(authorization string, httpClient *http.Client) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		var url = r.FormValue("url")
-		var sql = r.FormValue("sql")
 		if r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
 		}
+		var sql = r.FormValue("sql")
+
+		// table:<database>:<SQL> variables run through the table-model RPC
+		// client; every other query keeps the legacy tree-model behavior.
+		if strings.HasPrefix(strings.TrimSpace(sql), tableVariablePrefix) {
+			d.handleTableVariableQuery(w, r, sql)
+			return
+		}
+
 		var queryReq = &queryReq{Sql: sql}
 		qpJson, _ := json.Marshal(queryReq)
 		reader := bytes.NewReader(qpJson)
 		client := &http.Client{}
-		request, _ := http.NewRequest(http.MethodPost, url+"/grafana/v1/variable", reader)
+		// The tree-model endpoint is always the datasource's configured URL
+		// (d.Ulr), never the client-supplied "url" query parameter, so a caller
+		// cannot redirect this request to an arbitrary host (SSRF).
+		request, err := http.NewRequest(http.MethodPost, DataSourceUrlHandler(d.Ulr)+"/grafana/v1/variable", reader)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Add("Authorization", authorization)
-		rsp, _ := client.Do(request)
+		rsp, err := client.Do(request)
+		if err != nil {
+			log.DefaultLogger.Error("Data source is not working properly", err)
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		body, err := io.ReadAll(rsp.Body)
 		if err != nil {
 			log.DefaultLogger.Error("Data source is not working properly", err)
@@ -108,7 +136,65 @@ func getVariables(authorization string, httpClient *http.Client) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-func getNodes(authorization string, client *http.Client) http.Handler {
+// handleTableVariableQuery runs a table-model variable query and writes the
+// single-column result as a JSON string array (the shape Grafana's variable
+// dropdown expects), or a JSON error when parsing or execution fails.
+func (d *IoTDBDataSource) handleTableVariableQuery(w http.ResponseWriter, r *http.Request, query string) {
+	database, sql, err := parseTableVariableQuery(query)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	sql = d.expandVariableMacros(sql)
+	values, err := d.tableVariableValues(r.Context(), database, sql)
+	if err != nil {
+		log.DefaultLogger.Error("table-model variable query failed", "err", err)
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, values)
+}
+
+// parseTableVariableQuery splits a table-model variable query of the form
+// "table:<database>:<SQL>" into its database and SQL parts. Both parts are
+// required; an empty or missing part is an error rather than a fallback to the
+// legacy path.
+func parseTableVariableQuery(query string) (database, sql string, err error) {
+	body := strings.TrimSpace(query)
+	if !strings.HasPrefix(body, tableVariablePrefix) {
+		return "", "", errors.New("table-model variable query must start with table:")
+	}
+	rest := body[len(tableVariablePrefix):]
+	separator := strings.IndexByte(rest, ':')
+	if separator < 0 {
+		return "", "", errors.New("table-model variable query is missing the database:SQL separator")
+	}
+	database = strings.TrimSpace(rest[:separator])
+	sql = strings.TrimSpace(rest[separator+1:])
+	if database == "" {
+		return "", "", errors.New("table-model variable query requires a database")
+	}
+	if sql == "" {
+		return "", "", errors.New("table-model variable query requires SQL")
+	}
+	return database, sql, nil
+}
+
+// writeJSON writes a value as a JSON response with the default 200 status.
+func writeJSON(w http.ResponseWriter, value interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+// writeJSONError writes a machine-readable JSON error with an explicit HTTP
+// status so a failed variable query is never mistaken for an empty result.
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(queryResp{Code: status, Message: message})
+}
+
+func (d *IoTDBDataSource) getNodes(authorization string, client *http.Client) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		s, _ := ioutil.ReadAll(r.Body)
 		if r.Method != http.MethodPost {
@@ -124,10 +210,22 @@ func getNodes(authorization string, client *http.Client) http.Handler {
 		qpJson, _ := json.Marshal(nodeReq.Data)
 		reader := bytes.NewReader(qpJson)
 
-		request, _ := http.NewRequest(http.MethodPost, nodeReq.Url+"/grafana/v1/node", reader)
+		// The node endpoint is always the datasource's configured URL (d.Ulr),
+		// never a client-supplied URL, so a caller cannot redirect this request
+		// to an arbitrary host (SSRF).
+		request, err := http.NewRequest(http.MethodPost, DataSourceUrlHandler(d.Ulr)+"/grafana/v1/node", reader)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Add("Authorization", authorization)
-		rsp, _ := client.Do(request)
+		rsp, err := client.Do(request)
+		if err != nil {
+			log.DefaultLogger.Error("Data source is not working properly", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		body, err := io.ReadAll(rsp.Body)
 		if err != nil {
 			log.DefaultLogger.Error("Data source is not working properly", err)
