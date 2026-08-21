@@ -43,7 +43,7 @@ func (d *IoTDBDataSource) iotdbResourceHandler(authorization string, httpClient 
 	mux := http.NewServeMux()
 
 	mux.Handle("/getVariables", d.getVariables(authorization, httpClient))
-	mux.Handle("/getNodes", getNodes(authorization, httpClient))
+	mux.Handle("/getNodes", d.getNodes(authorization, httpClient))
 
 	return httpadapter.New(mux)
 }
@@ -53,7 +53,6 @@ type queryReq struct {
 }
 type nodeReq struct {
 	Data []string `json:"data"`
-	Url  string   `json:"url"`
 }
 
 type queryResp struct {
@@ -67,7 +66,6 @@ func (d *IoTDBDataSource) getVariables(authorization string, httpClient *http.Cl
 			http.NotFound(w, r)
 			return
 		}
-		var url = r.FormValue("url")
 		var sql = r.FormValue("sql")
 
 		// table:<database>:<SQL> variables run through the table-model RPC
@@ -81,10 +79,22 @@ func (d *IoTDBDataSource) getVariables(authorization string, httpClient *http.Cl
 		qpJson, _ := json.Marshal(queryReq)
 		reader := bytes.NewReader(qpJson)
 		client := &http.Client{}
-		request, _ := http.NewRequest(http.MethodPost, url+"/grafana/v1/variable", reader)
+		// The tree-model endpoint is always the datasource's configured URL
+		// (d.Ulr), never the client-supplied "url" query parameter, so a caller
+		// cannot redirect this request to an arbitrary host (SSRF).
+		request, err := http.NewRequest(http.MethodPost, DataSourceUrlHandler(d.Ulr)+"/grafana/v1/variable", reader)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Add("Authorization", authorization)
-		rsp, _ := client.Do(request)
+		rsp, err := client.Do(request)
+		if err != nil {
+			log.DefaultLogger.Error("Data source is not working properly", err)
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		body, err := io.ReadAll(rsp.Body)
 		if err != nil {
 			log.DefaultLogger.Error("Data source is not working properly", err)
@@ -184,7 +194,7 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 	_ = json.NewEncoder(w).Encode(queryResp{Code: status, Message: message})
 }
 
-func getNodes(authorization string, client *http.Client) http.Handler {
+func (d *IoTDBDataSource) getNodes(authorization string, client *http.Client) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		s, _ := ioutil.ReadAll(r.Body)
 		if r.Method != http.MethodPost {
@@ -200,10 +210,22 @@ func getNodes(authorization string, client *http.Client) http.Handler {
 		qpJson, _ := json.Marshal(nodeReq.Data)
 		reader := bytes.NewReader(qpJson)
 
-		request, _ := http.NewRequest(http.MethodPost, nodeReq.Url+"/grafana/v1/node", reader)
+		// The node endpoint is always the datasource's configured URL (d.Ulr),
+		// never a client-supplied URL, so a caller cannot redirect this request
+		// to an arbitrary host (SSRF).
+		request, err := http.NewRequest(http.MethodPost, DataSourceUrlHandler(d.Ulr)+"/grafana/v1/node", reader)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Add("Authorization", authorization)
-		rsp, _ := client.Do(request)
+		rsp, err := client.Do(request)
+		if err != nil {
+			log.DefaultLogger.Error("Data source is not working properly", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		body, err := io.ReadAll(rsp.Body)
 		if err != nil {
 			log.DefaultLogger.Error("Data source is not working properly", err)

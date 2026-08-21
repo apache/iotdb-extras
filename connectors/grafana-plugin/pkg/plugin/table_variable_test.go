@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -270,9 +271,12 @@ func TestGetVariablesLegacyPath(t *testing.T) {
 	}))
 	defer legacy.Close()
 
-	d := &IoTDBDataSource{}
+	// The request goes to the datasource's configured URL (d.Ulr); the
+	// client-supplied "url" query parameter is ignored so a caller cannot
+	// redirect the request (SSRF).
+	d := &IoTDBDataSource{Ulr: legacy.URL}
 	handler := d.getVariables("Bearer test", http.DefaultClient)
-	request := httptest.NewRequest(http.MethodGet, "/getVariables?url="+url.QueryEscape(legacy.URL)+"&sql="+url.QueryEscape("show timeseries"), nil)
+	request := httptest.NewRequest(http.MethodGet, "/getVariables?url="+url.QueryEscape("http://169.254.169.254")+"&sql="+url.QueryEscape("show timeseries"), nil)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 
@@ -372,5 +376,36 @@ func TestHandleTableVariableQueryExpandsActiveFrom(t *testing.T) {
 	want := formatTimeLiteral(fixed.Add(-nodeActiveTTL).UnixMilli())
 	if !strings.Contains(gotSQL, "time >= "+want) {
 		t.Fatalf("executor SQL = %q, want lower bound %q", gotSQL, want)
+	}
+}
+
+func TestGetNodesUsesConfiguredURL(t *testing.T) {
+	var gotPath, gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`["root.sg"]`))
+	}))
+	defer server.Close()
+
+	// The node endpoint goes to the datasource's configured URL (d.Ulr); the
+	// client-supplied "url" field is ignored so a caller cannot redirect the
+	// request (SSRF).
+	d := &IoTDBDataSource{Ulr: server.URL}
+	handler := d.getNodes("", http.DefaultClient)
+	request := httptest.NewRequest(http.MethodPost, "/getNodes", strings.NewReader(`{"data":["root.sg"],"url":"http://169.254.169.254"}`))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", recorder.Code, recorder.Body.String())
+	}
+	if gotPath != "/grafana/v1/node" {
+		t.Fatalf("node path = %q, want /grafana/v1/node", gotPath)
+	}
+	if gotBody != `["root.sg"]` {
+		t.Fatalf("node body = %q, want [\"root.sg\"]", gotBody)
 	}
 }
