@@ -433,7 +433,7 @@ func TestBuildTableResponseFrameLongToWide(t *testing.T) {
 		},
 	}
 
-	frame := buildTableResponseFrame(ds, "")
+	frame := buildTableResponseFrame(ds, "", "")
 	if len(frame.Fields) != 3 {
 		t.Fatalf("expected time + one series per device (3 fields), got %d", len(frame.Fields))
 	}
@@ -477,7 +477,7 @@ func TestBuildTableResponseFrameTableFormatPreservesOrder(t *testing.T) {
 		},
 	}
 
-	frame := buildTableResponseFrame(ds, tableFormatTable)
+	frame := buildTableResponseFrame(ds, tableFormatTable, "")
 	if len(frame.Fields) != 3 {
 		t.Fatalf("expected 3 plain fields, got %d", len(frame.Fields))
 	}
@@ -503,7 +503,7 @@ func TestBuildTableResponseFrameNullTimeFallsBack(t *testing.T) {
 		},
 	}
 
-	frame := buildTableResponseFrame(ds, tableFormatTimeSeries)
+	frame := buildTableResponseFrame(ds, tableFormatTimeSeries, "")
 	if len(frame.Fields) != 3 {
 		t.Fatalf("expected plain 3-field fallback frame, got %d fields", len(frame.Fields))
 	}
@@ -559,5 +559,374 @@ func TestTableRPCEndpoint(t *testing.T) {
 				t.Fatalf("endpoint = %s:%s, want %s:%s", host, port, c.wantHost, c.wantPort)
 			}
 		})
+	}
+}
+
+// TestResolveLegendFormat verifies template resolution: static strings,
+// label placeholders (with and without internal whitespace), missing labels
+// rendered as their names, canonical storage aliases, and multiple placeholders.
+func TestResolveLegendFormat(t *testing.T) {
+	labels := data.Labels{
+		"instance":       "192.168.130.36:9091",
+		"node_type":      "DATANODE",
+		"label_name":     "metric",
+		"database_name":  "root.db",
+		"label_type":     "READ",
+		"interface_name": "execute",
+		"label_id":       "region-1",
+		"empty":          "",
+	}
+
+	cases := []struct {
+		name   string
+		format string
+		want   string
+	}{
+		{name: "static text unchanged", format: "Average Disk Usage", want: "Average Disk Usage"},
+		{name: "single placeholder", format: "{{instance}}", want: "192.168.130.36:9091"},
+		{name: "placeholder with spaces", format: "{{ instance }}", want: "192.168.130.36:9091"},
+		{name: "multiple spaces in placeholder", format: "{{  instance  }}", want: "192.168.130.36:9091"},
+		{name: "multiple placeholders", format: "{{instance}} - {{node_type}}", want: "192.168.130.36:9091 - DATANODE"},
+		{name: "mixed static and dynamic", format: "Node {{instance}}", want: "Node 192.168.130.36:9091"},
+		{name: "missing label keeps placeholder name", format: "{{missing}}", want: "missing"},
+		{name: "empty label keeps placeholder name", format: "{{empty}}", want: "empty"},
+		{name: "missing with whitespace keeps placeholder name", format: "{{ missing }}", want: "missing"},
+		{name: "partial match: one found, one missing", format: "{{instance}}-{{notfound}}", want: "192.168.130.36:9091-notfound"},
+		{name: "prometheus labels map to IoTDB columns", format: "{{name}}/{{database}}/{{type}}/{{interface}}/{{id}}", want: "metric/root.db/READ/execute/region-1"},
+		{name: "empty format string", format: "", want: ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := resolveLegendFormat(c.format, labels)
+			if got != c.want {
+				t.Fatalf("resolveLegendFormat(%q) = %q, want %q", c.format, got, c.want)
+			}
+		})
+	}
+}
+
+func TestResolveLegendFormatCanonicalLabelAliases(t *testing.T) {
+	labels := data.Labels{
+		"node_type":      "DataNode",
+		"node_id":        "3",
+		"label_name":     "metric",
+		"database_name":  "root.db",
+		"label_type":     "READ",
+		"interface_name": "execute",
+		"label_id":       "region-1",
+		"label_rate":     "hit",
+		"source_from":    "cache",
+		"label_index":    "7",
+	}
+
+	format := "{{nodeType}}/{{nodeId}}/{{name}}/{{database}}/{{type}}/{{interface}}/{{id}}/{{rate}}/{{from}}/{{index}}"
+	want := "DataNode/3/metric/root.db/READ/execute/region-1/hit/cache/7"
+	if got := resolveLegendFormat(format, labels); got != want {
+		t.Fatalf("resolveLegendFormat() = %q, want %q", got, want)
+	}
+}
+
+// TestApplyLegendFormat checks that DisplayNameFromDS is set on non-time
+// fields after applying legendFormat, and that time fields are left alone.
+func TestApplyLegendFormat(t *testing.T) {
+	frame := data.NewFrame("test",
+		data.NewField("time", nil, []*time.Time{}),
+		data.NewField("value", data.Labels{"instance": "192.168.130.36:9091", "node_type": "DATANODE"}, []*float64{}),
+		data.NewField("value", data.Labels{"instance": "192.168.130.38:9091", "node_type": "DATANODE"}, []*float64{}),
+	)
+
+	applyLegendFormat(frame, "{{instance}}")
+
+	// Time field must not get DisplayNameFromDS.
+	if frame.Fields[0].Config != nil && frame.Fields[0].Config.DisplayNameFromDS != "" {
+		t.Fatalf("time field should not have DisplayNameFromDS, got %q", frame.Fields[0].Config.DisplayNameFromDS)
+	}
+	// Value fields must have DisplayNameFromDS resolved from labels.
+	if frame.Fields[1].Config == nil || frame.Fields[1].Config.DisplayNameFromDS != "192.168.130.36:9091" {
+		t.Fatalf("field 1 DisplayNameFromDS = %q, want %q",
+			fieldDisplayName(frame.Fields[1]), "192.168.130.36:9091")
+	}
+	if frame.Fields[2].Config == nil || frame.Fields[2].Config.DisplayNameFromDS != "192.168.130.38:9091" {
+		t.Fatalf("field 2 DisplayNameFromDS = %q, want %q",
+			fieldDisplayName(frame.Fields[2]), "192.168.130.38:9091")
+	}
+}
+
+func TestApplyLegendFormatSkipsNullableTime(t *testing.T) {
+	timestamp := ts(1000)
+	value := 1.0
+	frame := data.NewFrame("test",
+		data.NewField("time", nil, []*time.Time{&timestamp}),
+		data.NewField("value", data.Labels{"instance": "node-1"}, []*float64{&value}),
+	)
+
+	applyLegendFormat(frame, "timestamp {{instance}}")
+
+	if frame.Fields[0].Config != nil && frame.Fields[0].Config.DisplayNameFromDS != "" {
+		t.Fatalf("nullable time field should not have DisplayNameFromDS, got %q", frame.Fields[0].Config.DisplayNameFromDS)
+	}
+}
+
+func fieldDisplayName(f *data.Field) string {
+	if f.Config == nil {
+		return ""
+	}
+	return f.Config.DisplayNameFromDS
+}
+
+// TestApplyLegendFormatStatic verifies that a static legendFormat (no
+// placeholders) is applied as-is to every non-time field.
+func TestApplyLegendFormatStatic(t *testing.T) {
+	frame := data.NewFrame("test",
+		data.NewField("time", nil, []*time.Time{}),
+		data.NewField("value", data.Labels{"instance": "192.168.130.36:9091"}, []*float64{}),
+	)
+
+	applyLegendFormat(frame, "Average Disk Usage")
+
+	if frame.Fields[1].Config == nil || frame.Fields[1].Config.DisplayNameFromDS != "Average Disk Usage" {
+		t.Fatalf("static legend not applied: DisplayNameFromDS = %q", fieldDisplayName(frame.Fields[1]))
+	}
+}
+
+// TestApplyLegendFormatNoop checks that both the empty format and Grafana's
+// __auto sentinel leave series names untouched (Config stays nil), so Grafana
+// falls back to its automatic legend instead of showing literal "__auto".
+func TestApplyLegendFormatNoop(t *testing.T) {
+	for _, format := range []string{"", autoLegendFormat} {
+		frame := data.NewFrame("test",
+			data.NewField("time", nil, []*time.Time{}),
+			data.NewField("value", data.Labels{"instance": "192.168.130.36:9091"}, []*float64{}),
+		)
+		applyLegendFormat(frame, format)
+		if frame.Fields[1].Config != nil {
+			t.Fatalf("legendFormat %q should be a no-op, got Config %#v", format, frame.Fields[1].Config)
+		}
+	}
+}
+
+// TestBuildTableResponseFrameAutoLegend checks end-to-end that an __auto
+// legendFormat does not set DisplayNameFromDS on the pivoted value field.
+func TestBuildTableResponseFrameAutoLegend(t *testing.T) {
+	ds := &tableQueryDataSet{
+		ColumnNames: []string{"time", "instance", "value"},
+		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
+		Values: [][]interface{}{
+			{ts(1000), "192.168.130.36:9091", float64(11.0)},
+			{ts(2000), "192.168.130.36:9091", float64(12.0)},
+		},
+	}
+	frame := buildTableResponseFrame(ds, "", autoLegendFormat)
+	if len(frame.Fields) != 2 {
+		t.Fatalf("expected time + 1 series = 2 fields, got %d", len(frame.Fields))
+	}
+	if frame.Fields[1].Config != nil && frame.Fields[1].Config.DisplayNameFromDS != "" {
+		t.Fatalf("__auto legend must not set DisplayNameFromDS, got %q", fieldDisplayName(frame.Fields[1]))
+	}
+}
+
+// TestApplyLegendFormatPreservesExistingConfig verifies that if a field
+// already has Config set, we only overwrite DisplayNameFromDS and leave
+// the rest untouched.
+func TestApplyLegendFormatPreservesExistingConfig(t *testing.T) {
+	frame := data.NewFrame("test",
+		data.NewField("time", nil, []*time.Time{}),
+	)
+	valField := data.NewField("value", data.Labels{"instance": "x"}, []*float64{})
+	valField.Config = &data.FieldConfig{Unit: "percent"}
+	frame.Fields = append(frame.Fields, valField)
+
+	applyLegendFormat(frame, "{{instance}}")
+
+	if frame.Fields[1].Config.Unit != "percent" {
+		t.Fatalf("existing Config.Unit was clobbered: got %q, want %q", frame.Fields[1].Config.Unit, "percent")
+	}
+	if frame.Fields[1].Config.DisplayNameFromDS != "x" {
+		t.Fatalf("DisplayNameFromDS = %q, want %q", frame.Fields[1].Config.DisplayNameFromDS, "x")
+	}
+}
+
+// TestBuildTableResponseFrameLegendFormatEndToEnd checks that
+// buildTableResponseFrame wires legendFormat through to the final frame.
+func TestBuildTableResponseFrameLegendFormatEndToEnd(t *testing.T) {
+	ds := &tableQueryDataSet{
+		ColumnNames: []string{"time", "instance", "value"},
+		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
+		Values: [][]interface{}{
+			{ts(1000), "192.168.130.36:9091", float64(11.0)},
+			{ts(2000), "192.168.130.36:9091", float64(12.0)},
+		},
+	}
+
+	frame := buildTableResponseFrame(ds, "", "{{instance}}")
+	// After LongToWide: time + one value field with instance label.
+	if len(frame.Fields) != 2 {
+		t.Fatalf("expected time + 1 series = 2 fields, got %d", len(frame.Fields))
+	}
+	if frame.Fields[1].Config == nil || frame.Fields[1].Config.DisplayNameFromDS != "192.168.130.36:9091" {
+		t.Fatalf("DisplayNameFromDS = %q, want %q", fieldDisplayName(frame.Fields[1]), "192.168.130.36:9091")
+	}
+}
+
+// TestBuildTableResponseFrameEmptyTimeSeries checks that a zero-row dataset
+// with Time Series format still builds a frame (the "No data" skip is the
+// caller's responsibility in queryTableModel).
+func TestBuildTableResponseFrameEmptyTimeSeries(t *testing.T) {
+	ds := &tableQueryDataSet{
+		ColumnNames: []string{"time", "device", "value"},
+		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
+		Values:      [][]interface{}{},
+	}
+
+	frame := buildTableResponseFrame(ds, "", "")
+	if len(frame.Fields) != 3 {
+		t.Fatalf("expected 3 fields for empty dataset, got %d", len(frame.Fields))
+	}
+	if frame.Fields[0].Len() != 0 {
+		t.Fatalf("expected 0 rows, got %d", frame.Fields[0].Len())
+	}
+}
+
+// TestBuildTableResponseFrameEmptyTableFormat verifies that a zero-row
+// Table-format dataset retains its column-definition frame.
+func TestBuildTableResponseFrameEmptyTableFormat(t *testing.T) {
+	ds := &tableQueryDataSet{
+		ColumnNames: []string{"time", "device", "value"},
+		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
+		Values:      [][]interface{}{},
+	}
+
+	frame := buildTableResponseFrame(ds, tableFormatTable, "")
+	if len(frame.Fields) != 3 {
+		t.Fatalf("Table format should retain column definitions, got %d fields", len(frame.Fields))
+	}
+	// Table format must not pivot.
+	if frame.TimeSeriesSchema().Type == data.TimeSeriesTypeWide {
+		t.Fatalf("Table format should not pivot to wide")
+	}
+}
+
+func TestQueryTableModelZeroRowsByFormat(t *testing.T) {
+	ds := &tableQueryDataSet{
+		ColumnNames: []string{"time", "device", "value"},
+		DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
+		Values:      [][]interface{}{},
+	}
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+			return ds, nil
+		},
+	}
+
+	timeSeriesResponse := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTimeSeries})
+	if len(timeSeriesResponse.Frames) != 0 {
+		t.Fatalf("zero-row Time series response has %d frames, want 0", len(timeSeriesResponse.Frames))
+	}
+
+	tableResponse := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTable})
+	if len(tableResponse.Frames) != 1 {
+		t.Fatalf("zero-row Table response has %d frames, want 1", len(tableResponse.Frames))
+	}
+	if got := len(tableResponse.Frames[0].Fields); got != len(ds.ColumnNames) {
+		t.Fatalf("zero-row Table frame has %d fields, want %d", got, len(ds.ColumnNames))
+	}
+}
+
+// TestQueryTableModelAllNullTimeSeries checks that rows whose value column is
+// entirely NULL (a HOP/rate query over sparse or absent data) also collapse to
+// the "No data" state in Time series format, while Table format keeps headers.
+func TestQueryTableModelAllNullTimeSeries(t *testing.T) {
+	ds := &tableQueryDataSet{
+		ColumnNames: []string{"time", "value"},
+		DataTypes:   []string{"TIMESTAMP", "DOUBLE"},
+		Values: [][]interface{}{
+			{ts(1000), nil},
+			{ts(2000), nil},
+		},
+	}
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+			return ds, nil
+		},
+	}
+
+	timeSeriesResponse := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTimeSeries})
+	if len(timeSeriesResponse.Frames) != 0 {
+		t.Fatalf("all-NULL Time series response has %d frames, want 0 (No data)", len(timeSeriesResponse.Frames))
+	}
+
+	tableResponse := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTable})
+	if len(tableResponse.Frames) != 1 {
+		t.Fatalf("all-NULL Table response has %d frames, want 1 (headers preserved)", len(tableResponse.Frames))
+	}
+}
+
+// TestHasPlottableValue pins what counts as data for the "No data" decision:
+// only non-null cells in numeric columns are plottable; timestamps, string tags,
+// and NULL cells are ignored.
+func TestHasPlottableValue(t *testing.T) {
+	cases := []struct {
+		name string
+		ds   *tableQueryDataSet
+		want bool
+	}{
+		{
+			name: "zero rows",
+			ds:   &tableQueryDataSet{ColumnNames: []string{"time", "value"}, DataTypes: []string{"TIMESTAMP", "DOUBLE"}, Values: [][]interface{}{}},
+			want: false,
+		},
+		{
+			name: "all null values",
+			ds:   &tableQueryDataSet{ColumnNames: []string{"time", "value"}, DataTypes: []string{"TIMESTAMP", "DOUBLE"}, Values: [][]interface{}{{ts(1), nil}, {ts(2), nil}}},
+			want: false,
+		},
+		{
+			name: "some numeric values",
+			ds:   &tableQueryDataSet{ColumnNames: []string{"time", "value"}, DataTypes: []string{"TIMESTAMP", "DOUBLE"}, Values: [][]interface{}{{ts(1), nil}, {ts(2), float64(3.0)}}},
+			want: true,
+		},
+		{
+			name: "non-null tag does not count as value",
+			ds:   &tableQueryDataSet{ColumnNames: []string{"time", "device", "value"}, DataTypes: []string{"TIMESTAMP", "STRING", "DOUBLE"}, Values: [][]interface{}{{ts(1), "d1", nil}}},
+			want: false,
+		},
+		{
+			name: "int value counts",
+			ds:   &tableQueryDataSet{ColumnNames: []string{"time", "value"}, DataTypes: []string{"TIMESTAMP", "INT64"}, Values: [][]interface{}{{ts(1), int64(7)}}},
+			want: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := hasPlottableValue(c.ds); got != c.want {
+				t.Fatalf("hasPlottableValue() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+// TestQueryParamLegendFormatDeserialization verifies that legendFormat
+// survives the JSON -> queryParam round-trip.
+func TestQueryParamLegendFormatDeserialization(t *testing.T) {
+	body := `{"sqlType":"SQL: Table Model","sql":"SELECT 1","database":"db1","legendFormat":"{{instance}}"}`
+	qp, msg := verifyQuery(backend.DataQuery{JSON: []byte(body)})
+	if msg != "" {
+		t.Fatalf("valid query rejected: %q", msg)
+	}
+	if qp.LegendFormat != "{{instance}}" {
+		t.Fatalf("LegendFormat = %q, want %q", qp.LegendFormat, "{{instance}}")
+	}
+}
+
+// TestQueryParamLegendFormatEmpty verifies that omitting legendFormat
+// from JSON yields an empty string (backward-compatible).
+func TestQueryParamLegendFormatEmpty(t *testing.T) {
+	body := `{"sqlType":"SQL: Table Model","sql":"SELECT 1","database":"db1"}`
+	qp, msg := verifyQuery(backend.DataQuery{JSON: []byte(body)})
+	if msg != "" {
+		t.Fatalf("valid query rejected: %q", msg)
+	}
+	if qp.LegendFormat != "" {
+		t.Fatalf("LegendFormat should default to empty, got %q", qp.LegendFormat)
 	}
 }

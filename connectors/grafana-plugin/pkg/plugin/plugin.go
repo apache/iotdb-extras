@@ -101,6 +101,10 @@ type IoTDBDataSource struct {
 	tablePoolMu sync.Mutex
 	tablePool   *client.TableSessionPool
 
+	// tableQueryRunner is replaceable in tests so queryTableModel's response
+	// behavior can be exercised without a live IoTDB RPC service.
+	tableQueryRunner func(context.Context, *queryParam) (*tableQueryDataSet, error)
+
 	// tableExecutor runs a table-model statement and returns the fetched
 	// dataset. A nil value selects the real RPC executor; tests substitute a
 	// fake to exercise the variable-query path without a live server.
@@ -178,6 +182,7 @@ type queryParam struct {
 	Sql          string   `json:"sql"`
 	Format       string   `json:"format"`
 	IntervalMS   int64    `json:"-"`
+	LegendFormat string   `json:"legendFormat"`
 }
 
 type QueryDataReq struct {
