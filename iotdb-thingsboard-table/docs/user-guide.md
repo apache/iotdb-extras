@@ -76,22 +76,56 @@ Notes:
   timeseries selectors are required as well because the latest value is derived
   from the `telemetry` table that only the IoTDB writer populates — the latest
   path can never activate without that writer.
-- **Attributes** is an opt-in stretch feature. No shipped
-  ThingsBoard release exposes a `database.attributes.type` selector yet (open
-  question Q6 / ThingsBoard Discussion #15296), so a real deployment normally
-  leaves it unset and attributes keep flowing to the host entity database. When
-  it is activated, `iotdb.attributes.cluster-mode` must also be set or the DAO
-  fails fast at startup (see [§6](#6-configuration-reference)).
+- **Attributes** is an opt-in stretch feature, and `database.attributes.type` is
+  a selector this module supplies rather than one ThingsBoard offers. ThingsBoard
+  switches its timeseries DAOs by configuration but has no equivalent for
+  attributes: `JpaAttributeDao` is an unconditional `@Component` (verified at
+  v4.3.1.2), so nothing in `thingsboard.yml` can stand it down. Setting this
+  selector therefore has the module withdraw that one bean at startup, logging a
+  WARN that names it. Leaving the selector unset is the default posture and
+  attributes keep flowing to the host entity database. When it is activated,
+  `iotdb.attributes.cluster-mode` must also be set or the DAO fails fast at
+  startup (see [§6](#6-configuration-reference)). Open question Q6 / ThingsBoard
+  Discussion #15296 tracks a native selector; if one ships, this module should
+  use it instead.
 
 When activated, the DAOs share a single module-owned IoTDB table session pool.
 
 ### Conflict guards
 
-When a selector is on, the module fails startup fast if a conflicting non-IoTDB
-DAO bean of the same SPI type is also present (for example, another
-`TimeseriesDao` while `database.ts.type=iotdb-table`). This is deliberate: it
-prevents the module from silently shadowing, or being shadowed by, a different
-backend. Remove the conflicting backend or unset the IoTDB selector.
+When a selector is on, the module refuses to share its SPI slot with another
+backend. The timeseries and latest guards do this by failing startup: if a
+conflicting non-IoTDB `TimeseriesDao` or `TimeseriesLatestDao` bean is present
+while the matching selector is set, startup stops with a message naming it.
+Remove the conflicting backend or unset the IoTDB selector.
+
+The attributes guard behaves differently, because the conflict it faces is not
+one you can resolve from a configuration file. ThingsBoard registers
+`JpaAttributeDao` unconditionally, so "remove the conflicting backend" is not
+advice an operator can act on. When `database.attributes.type=iotdb-table` is
+set, the module therefore withdraws that one bean definition itself and logs the
+line below. `AttributesDaoConflictGuardTest` asserts that the module emits it;
+it was also observed in a live run against `thingsboard/tb-node:4.3.1.2` on
+2026-08-20:
+
+```text
+WARN  Removed ThingsBoard bean 'jpaAttributeDao'
+      (org.thingsboard.server.dao.sql.attributes.JpaAttributeDao)
+      because database.attributes.type=iotdb-table selects the IoTDB attributes
+      backend; ...
+```
+
+The withdrawal is narrow on purpose. It matches on both the bean name and the
+exact fully-qualified class name, so **only** ThingsBoard's own component is
+removed. Any other
+competing `AttributesDao` — a third-party backend, a decorator, or a subclass of
+this module's DAO under a different bean name — is left in place and startup
+fails instead, naming it. A bean your application registered deliberately is not
+the module's to delete.
+
+The guard reads the bean definitions present when it runs. A definition
+registered later, supplied by a `FactoryBean` that does not report its type until
+initialisation, or inherited from a parent context is outside its reach.
 
 ## 4. The three DAOs
 

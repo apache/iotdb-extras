@@ -55,14 +55,15 @@ import java.util.concurrent.locks.ReadWriteLock;
 /**
  * Entity-attribute DAO for the IoTDB Table Mode backend.
  *
- * <p>Spring activation: {@code database.attributes.type=iotdb-table}. NOTE: this activation
- * property is the Phase-1 selector pending upstream ThingsBoard confirmation; upstream ThingsBoard
- * does not yet expose an {@code AttributesDao} selector, so the DAO is <b>inert by default</b> (no
- * real Phase-1 deployment sets {@code database.attributes.type}, so the {@link
- * IoTDBTableAttributesEnabledCondition} stays false and the bean is never instantiated). The
- * selector is independent of {@code database.ts.type} / {@code database.ts_latest.type} (the
- * attribute DAO routes separately); if upstream resolves to a different property, the condition is
- * updated. Phase-1 attributes stay in the host entity DB.
+ * <p>Spring activation: {@code database.attributes.type=iotdb-table}. This is a selector this
+ * module supplies rather than one upstream ThingsBoard offers -- upstream exposes no {@code
+ * AttributesDao} selector of its own -- so the DAO is <b>inert by default</b>: while the property
+ * is unset, {@link IoTDBTableAttributesEnabledCondition} stays false, the bean is never
+ * instantiated, and attributes stay in the host entity DB. Setting it makes {@code
+ * AttributesDaoConflictGuard} withdraw ThingsBoard's own attributes bean; see that guard's javadoc
+ * for the matching rule and the boundary of what it can see. The selector is independent of {@code
+ * database.ts.type} / {@code database.ts_latest.type} (the attribute DAO routes separately); if
+ * upstream ever exposes a native selector, this module should use it instead.
  *
  * <p>This DAO is wired as an explicit {@code @Bean} in {@link IoTDBTableConfiguration} (guarded by
  * the activation property) rather than via component scanning, so the {@code ITableSessionPool}

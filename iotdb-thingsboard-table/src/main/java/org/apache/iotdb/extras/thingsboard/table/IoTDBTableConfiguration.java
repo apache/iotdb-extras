@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -36,10 +37,16 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.PriorityOrdered;
 import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Spring Boot auto-configuration entry point for the IoTDB Table Mode backend.
@@ -76,6 +83,12 @@ public class IoTDBTableConfiguration {
       "org.thingsboard.server.dao.timeseries.TimeseriesLatestDao";
   static final String ATTRIBUTES_DAO_CLASS_NAME =
       "org.thingsboard.server.dao.attributes.AttributesDao";
+  // ThingsBoard's own attributes component. Verified at v4.3.1.2 (tag c37fb509):
+  // dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java:58-61 is a
+  // bare @Component on this class, so Spring's default name is the uncapitalised simple name.
+  static final String JPA_ATTRIBUTE_DAO_CLASS_NAME =
+      "org.thingsboard.server.dao.sql.attributes.JpaAttributeDao";
+  static final String JPA_ATTRIBUTE_DAO_BEAN_NAME = "jpaAttributeDao";
 
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnClass(name = TIMESERIES_DAO_CLASS_NAME)
@@ -211,10 +224,11 @@ public class IoTDBTableConfiguration {
    * a separate inner configuration from {@link EnabledRawOnlyConfiguration} because the attribute
    * DAO routes separately from the time-series DAOs: it must be able to activate on its own
    * (attributes selector set, ts selectors unset) and must stay inert when no attributes selector
-   * is present. Because no shipped ThingsBoard release exposes {@code database.attributes.type},
-   * the default Phase-1 deployment leaves it unset, this configuration is skipped, no session pool
-   * or attribute bean is created, and attributes keep flowing to the host entity-DB {@code
-   * AttributesDao} (inert by default).
+   * is present. Leaving the selector unset is the default posture: this configuration is skipped,
+   * no session pool or attribute bean is created, and attributes keep flowing to the host entity-DB
+   * {@code AttributesDao} (inert by default). {@code database.attributes.type} is a selector this
+   * module supplies rather than one ThingsBoard offers -- see {@link #attributesDaoConflictGuard()}
+   * for what setting it does to the host's own attributes bean.
    *
    * <p>The session pool / schema bootstrap beans here reuse the same bean name as {@link
    * EnabledRawOnlyConfiguration} and carry {@code @ConditionalOnMissingBean(name=...)}, so when
@@ -234,10 +248,25 @@ public class IoTDBTableConfiguration {
     }
 
     /**
-     * Fails startup before any IoTDB pool/bootstrap singleton is created if the explicit IoTDB
-     * attribute backend selection conflicts with a host-provided {@code AttributesDao}, mirroring
-     * {@code timeseriesDaoConflictGuard()} so the attribute path does not silently shadow a
-     * different backend.
+     * Resolves the attributes-backend conflict before any IoTDB pool/bootstrap singleton is
+     * created. Unlike its timeseries siblings this guard does not only fail: ThingsBoard switches
+     * its timeseries DAOs by configuration but offers no equivalent for attributes, so when the
+     * IoTDB attributes backend is selected the guard <em>withdraws</em> ThingsBoard's own {@code
+     * jpaAttributeDao} bean definition and logs a WARN naming it.
+     *
+     * <p>Withdrawal is deliberately narrow. It applies to exactly one bean, matched on both the
+     * bean name {@code jpaAttributeDao} and the resolved type {@code
+     * org.thingsboard.server.dao.sql.attributes.JpaAttributeDao}. Any <em>other</em> competing
+     * {@code AttributesDao} — a third-party backend, a decorator, a subclass of this module's own
+     * DAO — fails startup untouched, because a bean the operator registered deliberately is not
+     * ours to delete.
+     *
+     * <p><b>Scope of the guarantee.</b> Candidates are discovered from a single {@code
+     * getBeanNamesForType(type, true, false)} snapshot, which does not initialise FactoryBeans and
+     * does not consult a parent factory. What this guard promises is therefore bounded to the
+     * definitions visible in this bean factory at the moment it runs: a definition registered by a
+     * later post-processor, produced by an opaque {@code FactoryBean} whose {@code getObjectType()}
+     * is null until initialisation, or inherited from an ancestor context is outside it.
      */
     @Bean
     static BeanFactoryPostProcessor attributesDaoConflictGuard() {
@@ -250,9 +279,17 @@ public class IoTDBTableConfiguration {
      * classes while evaluating auto-configuration metadata, and the {@code @Bean} destroy method
      * drains the DAO's IO executor on shutdown.
      */
+    // NOTE: deliberately NOT @ConditionalOnMissingBean(type = ATTRIBUTES_DAO_CLASS_NAME).
+    // At ThingsBoard v4.3.1.2 JpaAttributeDao is an unconditional @Component, and that condition is
+    // evaluated while configuration classes are parsed -- strictly BEFORE
+    // attributesDaoConflictGuard() runs. Keeping it meant this bean was skipped on that build, so
+    // the selector could never take effect. The guard now resolves the conflict instead: it
+    // withdraws ThingsBoard's own attributes bean, or refuses to start if it finds any other
+    // competing AttributesDao. Within the definitions visible to the guard when it runs, that
+    // leaves exactly one -- this one. It is not a guarantee about definitions the guard cannot
+    // see; see attributesDaoConflictGuard()'s javadoc for that boundary.
     @Bean(name = IOTDB_TABLE_ATTRIBUTES_DAO_BEAN_NAME, destroyMethod = "destroy")
     @ConditionalOnBean(name = IOTDB_TABLE_SESSION_POOL_BEAN_NAME)
-    @ConditionalOnMissingBean(type = ATTRIBUTES_DAO_CLASS_NAME)
     IoTDBTableAttributesDao ioTDBTableAttributesDao(
         @Qualifier(IOTDB_TABLE_SESSION_POOL_BEAN_NAME) ITableSessionPool tableSessionPool,
         IoTDBTableConfig config) {
@@ -407,33 +444,165 @@ public class IoTDBTableConfiguration {
     }
   }
 
-  private static final class AttributesDaoConflictGuard implements BeanFactoryPostProcessor {
+  private static final class AttributesDaoConflictGuard
+      implements BeanFactoryPostProcessor, PriorityOrdered {
+
+    // This guard MUTATES bean definitions; its throw-only siblings do not. PriorityOrdered with
+    // HIGHEST_PRECEDENCE puts it ahead of other regular BeanFactoryPostProcessors, which is what
+    // keeps the withdrawal ahead of anything that would resolve AttributesDao through one. It does
+    // NOT order this guard against BeanDefinitionRegistryPostProcessors, which run as a separate
+    // earlier phase -- a definition registered there is simply part of the snapshot this guard
+    // reads, while one registered by a LATER post-processor is outside what it can see at all.
+    @Override
+    public int getOrder() {
+      return Ordered.HIGHEST_PRECEDENCE;
+    }
+
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory)
         throws BeansException {
+      // PHASE 0 -- the only check that depends on no candidate, so it is answered once. Testing
+      // this per-candidate made the failure message depend on iteration order.
+      if (!(beanFactory instanceof BeanDefinitionRegistry registry)) {
+        throw new IllegalStateException(
+            "database.attributes.type=iotdb-table, but this bean factory is not a "
+                + "BeanDefinitionRegistry, so ThingsBoard's competing attributes bean cannot be "
+                + "withdrawn; unset the IoTDB attributes selector");
+      }
       Class<?> attributesDaoType = resolveAttributesDaoClass(beanFactory);
+
+      // PHASE 1 -- read-only. Nothing below this point mutates until every reason to stop has
+      // been evaluated.
+      //
+      // (a) OUR bean is found by DIRECT NAME LOOKUP, not by filtering the type snapshot.
+      //     Assignability is not identity: a user subclass of IoTDBTableAttributesDao is
+      //     somebody else's bean that happens to extend ours. Looking the name up directly also
+      //     catches a bean that took our name while implementing something else entirely --
+      //     that bean never enters the AttributesDao snapshot at all.
+      boolean ourDefinitionPresent =
+          beanFactory.containsBeanDefinition(IOTDB_TABLE_ATTRIBUTES_DAO_BEAN_NAME);
+      Class<?> ourType =
+          ourDefinitionPresent
+              ? resolveBeanType(beanFactory, IOTDB_TABLE_ATTRIBUTES_DAO_BEAN_NAME)
+              : null;
+
+      // (b) every OTHER visible AttributesDao candidate falls into one of two classes:
+      //
+      //   KNOWN_TARGET  ThingsBoard's own attributes component, matched CONJUNCTIVELY on the
+      //                 default component name AND the exact resolved class name. This is the
+      //                 single bean the explicit database.attributes.type=iotdb-table selector
+      //                 asks this module to replace, and the only one the documentation
+      //                 names. Verified at ThingsBoard v4.3.1.2 (tag c37fb509):
+      //                 JpaAttributeDao is a bare @Component on that class, hence that
+      //                 name.
+      //   UNKNOWN       everything else -- a subclass, a decorator, a third-party backend, or a
+      //                 right-name/wrong-type imposter. Deleting a bean an operator wired on
+      //                 purpose is worse than the ambiguity it would prevent, so these keep the
+      //                 original fail-fast semantics, and that advice is now actionable: the
+      //                 bean belongs to the application, which can remove it.
+      //
+      // Discovery is getBeanNamesForType(type, true, false): a one-time snapshot that does not
+      // initialise FactoryBeans and does not consult a parent factory. Definitions registered
+      // after this post-processor, produced by an opaque FactoryBean whose getObjectType() is
+      // null until initialisation, or inherited from an ancestor context are outside what this
+      // guard can see -- and therefore outside what it promises.
+      // At most ONE bean can ever be the known target: the match is conjunctive on a fixed bean
+      // name, and bean names are unique within a factory. A collection here would imply a
+      // generality that cannot occur -- the same objection that removed an unreachable
+      // "more than one of ours" branch from an earlier draft.
+      String knownTargetName = null;
+      Class<?> knownTargetType = null;
+      Map<String, Class<?>> unknown = new LinkedHashMap<>();
+      List<String> unresolvable = new ArrayList<>();
+
       for (String beanName : beanFactory.getBeanNamesForType(attributesDaoType, true, false)) {
-        if (!isIoTDBAttributesDaoBean(beanFactory, beanName)) {
-          throw new IllegalStateException(
-              "database.attributes.type=iotdb-table, but a non-IoTDB AttributesDao bean '"
-                  + beanName
-                  + "' is present; remove it or unset the IoTDB attributes selector");
+        if (IOTDB_TABLE_ATTRIBUTES_DAO_BEAN_NAME.equals(beanName)) {
+          continue;
         }
+        Class<?> beanType = resolveBeanType(beanFactory, beanName);
+        if (beanType == null) {
+          unresolvable.add(beanName);
+        } else if (JPA_ATTRIBUTE_DAO_BEAN_NAME.equals(beanName)
+            && JPA_ATTRIBUTE_DAO_CLASS_NAME.equals(beanType.getName())) {
+          knownTargetName = beanName;
+          knownTargetType = beanType;
+        } else {
+          unknown.put(beanName, beanType);
+        }
+      }
+
+      // An earlier version checked each candidate's removability inside the mutation loop, so it
+      // could withdraw candidate one and then throw on candidate two, leaving a half-mutated
+      // context that the surrounding comment claimed was impossible.
+      if (!unresolvable.isEmpty()) {
+        throw new IllegalStateException(
+            "database.attributes.type=iotdb-table, but AttributesDao bean(s) "
+                + unresolvable
+                + " have no resolvable type and cannot be classified; expose a concrete type or "
+                + "remove the bean(s). Nothing was withdrawn");
+      }
+      if (!ourDefinitionPresent) {
+        throw new IllegalStateException(
+            "database.attributes.type=iotdb-table, but the IoTDB Table Mode attributes DAO bean '"
+                + IOTDB_TABLE_ATTRIBUTES_DAO_BEAN_NAME
+                + "' did not register (check the session pool bean and the with-thingsboard "
+                + "build); NOT withdrawing competing AttributesDao bean(s) "
+                + competing(knownTargetName, unknown.keySet()));
+      }
+      if (ourType == null || !IoTDBTableAttributesDao.class.isAssignableFrom(ourType)) {
+        throw new IllegalStateException(
+            "database.attributes.type=iotdb-table, but bean '"
+                + IOTDB_TABLE_ATTRIBUTES_DAO_BEAN_NAME
+                + "' is "
+                + (ourType == null ? "of no resolvable type" : "a " + ourType.getName())
+                + " rather than an IoTDBTableAttributesDao; something else holds this module's "
+                + "bean name. Nothing was withdrawn");
+      }
+      if (!unknown.isEmpty()) {
+        throw new IllegalStateException(
+            "database.attributes.type=iotdb-table selects the IoTDB attributes backend, but "
+                + "bean(s) "
+                + unknown
+                + " also implement AttributesDao. This module withdraws only ThingsBoard's own '"
+                + JPA_ATTRIBUTE_DAO_BEAN_NAME
+                + "' ("
+                + JPA_ATTRIBUTE_DAO_CLASS_NAME
+                + "); it will not remove a bean your application registered. Remove the "
+                + "conflicting bean(s) or unset the selector. Nothing was withdrawn");
+      }
+      if (knownTargetName != null && !registry.containsBeanDefinition(knownTargetName)) {
+        throw new IllegalStateException(
+            "database.attributes.type=iotdb-table, but ThingsBoard's attributes bean '"
+                + knownTargetName
+                + "' has no bean definition in this registry (it was most likely supplied as a "
+                + "pre-built singleton) and cannot be withdrawn; unset the IoTDB attributes "
+                + "selector. Nothing was withdrawn");
+      }
+
+      // PHASE 2 -- the single mutation. The bean removed here has been established to be
+      // ThingsBoard's own component and to have a removable definition, so the WARN's wording is
+      // true by construction rather than by assumption.
+      if (knownTargetName != null) {
+        registry.removeBeanDefinition(knownTargetName);
+        log.warn(
+            "Removed ThingsBoard bean '{}' ({}) because {}={} selects the IoTDB attributes "
+                + "backend; ThingsBoard provides no configuration switch for attributes, so the "
+                + "conflicting bean is deregistered rather than left to conflict.",
+            knownTargetName,
+            knownTargetType.getName(),
+            IoTDBTableAttributesEnabledCondition.SELECTOR_PROPERTY,
+            IoTDBTableAttributesEnabledCondition.SELECTOR_VALUE);
       }
     }
 
-    private static boolean isIoTDBAttributesDaoBean(
-        ConfigurableListableBeanFactory beanFactory, String beanName) {
-      Class<?> beanType = resolveBeanType(beanFactory, beanName);
-      if (beanType == null) {
-        throw new IllegalStateException(
-            "database.attributes.type=iotdb-table, but AttributesDao bean '"
-                + beanName
-                + "' has no resolvable type; expose a concrete IoTDBTableAttributesDao type or "
-                + "remove the bean");
+    /** Names every bean that competes for the AttributesDao role, for a refusal message. */
+    private static List<String> competing(String knownTargetName, Collection<String> unknown) {
+      List<String> all = new ArrayList<>();
+      if (knownTargetName != null) {
+        all.add(knownTargetName);
       }
-      // beanType is guaranteed non-null here (the null case throws above).
-      return IoTDBTableAttributesDao.class.isAssignableFrom(beanType);
+      all.addAll(unknown);
+      return all;
     }
 
     private static Class<?> resolveBeanType(

@@ -28,15 +28,16 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
  *
  * <p>This selector is INDEPENDENT of {@code database.ts.type} / {@code database.ts_latest.type}:
  * the attribute DAO routes separately from the time-series DAOs (a piggy-back on the timeseries
- * selector was deliberately rejected). Because upstream ThingsBoard does not expose an {@code
- * AttributesDao} selector yet, no real Phase-1 deployment sets {@code database.attributes.type};
- * the property is therefore absent in practice, this condition returns false, the attribute bean is
- * never instantiated, and attributes keep flowing to the host entity-DB {@code AttributesDao}. The
- * DAO is thus inert by default and only activates when an operator opts in explicitly.
+ * selector was deliberately rejected). Upstream ThingsBoard exposes no {@code AttributesDao}
+ * selector of its own, so {@code database.attributes.type} is one this module supplies. Leaving it
+ * unset is the default posture: this condition returns false, the attribute bean is never
+ * instantiated, and attributes keep flowing to the host entity-DB {@code AttributesDao}. The DAO is
+ * inert by default and activates only when an operator opts in explicitly -- at which point {@code
+ * AttributesDaoConflictGuard} withdraws ThingsBoard's own attributes bean.
  */
 final class IoTDBTableAttributesEnabledCondition implements Condition {
-  private static final String SELECTOR_PROPERTY = "database.attributes.type";
-  private static final String SELECTOR_VALUE = "iotdb-table";
+  static final String SELECTOR_PROPERTY = "database.attributes.type";
+  static final String SELECTOR_VALUE = "iotdb-table";
 
   @Override
   public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
