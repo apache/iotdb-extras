@@ -291,6 +291,8 @@
                         </goals>
                         <phase>test</phase>
                         <configuration>
+                            <!-- Execution-level argLine overrides the parent Surefire argLine; retain its heap limit. -->
+                            <argLine>@{argLine} -Xmx1024m -javaagent:${org.mockito:mockito-core:jar}</argLine>
                             <includes>
                                 <include>**/*Test.java</include>
                             </includes>
@@ -305,6 +307,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
+                    <execution>
+                        <id>mockito-agent-path</id>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>check-dependencies</id>
                         <configuration>
