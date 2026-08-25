@@ -31,6 +31,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.Ordered;
 import org.springframework.core.PriorityOrdered;
 import org.thingsboard.server.dao.attributes.AttributesDao;
@@ -228,10 +229,16 @@ class AttributesDaoConflictGuardTest {
    * method would resolve only to {@code AttributesDao} and the guard would classify it as
    * unrecognised and refuse to start -- correctly, since at that point nothing distinguishes it
    * from a third-party backend.
+   *
+   * <p>The fixture is lazy because these tests exercise bean-definition selection, not the host DAO
+   * itself. Constructing the genuine ThingsBoard class would otherwise require host-only
+   * collaborators such as {@code jpaExecutorService}, which this isolated module context does not
+   * bootstrap.
    */
   @Configuration(proxyBeanMethods = false)
   static class HostAttributesDaoConfiguration {
     @Bean(name = HOST_DAO_BEAN)
+    @Lazy
     JpaAttributeDao jpaAttributeDao() {
       return new JpaAttributeDao();
     }
