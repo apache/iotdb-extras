@@ -237,4 +237,43 @@ describe('DataSource', () => {
       expect(result.groupBy?.step).toBe('1h');
     });
   });
+
+  describe('metricFindQuery', () => {
+    it('extracts and expands a standard variable query object', async () => {
+      const scopedVars: ScopedVars = { cluster: { text: 'cluster-a', value: 'cluster-a' } };
+      const sql =
+        "table:metrics_validation:SELECT DISTINCT instance FROM sys_cpu_cores WHERE cluster IN (${cluster:sqlstring})";
+      const expandedSql =
+        "table:metrics_validation:SELECT DISTINCT instance FROM sys_cpu_cores WHERE cluster IN ('cluster-a')";
+      const getVariablesResult = jest.spyOn(ds, 'getVariablesResult').mockResolvedValue([]);
+      mockReplace.mockReturnValue(expandedSql);
+
+      await ds.metricFindQuery({ query: sql, refId: 'StandardVariableQuery' }, { scopedVars });
+
+      expect(mockReplace).toHaveBeenCalledWith(sql, scopedVars);
+      expect(getVariablesResult).toHaveBeenCalledWith(expandedSql);
+    });
+
+    it('keeps legacy string variable queries compatible', async () => {
+      const sql = 'show child paths root.sg';
+      const getVariablesResult = jest.spyOn(ds, 'getVariablesResult').mockResolvedValue([]);
+      mockReplace.mockReturnValue(sql);
+
+      await ds.metricFindQuery(sql);
+
+      expect(mockReplace).toHaveBeenCalledWith(sql, undefined);
+      expect(getVariablesResult).toHaveBeenCalledWith(sql);
+    });
+
+    it('rejects variable query objects without a string query field', async () => {
+      const getVariablesResult = jest.spyOn(ds, 'getVariablesResult').mockResolvedValue([]);
+
+      await expect(ds.metricFindQuery({ refId: 'StandardVariableQuery' })).rejects.toThrow(
+        'Variable query must be a string or an object with a string query field'
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(getVariablesResult).not.toHaveBeenCalled();
+    });
+  });
 });
