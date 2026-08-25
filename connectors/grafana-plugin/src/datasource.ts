@@ -20,6 +20,21 @@ import { IoTDBOptions, IoTDBQuery } from './types';
 import { toMetricFindValue } from './functions';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 
+function variableQueryText(query: unknown): string | undefined {
+  if (typeof query === 'string') {
+    return query;
+  }
+
+  if (query && typeof query === 'object' && 'query' in query) {
+    const queryText = (query as { query?: unknown }).query;
+    if (typeof queryText === 'string') {
+      return queryText;
+    }
+  }
+
+  return undefined;
+}
+
 export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> {
   username: string;
   url: string;
@@ -138,8 +153,13 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
   }
 
   metricFindQuery(query: any, options?: any): Promise<MetricFindValue[]> {
-    query = getTemplateSrv().replace(query, options.scopedVars);
-    return this.getVariablesResult(query);
+    const queryText = variableQueryText(query);
+    if (queryText === undefined) {
+      return Promise.reject(new Error('Variable query must be a string or an object with a string query field'));
+    }
+
+    const expandedQuery = getTemplateSrv().replace(queryText, options?.scopedVars);
+    return this.getVariablesResult(expandedQuery);
   }
 
   nodeQuery(query: any, options?: any): Promise<MetricFindValue[]> {
