@@ -792,6 +792,62 @@ class IoTDBTableTimeseriesAggregationIT {
     }
   }
 
+  @Test
+  void calendarMonthBucketsFollowTheQueryTimezoneRatherThanUtc() throws Exception {
+    TestScope scope =
+        scope(
+            "agg_month_tz",
+            "55555555-5555-5555-5555-555555555509",
+            "66666666-6666-6666-6666-666666666609");
+    bootstrapSchema(scope.database());
+    try (ITableSessionPool pool = newPool(scope.database())) {
+      IoTDBTableConfig config = config(8);
+      IoTDBTableTimeseriesWriter writer = new IoTDBTableTimeseriesWriter(pool, config);
+      IoTDBTableTimeseriesDao dao = new IoTDBTableTimeseriesDao(pool, writer, config);
+      try {
+        // Asia/Shanghai is UTC+8 with no DST, so every calendar MONTH boundary sits exactly eight
+        // hours EARLIER in epoch terms than the corresponding UTC boundary asserted above:
+        //   Jan [1672502400000,1675180800000) 31d -> midpoint 1673841600000
+        //   Feb [1675180800000,1677600000000) 28d -> midpoint 1676390400000
+        //   Mar [1677600000000,1680278400000) 31d -> midpoint 1678939200000
+        // Each midpoint is 28800000 ms below the UTC midpoint used by the test above.
+        //
+        // The middle sample is the discriminator. 1675195200000 is 2023-01-31T20:00Z, which UTC
+        // bucketing places in JANUARY but Shanghai bucketing places in FEBRUARY (local time
+        // 2023-02-01T04:00+08:00). If the DAO dropped the query timezone and fell back to UTC this
+        // would collapse to TWO buckets carrying 60 and 7, not three carrying 10, 50 and 7 -- so
+        // the test fails on the value distribution, not merely on the bucket labels.
+        saveAll(
+            dao,
+            scope,
+            List.of(
+                entry(1673308800000L, "n", DataType.LONG, 10L), // 2023-01-10, Jan in both zones
+                entry(1675195200000L, "n", DataType.LONG, 50L), // Jan in UTC, Feb in Shanghai
+                entry(1677974400000L, "n", DataType.LONG, 7L))); // 2023-03-05, Mar in both zones
+
+        long startTs = 1672502400000L; // 2023-01-01T00:00+08:00
+        long endTs = 1680278400000L; // 2023-04-01T00:00+08:00
+        long[] shanghaiMidpoints = {1673841600000L, 1676390400000L, 1678939200000L};
+
+        ReadTsKvQueryResult sum =
+            calendarAggregate(dao, scope, "n", startTs, endTs, Aggregation.SUM, "Asia/Shanghai");
+        assertNumericBuckets(
+            sum,
+            shanghaiMidpoints,
+            new DataType[] {DataType.LONG, DataType.LONG, DataType.LONG},
+            new double[] {10.0D, 50.0D, 7.0D},
+            1677974400000L);
+
+        ReadTsKvQueryResult count =
+            calendarAggregate(dao, scope, "n", startTs, endTs, Aggregation.COUNT, "Asia/Shanghai");
+        assertLongBuckets(count, shanghaiMidpoints, new long[] {1L, 1L, 1L});
+      } finally {
+        dao.destroy();
+        writer.destroy();
+      }
+    }
+  }
+
   private ReadTsKvQueryResult calendarAggregate(
       IoTDBTableTimeseriesDao dao,
       TestScope scope,
@@ -800,12 +856,24 @@ class IoTDBTableTimeseriesAggregationIT {
       long endTs,
       Aggregation aggregation)
       throws Exception {
+    return calendarAggregate(dao, scope, key, startTs, endTs, aggregation, "UTC");
+  }
+
+  private ReadTsKvQueryResult calendarAggregate(
+      IoTDBTableTimeseriesDao dao,
+      TestScope scope,
+      String key,
+      long startTs,
+      long endTs,
+      Aggregation aggregation,
+      String tzId)
+      throws Exception {
     ReadTsKvQuery query =
         new BaseReadTsKvQuery(
             key,
             startTs,
             endTs,
-            AggregationParams.calendar(aggregation, IntervalType.MONTH, "UTC"),
+            AggregationParams.calendar(aggregation, IntervalType.MONTH, tzId),
             100,
             "ASC");
     return dao.findAllAsync(scope.tenantId(), scope.entityId(), List.of(query))

@@ -74,7 +74,8 @@ selector:
   `telemetry_latest` overlay. Enabled by `database.ts_latest.type=iotdb-table`
   (see the latest-telemetry section below).
 - `IoTDBTableAttributesDao`: entity attributes, **inert by default**. Enabled
-  only by the independent `database.attributes.type=iotdb-table` opt-in.
+  only by the `database.attributes.type=iotdb-table` opt-in, which is separate
+  from the two timeseries selectors.
 
 > **This is an incremental / experimental backend.** Nothing routes through
 > IoTDB Table Mode unless the matching selector is set explicitly; with no
@@ -91,10 +92,18 @@ explicitly with `database.attributes.type=iotdb-table`.
 This attribute selector is **independent** of `database.ts.type` /
 `database.ts_latest.type` — the attribute DAO routes separately from the
 time-series DAOs (a piggy-back on the timeseries selector was deliberately
-rejected). No shipped ThingsBoard release exposes a `database.attributes.type`
-selector yet, so a real Phase-1 deployment never sets it; the activation condition
+rejected). Leaving it unset is the default posture: the activation condition
 stays false, no attribute bean or session pool is created, and attributes keep
 flowing to the host entity-DB `AttributesDao`.
+
+`database.attributes.type` is a selector this module supplies rather than one
+ThingsBoard offers. ThingsBoard switches its timeseries DAOs by configuration but
+has no equivalent for attributes — at v4.3.1.2 its `JpaAttributeDao` is an
+unconditional `@Component`, so no property can stand it down. Setting this
+selector therefore has the module withdraw that one bean at startup, matched on
+both its bean name and its fully-qualified class name, logging a WARN that names
+it; any other competing `AttributesDao` fails startup untouched. See
+`docs/user-guide.md` for the full semantics and their boundary.
 
 When activated, each identity tuple
 `(tenant_id, entity_type, entity_id, attribute_scope, key)` holds exactly one
@@ -302,7 +311,7 @@ Key activation and operational flags:
 | --- | --- | --- |
 | `database.ts.type` | _(unset)_ | Set to `iotdb-table` as the ThingsBoard historical-timeseries backend selector. |
 | `iotdb.ts.experimental-raw-only` | `false` | Explicit opt-in for this backend. Must be `true` together with `database.ts.type=iotdb-table`. The name predates the aggregation support and is kept for compatibility: write, raw read, delete **and** time-bucketed aggregation are all served when it is enabled. |
-| `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO. Independent of the timeseries selectors. Unset in a real Phase-1 deployment, so the attribute DAO is inert by default. |
+| `database.attributes.type` | _(unset)_ | Set to `iotdb-table` to opt in to the entity-attribute DAO. Independent of the timeseries selectors. Unset by default, and while unset the attribute DAO is inert. Setting it withdraws ThingsBoard's own `jpaAttributeDao` bean — see the Entity attributes section. |
 | `iotdb.attributes.cluster_mode` | _(empty)_ | Required when `database.attributes.type=iotdb-table`. Must be `sticky-routing` (per-identity writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the attribute write path converges only within a single JVM. |
 | `iotdb.ts_latest.cluster_mode` | _(empty)_ | Required when `database.ts_latest.type=iotdb-table` (the latest-overlay DAO is active). Must be `sticky-routing` (per-identity latest writes pinned to one node) or `disabled` (single-node / acknowledged best-effort); any other value (including the empty default) fails construction fast, because the latest-overlay write path converges only within a single JVM. This is the symmetric acknowledgement to `iotdb.attributes.cluster_mode`. |
 | `iotdb.attributes.executor.threads` | `4` | Worker-thread count for the attribute DAO's bounded IO executor. Sized independently of `iotdb.ts.read.*` so the attribute path's concurrency can be tuned on its own; the default matches `iotdb.ts.read`. |
@@ -380,8 +389,10 @@ behind its own `database.ts_latest.type=iotdb-table` selector. Physical
 retention is a table property the operator sets on the schema; see
 Retention / TTL above.
 
-`IoTDBTableAttributesDao` is **inert by default** and activated only by the independent
-`database.attributes.type=iotdb-table` opt-in (see the Entity attributes section
-above and its Phase-1 limitations). In a real Phase-1 deployment the selector is
-unset, so the attribute DAO never activates and attributes stay in the host
-entity database.
+`IoTDBTableAttributesDao` is **inert by default** and activated only by the
+`database.attributes.type=iotdb-table` opt-in, which is separate from the two
+timeseries selectors (see the Entity attributes section above and its Phase-1
+limitations). While the selector is unset — the default posture — the attribute
+DAO never activates and attributes stay in the host entity database. Setting it
+has the module withdraw ThingsBoard's own attributes bean, which is why that
+section describes the matching rule and its boundary.

@@ -100,6 +100,24 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <!--
+                Test scope only. Without a binding the module's own slf4j calls resolve to the NOP
+                logger, so no test can observe them at all; AttributesDaoConflictGuardTest asserts
+                the WARN that records which ThingsBoard bean was withdrawn, and that assertion is
+                the only automated check that the disclosure actually happens. Version is managed
+                by the parent, and logback is already used by other modules in this repository.
+            -->
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- Test scope only: ListAppender, used to capture the withdrawal WARN. -->
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
             <scope>provided</scope>
@@ -130,14 +148,23 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <!-- test-scope only: the unit tests construct StatementExecutionException(TSStatus) with
-                 a specific status code to exercise the retry / idempotency classification. TSStatus
-                 lives in iotdb-thrift-commons (a transitive runtime dependency of iotdb-session);
-                 declared here at test scope so it is a declared, test-only use. Version inherited
-                 from the parent reactor (iotdb.version). -->
+            <!-- Runtime scope, deliberately. iotdb-thrift-commons carries TEndPoint and TSStatus:
+                 the session pool needs TEndPoint at RUNTIME, and the unit tests construct
+                 StatementExecutionException(TSStatus) to exercise the retry / idempotency
+                 classification. No main source references it, so compile scope would overstate the
+                 dependency; runtime scope puts it on both the runtime and the test classpaths,
+                 which is exactly where it is used.
+
+                 The scope must be declared: the artifact arrives transitively from iotdb-session,
+                 but a direct declaration wins under Maven's nearest-definition rule, so declaring
+                 it at TEST scope (as this block once did) demoted the transitive runtime dependency
+                 and dropped it from the runtime classpath entirely. Deploying the module then
+                 failed at first session creation with NoClassDefFoundError on TEndPoint. Verified
+                 with dependency:build-classpath -DincludeScope=runtime. Version inherited from the
+                 parent reactor (iotdb.version). -->
             <groupId>org.apache.iotdb</groupId>
             <artifactId>iotdb-thrift-commons</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -264,6 +291,8 @@
                         </goals>
                         <phase>test</phase>
                         <configuration>
+                            <!-- Execution-level argLine overrides the parent Surefire argLine; retain its heap limit. -->
+                            <argLine>@{argLine} -Xmx1024m -javaagent:${org.mockito:mockito-core:jar}</argLine>
                             <includes>
                                 <include>**/*Test.java</include>
                             </includes>
@@ -278,6 +307,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
+                    <execution>
+                        <id>mockito-agent-path</id>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>check-dependencies</id>
                         <configuration>

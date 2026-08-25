@@ -319,12 +319,25 @@ Each route is independently activated and guarded:
 - **Independent activation.** Enabling telemetry does not enable attributes, and
   vice versa. You can route telemetry + latest to IoTDB while attributes stay in
   the host entity database (the default Phase-1 posture).
-- **Fail-fast conflict guard.** When a route is enabled but a conflicting
-  non-IoTDB host DAO bean of the same SPI type is also present, startup fails
-  fast with a clear message rather than silently shadowing one DAO with another.
-  The historical (`TimeseriesDao`), latest (`TimeseriesLatestDao`), and attribute
-  (`AttributesDao`) routes each have their own guard. Make sure the host backend
-  for a route is removed/disabled when you point that route at IoTDB.
+- **Conflict guards, and they are not all fail-fast.** The historical
+  (`TimeseriesDao`), latest (`TimeseriesLatestDao`), and attribute
+  (`AttributesDao`) routes each have their own guard, but they resolve the
+  conflict differently.
+
+  The timeseries and latest guards fail startup when a conflicting non-IoTDB host
+  DAO of the same SPI type is present, rather than silently shadowing one DAO with
+  another. Remove or disable the host backend for that route before pointing it at
+  IoTDB.
+
+  The attribute guard cannot ask for that, because ThingsBoard registers
+  `JpaAttributeDao` unconditionally and no configuration stands it down. So when
+  `database.attributes.type=iotdb-table` is set, the module withdraws that one bean
+  definition itself and logs a WARN naming it. The match is on both the bean name
+  and the exact fully-qualified class name, so nothing else is ever removed: any
+  other competing `AttributesDao` visible to the guard when it runs fails startup
+  untouched. Definitions registered after it, supplied by a `FactoryBean` that
+  does not report its type until initialisation, or inherited from a parent
+  context are outside its reach.
 
 ### Rollback
 
@@ -370,10 +383,12 @@ module `README.md` for the authoritative list):
   with table-wide IoTDB TTL; the module uses it only for ThingsBoard's
   storage-accounting, never as a physical-retention directive. Set physical
   retention on the table (Step 5).
-- **The attributes route is a stretch / Phase-2 opt-in.** No shipped ThingsBoard
-  release exposes a `database.attributes.type` selector yet (open question,
-  tracked upstream), so in a real Phase-1 deployment the selector is unset and
-  attributes stay in the host entity database. When activated, `save` is a
+- **The attributes route is a stretch / Phase-2 opt-in.** `database.attributes.type`
+  is a selector this module supplies rather than one ThingsBoard offers; leaving it
+  unset is the default posture, and while unset attributes stay in the host entity
+  database. Setting it makes the module withdraw ThingsBoard's own attributes bean
+  — see the conflict-guard bullet above for the matching rule and its boundary.
+  When activated, `save` is a
   non-atomic tag-only delete-then-insert under a per-identity in-JVM lock that
   converges only within one JVM; `findNextBatch` is unsupported
   (`UnsupportedOperationException`), and `findAllKeysByDeviceProfileId` with a
