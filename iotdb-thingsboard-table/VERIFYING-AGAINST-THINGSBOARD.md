@@ -131,7 +131,7 @@ A green build proves nothing on its own: if the compile-only sources are still o
 the source path, everything compiles exactly as before. Check the compiler line.
 
 ```
-with the compile-only surface:     Compiling 58 source files
+with the compile-only surface:     Compiling 59 source files
 with the real artifacts:           Compiling 19 source files
 ```
 
@@ -142,26 +142,37 @@ tells you nothing about the real types.
 `mvn -P with-thingsboard -pl iotdb-thingsboard-table dependency:list | grep thingsboard`
 should also list the real artifacts at `provided` scope.
 
-## Result on 2026-08-10, against ThingsBoard 4.3.1.2
+## Result on 2026-08-25, against ThingsBoard 4.3.1.2
 
 ```
-Compiling 19 source files            (58 with the compile-only surface)
-Tests run: 190, Failures: 0, Errors: 0      unit
-Tests run:  57, Failures: 0, Errors: 0      container ITs, real IoTDB
+Compiling 19 source files            (59 with the compile-only surface)
+Tests run: 204, Failures: 0, Errors: 0      unit
+Tests run:  58, Failures: 0, Errors: 0      container ITs, real IoTDB
 BUILD SUCCESS
 ```
 
 Integration tests by suite: `IoTDBTableLatestDaoIT` 19,
-`IoTDBTableTimeseriesAggregationIT` 13, `IoTDBTableAttributesDaoIT` 12,
+`IoTDBTableTimeseriesAggregationIT` 14, `IoTDBTableAttributesDaoIT` 12,
 `IoTDBTableTimeseriesDaoIT` 10, `IoTDBTableTtlIT` 2,
 `IoTDBTableIngestionBenchmarkIT` 1.
+
+The context-test fixture marks its test-only `JpaAttributeDao` bean lazy. With
+the genuine ThingsBoard class in place, eagerly constructing that bean would
+also require ThingsBoard's host-provided `jpaExecutorService`, which this
+isolated module test intentionally does not bootstrap. The tests exercise bean
+definition selection and removal; the lazy marker prevents an unrelated host
+dependency from changing that scope and does not affect production code. Those
+context assertions therefore do not prove that the host DAO itself can be
+constructed in this isolated runner; host-application compatibility requires a
+separate live ThingsBoard deployment.
 
 No drift: every type in the compile-only surface matched, and all three
 `implements` clauses bound against the real interfaces.
 
-This has not been run inside a live ThingsBoard instance. It establishes that the
-types bind and that the DAO behaves correctly against a real IoTDB while using
-them; it does not establish that ThingsBoard as a whole runs on this DAO.
+This verification procedure does not launch a live ThingsBoard instance. It
+establishes that the types bind and that the DAO behaves correctly against a
+real IoTDB while using them; it does not establish that ThingsBoard as a whole
+runs on this DAO.
 
 ## When ThingsBoard publishes its artifacts
 
