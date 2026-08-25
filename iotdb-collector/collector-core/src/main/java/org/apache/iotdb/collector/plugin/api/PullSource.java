@@ -19,21 +19,23 @@
 
 package org.apache.iotdb.collector.plugin.api;
 
-import org.apache.iotdb.collector.runtime.progress.ProgressIndex;
 import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
+import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
-import java.util.Optional;
-
-public abstract class PullSource implements PipeSource {
+public abstract class PullSource extends BaseSource implements PipeSource {
 
   @Override
-  public final void customize(
-      PipeParameters pipeParameters,
-      PipeExtractorRuntimeConfiguration pipeExtractorRuntimeConfiguration) {
-    throw new UnsupportedOperationException();
+  public void validate(final PipeParameterValidator validator) throws Exception {
+    super.validate(validator);
   }
 
-  public abstract Optional<ProgressIndex> report();
+  @Override
+  public void customize(
+      final PipeParameters pipeParameters,
+      final PipeSourceRuntimeConfiguration pipeSourceRuntimeConfiguration)
+      throws Exception {
+    super.customize(pipeParameters, pipeSourceRuntimeConfiguration);
+  }
 }

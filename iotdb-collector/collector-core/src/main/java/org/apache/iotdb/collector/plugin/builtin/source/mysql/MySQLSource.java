@@ -17,6 +17,6 @@
  * under the License.
  */
 
-package org.apache.iotdb.collector.utils;
+package org.apache.iotdb.collector.plugin.builtin.source.mysql;
 
-public class PathUtil {}
+public class MySQLSource {}

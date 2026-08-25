@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.collector.runtime.task;
 
+import org.apache.iotdb.collector.plugin.builtin.sink.resource.memory.PipeMemoryBlock;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 
 import java.util.Map;
@@ -31,6 +32,10 @@ public abstract class Task {
   protected final int parallelism;
 
   protected final TaskDispatch dispatch;
+
+  protected PipeMemoryBlock allocateMemoryBlock;
+
+  protected static final Integer TASK_QUEUE_CAPACITY = 1000;
 
   protected Task(
       final String taskId,
@@ -69,6 +74,10 @@ public abstract class Task {
   public final synchronized void drop() throws Exception {
     dispatch.remove();
     dropInternal();
+
+    if (allocateMemoryBlock != null) {
+      allocateMemoryBlock.close();
+    }
   }
 
   public abstract void dropInternal() throws Exception;

@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 public class TaskPersistence extends Persistence {
@@ -84,6 +83,7 @@ public class TaskPersistence extends Persistence {
     final String queryAllTaskSQL =
         "SELECT task_id, task_state, source_attribute, processor_attribute, sink_attribute, create_time FROM task";
 
+    final List<String> failedResumeTaskIds = new ArrayList<>();
     try (final Connection connection = getConnection();
         final PreparedStatement statement = connection.prepareStatement(queryAllTaskSQL);
         final ResultSet taskResultSet = statement.executeQuery()) {
@@ -94,35 +94,63 @@ public class TaskPersistence extends Persistence {
         final byte[] processorAttribute = taskResultSet.getBytes(4);
         final byte[] sinkAttribute = taskResultSet.getBytes(5);
 
-        tryRecoverTask(
-            taskId,
-            taskState,
-            SerializationUtil.deserialize(sourceAttribute),
-            SerializationUtil.deserialize(processorAttribute),
-            SerializationUtil.deserialize(sinkAttribute));
+        final Response response =
+            tryRecoverTask(
+                taskId,
+                taskState,
+                SerializationUtil.deserialize(sourceAttribute),
+                SerializationUtil.deserialize(processorAttribute),
+                SerializationUtil.deserialize(sinkAttribute));
+
+        if (response.getStatus() != Response.Status.OK.getStatusCode()) {
+          LOGGER.warn(
+              "Failed to resume task {}, because {}, will delete from database later.",
+              taskId,
+              response);
+          failedResumeTaskIds.add(taskId);
+        }
       }
     } catch (final SQLException e) {
-      LOGGER.warn("Failed to resume task persistence message, because {}", e.getMessage());
+      LOGGER.warn(
+          "Failed to resume task persistence message, task ids is {}, because {}",
+          failedResumeTaskIds,
+          e.getMessage());
+    }
+
+    if (!failedResumeTaskIds.isEmpty()) {
+      tryDeleteBatchTaskIds(failedResumeTaskIds);
     }
   }
 
-  public void tryRecoverTask(
+  public Response tryRecoverTask(
       final String taskId,
       final TaskStateEnum taskState,
       final Map<String, String> sourceAttribute,
       final Map<String, String> processorAttribute,
       final Map<String, String> sinkAttribute) {
-    final Response response =
-        RuntimeService.task().isPresent()
-            ? RuntimeService.task()
-                .get()
-                .createTask(
-                    taskId, taskState, sourceAttribute, processorAttribute, sinkAttribute, false)
-            : null;
 
-    if (Objects.isNull(response) || response.getStatus() != Response.Status.OK.getStatusCode()) {
-      LOGGER.warn("Failed to recover task persistence message, because {}", response);
-      tryDeleteTask(taskId);
+    return RuntimeService.task().isPresent()
+        ? RuntimeService.task()
+            .get()
+            .createTask(
+                taskId, taskState, sourceAttribute, processorAttribute, sinkAttribute, false)
+        : Response.serverError().entity("[RuntimeService] the task runtime is null.").build();
+  }
+
+  public void tryDeleteBatchTaskIds(final List<String> taskIds) {
+    final String batchDeleteSQL = "DELETE FROM task WHERE task_id = ?";
+
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(batchDeleteSQL)) {
+      for (final String taskId : taskIds) {
+        statement.setString(1, taskId);
+        statement.addBatch();
+      }
+      statement.executeBatch();
+
+      LOGGER.info("Successfully deleted task ids: {}", taskIds);
+    } catch (final SQLException e) {
+      LOGGER.warn("Failed to delete task ids: {}, because {}", taskIds, e.getMessage());
     }
   }
 
@@ -151,7 +179,7 @@ public class TaskPersistence extends Persistence {
       statement.setString(7, String.valueOf(new Timestamp(System.currentTimeMillis())));
       statement.executeUpdate();
 
-      LOGGER.info("successfully persisted task {} info", taskId);
+      LOGGER.info("Successfully persisted task {} info", taskId);
     } catch (final SQLException | IOException e) {
       LOGGER.warn("Failed to persistence task message, because {}", e.getMessage());
     }
@@ -165,7 +193,7 @@ public class TaskPersistence extends Persistence {
       statement.setString(1, taskId);
       statement.executeUpdate();
 
-      LOGGER.info("successfully deleted task {}", taskId);
+      LOGGER.info("Successfully deleted task {}", taskId);
     } catch (final SQLException e) {
       LOGGER.warn("Failed to delete task persistence message, because {}", e.getMessage());
     }
@@ -180,7 +208,11 @@ public class TaskPersistence extends Persistence {
       statement.setString(2, taskId);
       statement.executeUpdate();
 
-      LOGGER.info("successfully altered task {}", taskId);
+      LOGGER.info(
+          "Successfully altered task {} status, from {} to {} ",
+          taskId,
+          (taskState.getTaskState() + 1) % 2,
+          taskState);
     } catch (final SQLException e) {
       LOGGER.warn("Failed to alter task persistence message, because {}", e.getMessage());
     }

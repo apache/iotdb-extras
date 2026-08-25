@@ -23,6 +23,7 @@ import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 import org.apache.iotdb.pipe.api.exception.PipeException;
 
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,11 +33,10 @@ public class PipeTsFileInsertionEvent extends PipeInsertionEvent implements TsFi
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PipeTsFileInsertionEvent.class);
 
-  private File tsFile;
+  private final File tsFile;
 
-  @Override
-  public boolean isTableModelEvent() {
-    throw new PipeException("");
+  public PipeTsFileInsertionEvent(final File tsFile) {
+    this.tsFile = tsFile;
   }
 
   public File getTsFile() {
@@ -54,5 +54,8 @@ public class PipeTsFileInsertionEvent extends PipeInsertionEvent implements TsFi
   }
 
   @Override
-  public void close() throws Exception {}
+  public void close() throws Exception {
+    LOGGER.info("Closing PipeTsFileInsertionEvent, file path {}", tsFile.getAbsolutePath());
+    FileUtils.delete(tsFile);
+  }
 }
