@@ -73,6 +73,11 @@ var timeFilterRe = regexp.MustCompile(`\$__timeFilter\(\s*((?:[^()]|\([^()]*\))*
 var (
 	timeFromRe = regexp.MustCompile(`\$__timeFrom\b(?:\s*\(\s*\))?`)
 	timeToRe   = regexp.MustCompile(`\$__timeTo\b(?:\s*\(\s*\))?`)
+	// $__evaluationTime is an explicit opt-in for SQL constructs such as HOP
+	// ORIGIN that need Grafana's point-in-time evaluation bound. It is deliberately
+	// separate from $__timeFrom/__timeTo so Instant does not alter ordinary range
+	// predicates or user-authored constants.
+	evaluationTimeRe = regexp.MustCompile(`\$__evaluationTime\b(?:\s*\(\s*\))?`)
 	// These patterns intentionally match the macro prefix. hasStandaloneMacro
 	// and replaceStandaloneMacro reject an identifier byte after the match, so
 	// $__interval_ms is not mistaken for $__interval.
@@ -129,6 +134,7 @@ func (d *IoTDBDataSource) expandVariableMacros(sql string) string {
 //	$__timeFilter(col)      -> (col >= <from> AND col <= <to>)
 //	$__timeFrom[()]         -> <from>
 //	$__timeTo[()]           -> <to>
+//	$__evaluationTime[()]   -> <to>
 //	$__interval              -> a fixed-width IoTDB duration literal
 //	$__interval_ms           -> the interval in milliseconds, per Grafana's contract
 //
@@ -156,6 +162,7 @@ func expandTableMacros(sql string, startMs int64, endMs int64, intervalMS int64)
 
 	from := formatTimeLiteral(startMs)
 	to := formatTimeLiteral(endMs)
+	sql = replaceStandaloneMacro(sql, evaluationTimeRe, to)
 	sql = timeFilterRe.ReplaceAllStringFunc(sql, func(m string) string {
 		col := strings.TrimSpace(timeFilterRe.FindStringSubmatch(m)[1])
 		if col == "" {
@@ -166,6 +173,14 @@ func expandTableMacros(sql string, startMs int64, endMs int64, intervalMS int64)
 	sql = timeFromRe.ReplaceAllString(sql, from)
 	sql = timeToRe.ReplaceAllString(sql, to)
 	return sql, nil
+}
+
+// expandInstantTableMacros expands an Instant query over the complete Grafana
+// range, while exposing the range end through the explicit $__evaluationTime
+// macro. The result selector later chooses the latest row at or before that
+// evaluation time for each series.
+func expandInstantTableMacros(sql string, startMs int64, endMs int64, intervalMS int64) (string, error) {
+	return expandTableMacros(sql, startMs, endMs, intervalMS)
 }
 
 // hasStandaloneMacro reports whether re has a match that is not followed by an
@@ -333,6 +348,30 @@ func (d *IoTDBDataSource) getTablePool() (*client.TableSessionPool, error) {
 // queryTableModel runs a table-model SQL query through the native client and
 // turns the result set into a Grafana data frame.
 func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) backend.DataResponse {
+	wantsInstant := qp.Instant
+	wantsRange := !qp.Instant || qp.Range
+	if wantsInstant && wantsRange {
+		response := backend.DataResponse{}
+		rangeQuery := *qp
+		rangeQuery.Instant = false
+		rangeResponse := d.queryTableModelOnce(ctx, &rangeQuery, "response_range")
+		response.Frames = append(response.Frames, rangeResponse.Frames...)
+		if rangeResponse.Error != nil {
+			response.Error = rangeResponse.Error
+			return response
+		}
+
+		instantQuery := *qp
+		instantResponse := d.queryTableModelOnce(ctx, &instantQuery, "response_instant")
+		response.Frames = append(response.Frames, instantResponse.Frames...)
+		response.Error = instantResponse.Error
+		return response
+	}
+
+	return d.queryTableModelOnce(ctx, qp, "response")
+}
+
+func (d *IoTDBDataSource) queryTableModelOnce(ctx context.Context, qp *queryParam, frameName string) backend.DataResponse {
 	response := backend.DataResponse{}
 
 	if (hasStandaloneMacro(qp.Sql, intervalRe) || hasStandaloneMacro(qp.Sql, intervalMSRe)) && qp.IntervalMS <= 0 {
@@ -351,6 +390,9 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 		response.Error = err
 		return response
 	}
+	if qp.Instant {
+		dataSet = prepareInstantDataSet(dataSet, qp.EndTime)
+	}
 
 	if !strings.EqualFold(qp.Format, tableFormatTable) && !hasPlottableValue(dataSet) {
 		// Time Series with no plottable values — zero rows, or rows whose value
@@ -360,18 +402,121 @@ func (d *IoTDBDataSource) queryTableModel(ctx context.Context, qp *queryParam) b
 		return response
 	}
 
-	response.Frames = append(response.Frames, buildTableResponseFrame(dataSet, qp.Format, qp.LegendFormat))
+	frame := buildTableResponseFrame(dataSet, qp.Format, qp.LegendFormat)
+	frame.Name = frameName
+	response.Frames = append(response.Frames, frame)
 	return response
 }
 
 // executeTableQuery runs and fetches one table-model query. queryTableModel
 // owns response semantics so the same zero-row path is covered in tests.
 func (d *IoTDBDataSource) executeTableQuery(ctx context.Context, qp *queryParam) (*tableQueryDataSet, error) {
-	sql, err := expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS)
+	var sql string
+	var err error
+	if qp.Instant {
+		sql, err = expandInstantTableMacros(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS)
+	} else {
+		sql, err = expandTableMacros(qp.Sql, qp.StartTime, qp.EndTime, qp.IntervalMS)
+	}
 	if err != nil {
 		return nil, err
 	}
 	return d.executeTableStatement(ctx, qp.Database, sql)
+}
+
+// prepareInstantDataSet enforces the point-in-time response contract after the
+// SQL has evaluated over the requested range. For each label/series identity it
+// keeps the latest row whose timestamp is at or before evaluationMs, then
+// normalizes that row's timestamp to evaluationMs. Scalar results without a
+// TIMESTAMP column receive a synthetic evaluation-time column.
+func prepareInstantDataSet(dataSet *tableQueryDataSet, evaluationMs int64) *tableQueryDataSet {
+	evaluation := time.UnixMilli(evaluationMs).UTC()
+	timeCol := -1
+	for i, dataType := range dataSet.DataTypes {
+		if strings.EqualFold(dataType, "TIMESTAMP") {
+			timeCol = i
+			break
+		}
+	}
+
+	prepared := &tableQueryDataSet{
+		ColumnNames: append([]string(nil), dataSet.ColumnNames...),
+		DataTypes:   append([]string(nil), dataSet.DataTypes...),
+		Values:      make([][]interface{}, 0, len(dataSet.Values)),
+	}
+	if timeCol < 0 {
+		seenSeries := make(map[string]struct{}, len(dataSet.Values))
+		prepared.ColumnNames = append([]string{"time"}, prepared.ColumnNames...)
+		prepared.DataTypes = append([]string{"TIMESTAMP"}, prepared.DataTypes...)
+		for _, row := range dataSet.Values {
+			seriesKey := instantSeriesKey(dataSet, row, timeCol)
+			if _, exists := seenSeries[seriesKey]; exists {
+				continue
+			}
+			seenSeries[seriesKey] = struct{}{}
+			instantRow := make([]interface{}, 0, len(row)+1)
+			instantRow = append(instantRow, evaluation)
+			instantRow = append(instantRow, row...)
+			prepared.Values = append(prepared.Values, instantRow)
+		}
+		return prepared
+	}
+
+	// Keep the first-seen series order while replacing each series' candidate
+	// whenever a later eligible timestamp is encountered. A row after the
+	// evaluation time can never satisfy Instant semantics.
+	type candidate struct {
+		row  []interface{}
+		time time.Time
+	}
+	candidates := make(map[string]candidate, len(dataSet.Values))
+	seriesOrder := make([]string, 0, len(dataSet.Values))
+	for _, row := range dataSet.Values {
+		rowTime, ok := rowTimeAt(row, timeCol)
+		if !ok || rowTime.After(evaluation) {
+			continue
+		}
+		seriesKey := instantSeriesKey(dataSet, row, timeCol)
+		current, exists := candidates[seriesKey]
+		if !exists {
+			seriesOrder = append(seriesOrder, seriesKey)
+		} else if !rowTime.After(current.time) {
+			// Preserve the first row when timestamps tie.
+			continue
+		}
+		candidates[seriesKey] = candidate{row: row, time: rowTime}
+	}
+	for _, seriesKey := range seriesOrder {
+		row := candidates[seriesKey].row
+		instantRow := append([]interface{}(nil), row...)
+		instantRow[timeCol] = evaluation
+		prepared.Values = append(prepared.Values, instantRow)
+	}
+	return prepared
+}
+
+// instantSeriesKey mirrors the long-to-wide series identity: non-time,
+// non-numeric columns are labels, while each numeric column is a value series.
+// Grouping rows by this key lets Instant select one latest eligible point for
+// each series rather than treating the query's globally last row as its result.
+func instantSeriesKey(dataSet *tableQueryDataSet, row []interface{}, timeCol int) string {
+	var key strings.Builder
+	for col, cell := range row {
+		if col == timeCol || col < len(dataSet.DataTypes) && isNumericTableType(dataSet.DataTypes[col]) {
+			continue
+		}
+		value := "<nil>"
+		if cell != nil {
+			value = fmt.Sprintf("%T:%s", cell, toString(cell))
+		}
+		key.WriteString(strconv.Itoa(col))
+		key.WriteByte(':')
+		key.WriteString(strconv.Itoa(len(value)))
+		key.WriteByte(':')
+		key.WriteString(value)
+		key.WriteByte(';')
+	}
+	return key.String()
 }
 
 // executeTableStatement runs a table-model SQL statement against the given

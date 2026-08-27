@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 import { DataSource } from './datasource';
-import { IoTDBQuery } from './types';
+import { applyQueryType, getQueryType, IoTDBQuery } from './types';
 import { ScopedVars } from '@grafana/data';
 
 const mockReplace = jest.fn();
@@ -275,5 +275,29 @@ describe('DataSource', () => {
       expect(mockReplace).not.toHaveBeenCalled();
       expect(getVariablesResult).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('query type model', () => {
+  const query = { sqlType: 'SQL: Table Model' } as IoTDBQuery;
+
+  it('keeps omitted query flags backward-compatible as Range', () => {
+    expect(getQueryType(query)).toBe('Range');
+  });
+
+  it.each([
+    ['Range', false, true],
+    ['Instant', true, false],
+    ['Both', true, true],
+  ] as const)('serializes %s into dashboard query flags', (queryType, instant, range) => {
+    const result = applyQueryType(query, queryType);
+
+    expect(result.instant).toBe(instant);
+    expect(result.range).toBe(range);
+    expect(getQueryType(result)).toBe(queryType);
+  });
+
+  it('recognizes an existing dashboard instant target without a range field', () => {
+    expect(getQueryType({ ...query, instant: true })).toBe('Instant');
   });
 });

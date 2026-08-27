@@ -183,6 +183,8 @@ type queryParam struct {
 	Format       string   `json:"format"`
 	IntervalMS   int64    `json:"-"`
 	LegendFormat string   `json:"legendFormat"`
+	Instant      bool     `json:"instant"`
+	Range        bool     `json:"range"`
 }
 
 type QueryDataReq struct {

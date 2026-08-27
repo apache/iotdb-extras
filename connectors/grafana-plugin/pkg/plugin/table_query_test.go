@@ -33,6 +33,18 @@ func ts(ms int64) time.Time {
 	return time.UnixMilli(ms).UTC()
 }
 
+func fieldTime(value interface{}) (time.Time, bool) {
+	switch value := value.(type) {
+	case time.Time:
+		return value, true
+	case *time.Time:
+		if value != nil {
+			return *value, true
+		}
+	}
+	return time.Time{}, false
+}
+
 func TestExpandTableMacros(t *testing.T) {
 	const from int64 = 1600000000000 // 2020-09-13T12:26:40.000+00:00
 	const to int64 = 1600000001000   // 2020-09-13T12:26:41.000+00:00
@@ -63,6 +75,11 @@ func TestExpandTableMacros(t *testing.T) {
 			name: "function form timeFrom and timeTo",
 			in:   "SELECT * FROM db.t WHERE time >= $__timeFrom() AND time <= $__timeTo( )",
 			want: "SELECT * FROM db.t WHERE time >= " + fromLit + " AND time <= " + toLit,
+		},
+		{
+			name: "evaluation time uses range end in either form",
+			in:   "SELECT $__evaluationTime, $__evaluationTime() FROM db.t",
+			want: "SELECT " + toLit + ", " + toLit + " FROM db.t",
 		},
 		{
 			name: "timeFilter with one nested paren level",
@@ -928,5 +945,317 @@ func TestQueryParamLegendFormatEmpty(t *testing.T) {
 	}
 	if qp.LegendFormat != "" {
 		t.Fatalf("LegendFormat should default to empty, got %q", qp.LegendFormat)
+	}
+}
+
+func TestQueryParamInstantDeserialization(t *testing.T) {
+	qp, msg := verifyQuery(backend.DataQuery{JSON: []byte(`{"sqlType":"SQL: Table Model","sql":"SELECT 1","database":"db1","instant":true}`)})
+	if msg != "" {
+		t.Fatalf("valid query rejected: %q", msg)
+	}
+	if !qp.Instant || qp.Range {
+		t.Fatalf("instant flags = instant:%v range:%v, want true and false", qp.Instant, qp.Range)
+	}
+}
+
+func TestQueryParamOmittedInstantIsBackwardCompatibleRange(t *testing.T) {
+	qp, msg := verifyQuery(backend.DataQuery{JSON: []byte(`{"sqlType":"SQL: Table Model","sql":"SELECT 1","database":"db1"}`)})
+	if msg != "" {
+		t.Fatalf("valid query rejected: %q", msg)
+	}
+	if qp.Instant || qp.Range {
+		t.Fatalf("omitted query flags = instant:%v range:%v, want false and false", qp.Instant, qp.Range)
+	}
+}
+
+func TestExpandInstantTableMacrosPreservesRangeAndExpandsExplicitEvaluationTime(t *testing.T) {
+	const start int64 = 1600000000000
+	const evaluation int64 = 1600000001000
+	const startLit = "2020-09-13T12:26:40.000+00:00"
+	const evaluationLit = "2020-09-13T12:26:41.000+00:00"
+	sql := `SELECT window_start AS time
+FROM HOP(
+  DATA => (SELECT time FROM metrics WHERE time >= $__timeFrom - 300000 AND time <= $__timeTo),
+  TIMECOL => 'time', SLIDE => $__interval, SIZE => 5m, ORIGIN => $__evaluationTime)
+WHERE $__timeFilter(window_start)
+-- ORIGIN => 0 must remain a comment
+/* 'ORIGIN => 0' must remain a string */`
+
+	got, err := expandInstantTableMacros(sql, start, evaluation, 60000)
+	if err != nil {
+		t.Fatalf("expandInstantTableMacros() unexpected error: %v", err)
+	}
+	for _, want := range []string{
+		"time >= " + startLit + " - 300000",
+		"time <= " + evaluationLit,
+		"SLIDE => 1m",
+		"ORIGIN => " + evaluationLit,
+		"window_start >= " + startLit + " AND window_start <= " + evaluationLit,
+		"-- ORIGIN => 0 must remain a comment",
+		"/* 'ORIGIN => 0' must remain a string */",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("instant SQL does not contain %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "$__") {
+		t.Fatalf("instant SQL contains an unexpanded macro: %s", got)
+	}
+}
+
+func TestExpandInstantTableMacrosDoesNotRewriteUserOrigin(t *testing.T) {
+	const start int64 = 1600000000000
+	const evaluation int64 = 1600000001000
+	sql := `SELECT window_start AS time
+FROM HOP(DATA => metrics, SLIDE => $__interval, SIZE => 5m, ORIGIN => 0)
+WHERE $__timeFilter(window_start)
+-- ORIGIN => 0
+/* literal: 'ORIGIN => 0' */`
+
+	got, err := expandInstantTableMacros(sql, start, evaluation, 60000)
+	if err != nil {
+		t.Fatalf("expandInstantTableMacros() unexpected error: %v", err)
+	}
+	if count := strings.Count(got, "ORIGIN => 0"); count != 3 {
+		t.Fatalf("ORIGIN => 0 occurrences = %d, want 3 unchanged occurrences:\n%s", count, got)
+	}
+}
+
+func TestExecuteTableQueryInstantKeepsOrdinaryTableSQLRange(t *testing.T) {
+	var executedSQL string
+	d := &IoTDBDataSource{
+		tableExecutor: func(_ context.Context, _ string, sql string) (*tableQueryDataSet, error) {
+			executedSQL = sql
+			return &tableQueryDataSet{}, nil
+		},
+	}
+	_, err := d.executeTableQuery(context.Background(), &queryParam{
+		Sql:       "SELECT time, value FROM metrics WHERE $__timeFilter(time)",
+		Database:  "db1",
+		StartTime: 1600000000000,
+		EndTime:   1600000001000,
+		Instant:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "SELECT time, value FROM metrics WHERE (time >= 2020-09-13T12:26:40.000+00:00 AND time <= 2020-09-13T12:26:41.000+00:00)"
+	if executedSQL != want {
+		t.Fatalf("ordinary Instant SQL = %q, want complete range %q", executedSQL, want)
+	}
+}
+
+func TestExecuteTableQueryInstantSendsRangeSQLAndExplicitEvaluationTime(t *testing.T) {
+	var executedSQL string
+	d := &IoTDBDataSource{
+		tableExecutor: func(_ context.Context, _ string, sql string) (*tableQueryDataSet, error) {
+			executedSQL = sql
+			return &tableQueryDataSet{}, nil
+		},
+	}
+	_, err := d.executeTableQuery(context.Background(), &queryParam{
+		Sql:        "SELECT window_start AS time FROM HOP(DATA => t, SLIDE => $__interval, SIZE => 5m, ORIGIN => $__evaluationTime) WHERE $__timeFilter(window_start)",
+		Database:   "db1",
+		StartTime:  1600000000000,
+		EndTime:    1600000001000,
+		IntervalMS: 1000,
+		Instant:    true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const startLit = "2020-09-13T12:26:40.000+00:00"
+	const evaluationLit = "2020-09-13T12:26:41.000+00:00"
+	if !strings.Contains(executedSQL, "window_start >= "+startLit+" AND window_start <= "+evaluationLit) {
+		t.Fatalf("instant SQL did not retain the complete time range: %s", executedSQL)
+	}
+	if !strings.Contains(executedSQL, "ORIGIN => "+evaluationLit) {
+		t.Fatalf("instant SQL did not expand the explicit evaluation macro: %s", executedSQL)
+	}
+}
+
+func TestQueryTableModelRangeStillReturnsMultiplePoints(t *testing.T) {
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+			return &tableQueryDataSet{
+				ColumnNames: []string{"time", "value"},
+				DataTypes:   []string{"TIMESTAMP", "DOUBLE"},
+				Values: [][]interface{}{
+					{ts(1000), float64(1)},
+					{ts(2000), float64(2)},
+				},
+			}, nil
+		},
+	}
+
+	response := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTimeSeries, EndTime: 2000})
+	if response.Error != nil || len(response.Frames) != 1 {
+		t.Fatalf("range response = frames:%d error:%v", len(response.Frames), response.Error)
+	}
+	if got := response.Frames[0].Fields[0].Len(); got != 2 {
+		t.Fatalf("range time points = %d, want 2", got)
+	}
+}
+
+func TestQueryTableModelInstantReturnsOnePointPerSeriesAtQueryEnd(t *testing.T) {
+	const evaluation int64 = 3000
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+			return &tableQueryDataSet{
+				ColumnNames: []string{"time", "instance", "value"},
+				DataTypes:   []string{"TIMESTAMP", "STRING", "DOUBLE"},
+				Values: [][]interface{}{
+					{ts(1000), "node-a", float64(9)},
+					{ts(evaluation), "node-a", float64(0)},
+					{ts(evaluation), "node-a", float64(99)},
+					{ts(2000), "node-b", float64(8)},
+					{ts(evaluation), "node-b", float64(2)},
+				},
+			}, nil
+		},
+	}
+
+	response := d.queryTableModel(context.Background(), &queryParam{
+		Format:       tableFormatTimeSeries,
+		LegendFormat: "{{instance}}",
+		Instant:      true,
+		EndTime:      evaluation,
+	})
+	if response.Error != nil || len(response.Frames) != 1 {
+		t.Fatalf("instant response = frames:%d error:%v", len(response.Frames), response.Error)
+	}
+	frame := response.Frames[0]
+	if len(frame.Fields) != 3 {
+		t.Fatalf("instant fields = %d, want time plus two labeled series", len(frame.Fields))
+	}
+	if got := frame.Fields[0].Len(); got != 1 {
+		t.Fatalf("instant timestamps = %d, want 1", got)
+	}
+	gotTime, ok := fieldTime(frame.Fields[0].At(0))
+	if !ok || !gotTime.Equal(ts(evaluation)) {
+		t.Fatalf("instant timestamp = %#v, want %v", frame.Fields[0].At(0), ts(evaluation))
+	}
+
+	values := map[string]float64{}
+	for _, field := range frame.Fields[1:] {
+		if field.Len() != 1 {
+			t.Fatalf("series %q has %d points, want 1", field.Name, field.Len())
+		}
+		value, ok := field.At(0).(*float64)
+		if !ok || value == nil {
+			t.Fatalf("series %q value = %#v, want non-null float", field.Name, field.At(0))
+		}
+		values[field.Labels["instance"]] = *value
+		if field.Config == nil || field.Config.DisplayNameFromDS != field.Labels["instance"] {
+			t.Fatalf("series labels/legend not preserved: labels=%v config=%#v", field.Labels, field.Config)
+		}
+	}
+	if values["node-a"] != 0 || values["node-b"] != 2 {
+		t.Fatalf("instant values = %v, want node-a=0 and node-b=2", values)
+	}
+}
+
+func TestQueryTableModelInstantSelectsLatestSampleAtOrBeforeQueryEnd(t *testing.T) {
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+			return &tableQueryDataSet{
+				ColumnNames: []string{"time", "value"},
+				DataTypes:   []string{"TIMESTAMP", "DOUBLE"},
+				Values: [][]interface{}{
+					{ts(2999), float64(7)},
+					{ts(3001), float64(9)},
+				},
+			}, nil
+		},
+	}
+	response := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTimeSeries, Instant: true, EndTime: 3000})
+	if response.Error != nil || len(response.Frames) != 1 {
+		t.Fatalf("Instant response = frames:%d error:%v", len(response.Frames), response.Error)
+	}
+	frame := response.Frames[0]
+	gotTime, timeOK := fieldTime(frame.Fields[0].At(0))
+	value, valueOK := frame.Fields[1].At(0).(*float64)
+	if !timeOK || !gotTime.Equal(ts(3000)) || !valueOK || value == nil || *value != 7 {
+		t.Fatalf("Instant point = time:%v value:%v, want time:%v value:7", gotTime, value, ts(3000))
+	}
+}
+
+func TestQueryTableModelInstantEmptyAndNullAreNoData(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		values [][]interface{}
+	}{
+		{name: "empty", values: [][]interface{}{}},
+		{name: "null", values: [][]interface{}{{ts(3000), nil}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &IoTDBDataSource{
+				tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+					return &tableQueryDataSet{
+						ColumnNames: []string{"time", "value"},
+						DataTypes:   []string{"TIMESTAMP", "DOUBLE"},
+						Values:      tc.values,
+					}, nil
+				},
+			}
+			response := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTimeSeries, Instant: true, EndTime: 3000})
+			if len(response.Frames) != 0 || response.Error != nil {
+				t.Fatalf("%s Instant response = frames:%d error:%v, want No data", tc.name, len(response.Frames), response.Error)
+			}
+		})
+	}
+}
+
+func TestQueryTableModelInstantAddsEvaluationTimeToScalarResult(t *testing.T) {
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(context.Context, *queryParam) (*tableQueryDataSet, error) {
+			return &tableQueryDataSet{
+				ColumnNames: []string{"value"},
+				DataTypes:   []string{"INT64"},
+				Values:      [][]interface{}{{int64(0)}},
+			}, nil
+		},
+	}
+	response := d.queryTableModel(context.Background(), &queryParam{Format: tableFormatTimeSeries, Instant: true, EndTime: 3000})
+	if len(response.Frames) != 1 || len(response.Frames[0].Fields) != 2 {
+		t.Fatalf("scalar Instant response = %#v", response)
+	}
+	timeValue, timeOK := fieldTime(response.Frames[0].Fields[0].At(0))
+	intValue := response.Frames[0].Fields[1].At(0).(*int64)
+	if !timeOK || !timeValue.Equal(ts(3000)) || intValue == nil || *intValue != 0 {
+		t.Fatalf("scalar Instant values = time:%v value:%v", timeValue, intValue)
+	}
+}
+
+func TestQueryTableModelBothReturnsDistinctRangeAndInstantFrames(t *testing.T) {
+	var modes []bool
+	d := &IoTDBDataSource{
+		tableQueryRunner: func(_ context.Context, qp *queryParam) (*tableQueryDataSet, error) {
+			modes = append(modes, qp.Instant)
+			values := [][]interface{}{{ts(1000), float64(1)}, {ts(3000), float64(3)}}
+			return &tableQueryDataSet{
+				ColumnNames: []string{"time", "value"},
+				DataTypes:   []string{"TIMESTAMP", "DOUBLE"},
+				Values:      values,
+			}, nil
+		},
+	}
+	response := d.queryTableModel(context.Background(), &queryParam{
+		Format:  tableFormatTimeSeries,
+		Instant: true,
+		Range:   true,
+		EndTime: 3000,
+	})
+	if response.Error != nil || len(response.Frames) != 2 {
+		t.Fatalf("Both response = frames:%d error:%v", len(response.Frames), response.Error)
+	}
+	if len(modes) != 2 || modes[0] || !modes[1] {
+		t.Fatalf("Both execution modes = %v, want [range instant]", modes)
+	}
+	if response.Frames[0].Name != "response_range" || response.Frames[1].Name != "response_instant" {
+		t.Fatalf("Both frame names = %q, %q", response.Frames[0].Name, response.Frames[1].Name)
+	}
+	if response.Frames[0].Fields[0].Len() != 2 || response.Frames[1].Fields[0].Len() != 1 {
+		t.Fatalf("Both point counts = range:%d instant:%d", response.Frames[0].Fields[0].Len(), response.Frames[1].Fields[0].Len())
 	}
 }
