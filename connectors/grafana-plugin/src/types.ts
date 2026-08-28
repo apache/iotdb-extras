@@ -41,6 +41,10 @@ export interface IoTDBQuery extends DataQuery {
   sql?: string;
   format?: string;
   legendFormat?: string;
+  // Grafana query semantics. Queries saved before these fields existed are
+  // Range queries; Instant + Range together means Both.
+  instant?: boolean;
+  range?: boolean;
 }
 
 export interface GroupBy {
@@ -77,4 +81,25 @@ export interface IoTDBOptions extends DataSourceJsonData {
  */
 export interface IoTDBSecureJsonData {
   password?: string;
+}
+
+export const queryTypes = ['Range', 'Instant', 'Both'] as const;
+export type QueryType = (typeof queryTypes)[number];
+
+export function getQueryType(query: Pick<IoTDBQuery, 'instant' | 'range'>): QueryType {
+  if (query.instant) {
+    return query.range ? 'Both' : 'Instant';
+  }
+  return 'Range';
+}
+
+export function applyQueryType(query: IoTDBQuery, queryType: QueryType): IoTDBQuery {
+  switch (queryType) {
+    case 'Instant':
+      return { ...query, instant: true, range: false };
+    case 'Both':
+      return { ...query, instant: true, range: true };
+    default:
+      return { ...query, instant: false, range: true };
+  }
 }

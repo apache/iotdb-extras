@@ -155,8 +155,15 @@ SQL input box: a single table-model SELECT statement. The following macros are e
 | `$__timeFilter(col)` | `(col >= <panel start> AND col <= <panel end>)`; `col` defaults to `time` when omitted |
 | `$__timeFrom`, `$__timeFrom()` | the panel range start as an ISO 8601 UTC timestamp literal |
 | `$__timeTo`, `$__timeTo()` | the panel range end as an ISO 8601 UTC timestamp literal |
+| `$__evaluationTime`, `$__evaluationTime()` | the panel range end as an ISO 8601 UTC timestamp literal; use this explicitly for point-in-time constructs such as `HOP(... ORIGIN => ...)` |
 
 The macros expand to ISO 8601 timestamp literals (e.g. `2020-09-13T12:26:40.000+00:00`), which the server interprets in its own configured `timestamp_precision` — so time filtering works unchanged on `ms`, `us` and `ns` servers, and TIMESTAMP values are likewise converted by the client using the server-reported precision.
+
+QUERY TYPE option:
+
+- `Range` (default): evaluates the SQL over the complete Grafana time range. Queries saved before this option existed remain Range queries.
+- `Instant`: evaluates the SQL over the complete Grafana range, then returns the latest row at or before the range end for each series, with its timestamp normalized to that evaluation time. This supports samples whose timestamps do not exactly equal the panel end. SQL that needs a window boundary aligned to the evaluation time (for example `HOP(... ORIGIN => ...)`) must explicitly use `$__evaluationTime`; the plugin does not rewrite `ORIGIN` values, comments, or string literals.
+- `Both`: executes Range and Instant independently and returns both results in distinctly named frames.
 
 FORMAT option:
 

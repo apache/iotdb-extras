@@ -18,7 +18,7 @@ import defaults from 'lodash/defaults';
 import React, { ChangeEvent, PureComponent } from 'react';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from './datasource';
-import { GroupBy, IoTDBOptions, IoTDBQuery } from './types';
+import { applyQueryType, getQueryType, GroupBy, IoTDBOptions, IoTDBQuery, QueryType, queryTypes } from './types';
 import { QueryField, QueryInlineField } from './componments/Form';
 import { TimeSeries } from './componments/TimeSeries';
 import { SelectValue } from './componments/SelectValue';
@@ -70,6 +70,7 @@ const paths = [''];
 const expressions = [''];
 const selectType = ['SQL: Full Customized', 'SQL: Drop-down List', 'SQL: Table Model'];
 const tableFormats = ['Time series', 'Table'];
+const queryTypeOptions: Array<SelectableValue<QueryType>> = queryTypes.map((value) => ({ label: value, value }));
 const commonOption: SelectableValue<string> = { label: '*', value: '*' };
 const commonOptionDou: SelectableValue<string> = { label: '**', value: '**' };
 type Props = QueryEditorProps<DataSource, IoTDBQuery, IoTDBOptions>;
@@ -161,6 +162,11 @@ export class QueryEditor extends PureComponent<Props, State> {
     const { onChange, query } = this.props;
     this.setState({ format: value });
     onChange({ ...query, format: value });
+  };
+
+  onQueryTypeChange = ({ value: value = queryTypes[0] }: SelectableValue<QueryType>) => {
+    const { onChange, query } = this.props;
+    onChange(applyQueryType(query, value));
   };
 
   onLegendFormatChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -395,6 +401,16 @@ export class QueryEditor extends PureComponent<Props, State> {
             )}
             {this.state.sqlType === selectType[2] && (
               <>
+                <div className="gf-form">
+                  <QueryInlineField label={'QUERY TYPE'}>
+                    <Segment
+                      onChange={this.onQueryTypeChange}
+                      options={queryTypeOptions}
+                      value={getQueryType(query)}
+                      className="query-keyword width-10"
+                    />
+                  </QueryInlineField>
+                </div>
                 <div className="gf-form">
                   <QueryInlineField label={'DATABASE'}>
                     <Input
