@@ -15,19 +15,17 @@
 
 module github.com/grafana/grafana-starter-datasource-backend
 
-go 1.21
-
-toolchain go1.21.0
+go 1.25
 
 require (
-	github.com/apache/iotdb-client-go/v2 v2.0.8
+	github.com/apache/iotdb-client-go/v2 v2.0.10
 	github.com/grafana/grafana-plugin-sdk-go v0.250.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/apache/thrift v0.17.0 // indirect
+	github.com/apache/thrift v0.24.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
