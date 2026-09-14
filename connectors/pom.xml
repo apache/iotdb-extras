@@ -68,6 +68,7 @@
             <id>with-all-connectors</id>
             <modules>
                 <module>flink-iotdb-connector</module>
+                <module>flink-iotdb-table-connector</module>
                 <module>flink-sql-iotdb-connector</module>
                 <module>flink-tsfile-connector</module>
                 <module>hadoop</module>
@@ -101,6 +102,7 @@
             <id>with-flink</id>
             <modules>
                 <module>flink-iotdb-connector</module>
+                <module>flink-iotdb-table-connector</module>
                 <module>flink-sql-iotdb-connector</module>
                 <module>flink-tsfile-connector</module>
             </modules>
