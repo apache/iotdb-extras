@@ -32,8 +32,8 @@ import org.apache.flink.table.factories.FactoryUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -95,7 +95,8 @@ public class IoTDBRelationalDynamicTableFactory
         .withTable(config.get(IoTDBRelationalOptions.TABLE))
         .withTimeColumn(config.get(IoTDBRelationalOptions.TIME_COLUMN))
         .withTagColumns(parseColumnNames(config.get(IoTDBRelationalOptions.TAG_COLUMNS)))
-        .withAttributeColumns(parseColumnNames(config.get(IoTDBRelationalOptions.ATTRIBUTE_COLUMNS)))
+        .withAttributeColumns(
+            parseColumnNames(config.get(IoTDBRelationalOptions.ATTRIBUTE_COLUMNS)))
         .build();
   }
 

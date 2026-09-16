@@ -129,17 +129,23 @@ public class IoTDBRelationalOptions implements Serializable {
     return defaultDatabase;
   }
 
-  /** @return the configured IoTDB time-column name, or {@code null} when unspecified. */
+  /**
+   * @return the configured IoTDB time-column name, or {@code null} when unspecified.
+   */
   public String getTimeColumn() {
     return timeColumn;
   }
 
-  /** @return configured IoTDB TAG column names. */
+  /**
+   * @return configured IoTDB TAG column names.
+   */
   public List<String> getTagColumns() {
     return tagColumns;
   }
 
-  /** @return configured IoTDB ATTRIBUTE column names. */
+  /**
+   * @return configured IoTDB ATTRIBUTE column names.
+   */
   public List<String> getAttributeColumns() {
     return attributeColumns;
   }

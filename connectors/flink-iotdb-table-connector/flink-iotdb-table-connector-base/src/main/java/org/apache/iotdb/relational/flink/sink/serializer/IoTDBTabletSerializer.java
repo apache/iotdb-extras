@@ -25,10 +25,10 @@ import java.io.IOException;
 import java.io.Serializable;
 
 /**
- * Converts one Flink input record into an IoTDB {@link Tablet}.
+ * Serializes Flink input records into a writer-owned IoTDB {@link Tablet}.
  *
- * <p>The returned tablet may contain zero, one, or multiple rows. The sink writer owns batching and
- * flushing, while the serializer only defines how an input record is represented as tablet rows.
+ * <p>The sink writer owns tablet creation, batching, and flushing. The serializer only defines how
+ * an input record is appended to the provided tablet.
  *
  * @param <IN> input record type
  */
@@ -38,11 +38,19 @@ public interface IoTDBTabletSerializer<IN> extends Serializable {
   default void open() throws Exception {}
 
   /**
-   * Serializes one input record.
+   * Creates the writer-owned tablet used for batching.
    *
-   * <p>TODO: define the exact owner of the returned tablet and the batch-size contract.
+   * <p>The returned tablet must have a positive maximum row number. The writer owns the returned
+   * instance and reuses it until it is flushed.
    */
-  Tablet serialize(IN record) throws IOException;
+  Tablet createTablet(int maxRows) throws IOException;
+
+  /**
+   * Serializes one input record directly into the writer-owned tablet.
+   *
+   * @return {@code true} if the tablet is full after serialization, otherwise {@code false}
+   */
+  boolean serialize(IN record, Tablet tablet) throws IOException;
 
   /** Closes the serializer after the last record has been processed. */
   default void close() throws Exception {}

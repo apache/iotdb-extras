@@ -45,7 +45,12 @@ public class RowDataIoTDBTabletSerializer implements IoTDBTabletSerializer<RowDa
   }
 
   @Override
-  public Tablet serialize(RowData record) throws IOException {
+  public Tablet createTablet(int maxRows) throws IOException {
+    throw new UnsupportedOperationException("Not implemented yet.");
+  }
+
+  @Override
+  public boolean serialize(RowData record, Tablet tablet) throws IOException {
     throw new UnsupportedOperationException("Not implemented yet.");
   }
 

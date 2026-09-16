@@ -20,48 +20,94 @@
 package org.apache.iotdb.relational.flink.table;
 
 import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.source.IoTDBSource;
+import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
 
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.connector.source.LookupTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
+import org.apache.flink.table.connector.source.SourceProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
+import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
+import org.apache.flink.table.expressions.ResolvedExpression;
+import org.apache.flink.table.types.DataType;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * Dynamic table source of the IoTDB relational (table model) Flink connector, covering scan and
- * lookup reading.
+ * Dynamic table source of the IoTDB relational (table model) Flink connector.
  *
- * <p>Mirrors the structure of Doris' {@code DorisDynamicTableSource}. TODO: implement the scan and
- * lookup runtime providers.
+ * <p>Only scan reads are exposed for now. Projection pushdown and lookup reads are intentionally
+ * disabled until their runtime behavior is implemented.
  */
-public class IoTDBRelationalDynamicTableSource implements ScanTableSource, LookupTableSource {
+public class IoTDBRelationalDynamicTableSource
+    implements ScanTableSource, SupportsFilterPushDown, SupportsLimitPushDown {
 
   private final IoTDBRelationalOptions options;
   private final ResolvedSchema schema;
+  private DataType physicalRowDataType;
+  private final List<String> resolvedFilterQueries = new ArrayList<>();
+  private long limit = -1L;
 
   public IoTDBRelationalDynamicTableSource(IoTDBRelationalOptions options, ResolvedSchema schema) {
     this.options = options;
     this.schema = schema;
+    this.physicalRowDataType = schema.toPhysicalRowDataType();
   }
 
   @Override
   public ChangelogMode getChangelogMode() {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    return ChangelogMode.insertOnly();
   }
 
   @Override
   public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    return SourceProvider.of(
+        new IoTDBSource<>(
+            options,
+            physicalRowDataType,
+            new RowDataDeserializationSchema(physicalRowDataType),
+            resolvedFilterQueries));
   }
 
   @Override
-  public LookupRuntimeProvider getLookupRuntimeProvider(LookupContext lookupContext) {
-    throw new UnsupportedOperationException("Not implemented yet.");
+  public Result applyFilters(List<ResolvedExpression> filters) {
+    if (filters == null || filters.isEmpty()) {
+      return Result.of(Collections.emptyList(), Collections.emptyList());
+    }
+
+    List<ResolvedExpression> acceptedFilters = new ArrayList<>();
+    List<ResolvedExpression> remainingFilters = new ArrayList<>();
+    IoTDBExpressionVisitor expressionVisitor = new IoTDBExpressionVisitor();
+    for (ResolvedExpression filter : filters) {
+      String filterQuery = filter.accept(expressionVisitor);
+      if (filterQuery == null || filterQuery.trim().isEmpty()) {
+        remainingFilters.add(filter);
+      } else {
+        acceptedFilters.add(filter);
+        resolvedFilterQueries.add(filterQuery);
+      }
+    }
+    return Result.of(acceptedFilters, remainingFilters);
+  }
+
+  @Override
+  public void applyLimit(long limit) {
+    // TODO: push this limit into the single-split SQL when the optimization is enabled.
+    this.limit = limit;
   }
 
   @Override
   public DynamicTableSource copy() {
-    return new IoTDBRelationalDynamicTableSource(options, schema);
+    IoTDBRelationalDynamicTableSource copy = new IoTDBRelationalDynamicTableSource(options, schema);
+    copy.physicalRowDataType = physicalRowDataType;
+    copy.resolvedFilterQueries.addAll(resolvedFilterQueries);
+    copy.limit = limit;
+    return copy;
   }
 
   @Override

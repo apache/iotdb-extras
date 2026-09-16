@@ -53,8 +53,7 @@ public class IoTDBRelationalDynamicTableSink implements DynamicTableSink {
 
   @Override
   public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
-    IoTDBTabletSerializer<RowData> serializer =
-        new RowDataIoTDBTabletSerializer(options, schema);
+    IoTDBTabletSerializer<RowData> serializer = new RowDataIoTDBTabletSerializer(options, schema);
     return SinkV2Provider.of(new IoTDBSink<>(options, serializer));
   }
 

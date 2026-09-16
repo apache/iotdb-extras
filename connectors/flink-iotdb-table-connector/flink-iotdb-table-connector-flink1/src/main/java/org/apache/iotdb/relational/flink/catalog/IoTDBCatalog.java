@@ -61,8 +61,8 @@ import java.util.Set;
  * Flink 1.x Catalog adapter for IoTDB relational tables.
  *
  * <p>Flink Catalog API adaptation belongs here. IoTDB metadata access belongs in {@link
- * IoTDBCatalogClient}; the current implementation supports database/table discovery, table
- * schema resolution, and basic database/table DDL.
+ * IoTDBCatalogClient}; the current implementation supports database/table discovery, table schema
+ * resolution, and basic database/table DDL.
  */
 public class IoTDBCatalog extends AbstractCatalog {
 
@@ -363,8 +363,7 @@ public class IoTDBCatalog extends AbstractCatalog {
       }
 
       String columnName = column.getName();
-      TSDataType dataType =
-          IoTDBRelationalTypeUtils.toIoTDBDataType((DataType) abstractDataType);
+      TSDataType dataType = IoTDBRelationalTypeUtils.toIoTDBDataType((DataType) abstractDataType);
       columnNames.add(columnName);
       dataTypes.add(dataType);
       dataTypesByColumn.put(normalizeColumnName(columnName), dataType);
@@ -397,7 +396,8 @@ public class IoTDBCatalog extends AbstractCatalog {
     }
     for (String columnName : value.split(",", -1)) {
       if (columnName.trim().isEmpty()) {
-        throw new CatalogException("Table option '" + optionName + "' contains an empty column name.");
+        throw new CatalogException(
+            "Table option '" + optionName + "' contains an empty column name.");
       }
       String normalizedColumnName = normalizeColumnName(columnName);
       if (!columnNames.add(normalizedColumnName)) {
@@ -438,15 +438,16 @@ public class IoTDBCatalog extends AbstractCatalog {
       String columnName, String optionName, Map<String, TSDataType> dataTypesByColumn) {
     if (!dataTypesByColumn.containsKey(columnName)) {
       throw new CatalogException(
-          "Column '" + columnName + "' declared by table option '" + optionName + "' does not exist.");
+          "Column '"
+              + columnName
+              + "' declared by table option '"
+              + optionName
+              + "' does not exist.");
     }
   }
 
   private static ColumnCategory toColumnCategory(
-      String columnName,
-      String timeColumn,
-      Set<String> tagColumns,
-      Set<String> attributeColumns) {
+      String columnName, String timeColumn, Set<String> tagColumns, Set<String> attributeColumns) {
     String normalizedColumnName = normalizeColumnName(columnName);
     if (timeColumn.equals(normalizedColumnName)) {
       return ColumnCategory.TIME;
@@ -475,8 +476,7 @@ public class IoTDBCatalog extends AbstractCatalog {
     for (int i = 0; i < columns.size(); i++) {
       IMeasurementSchema column = columns.get(i);
       schemaBuilder.column(
-          column.getMeasurementName(),
-          IoTDBRelationalTypeUtils.toFlinkDataType(column.getType()));
+          column.getMeasurementName(), IoTDBRelationalTypeUtils.toFlinkDataType(column.getType()));
       switch (categories.get(i)) {
         case TIME:
           timeColumn = column.getMeasurementName();
@@ -492,7 +492,8 @@ public class IoTDBCatalog extends AbstractCatalog {
       }
     }
     if (timeColumn == null) {
-      throw new CatalogException("IoTDB table has no TIME column: " + databaseName + "." + tableName);
+      throw new CatalogException(
+          "IoTDB table has no TIME column: " + databaseName + "." + tableName);
     }
 
     Map<String, String> tableOptions = new HashMap<>();

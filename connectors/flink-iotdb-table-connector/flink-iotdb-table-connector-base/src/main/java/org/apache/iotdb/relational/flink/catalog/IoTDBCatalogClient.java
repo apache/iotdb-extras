@@ -23,6 +23,7 @@ import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.utils.IoTDBIdentifierUtils;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -40,8 +41,8 @@ import java.util.Locale;
 /**
  * Common IoTDB catalog metadata access layer.
  *
- * <p>This class implements metadata and basic DDL operations used by the Flink catalog. It talks
- * to IoTDB through the table model session and the following SQL statements:
+ * <p>This class implements metadata and basic DDL operations used by the Flink catalog. It talks to
+ * IoTDB through the table model session and the following SQL statements:
  *
  * <pre>
  *   SHOW DATABASES
@@ -71,8 +72,7 @@ public class IoTDBCatalogClient implements AutoCloseable {
   }
 
   public List<String> listTables(String database) {
-    return querySingleColumn(
-        "SHOW TABLES FROM " + quoteIdentifier(database), COLUMN_TABLE_NAME);
+    return querySingleColumn("SHOW TABLES FROM " + quoteIdentifier(database), COLUMN_TABLE_NAME);
   }
 
   public boolean databaseExists(String database) {
@@ -116,11 +116,7 @@ public class IoTDBCatalogClient implements AutoCloseable {
   }
 
   public void dropTable(String database, String table) {
-    executeNonQuery(
-        "DROP TABLE "
-            + quoteIdentifier(database)
-            + "."
-            + quoteIdentifier(table));
+    executeNonQuery("DROP TABLE " + quoteIdentifier(database) + "." + quoteIdentifier(table));
   }
 
   public TableSchema getTable(String database, String table) {
@@ -235,7 +231,7 @@ public class IoTDBCatalogClient implements AutoCloseable {
   }
 
   private static String quoteIdentifier(String identifier) {
-    return "\"" + identifier.replace("\"", "\"\"") + "\"";
+    return IoTDBIdentifierUtils.quoteIdentifier(identifier);
   }
 
   private ITableSessionPool getSessionPool() {

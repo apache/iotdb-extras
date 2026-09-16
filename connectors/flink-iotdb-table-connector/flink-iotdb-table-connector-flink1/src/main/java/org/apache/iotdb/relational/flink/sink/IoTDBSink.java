@@ -37,7 +37,7 @@ import java.io.IOException;
  *   <li>DataStream API can create {@code IoTDBSink<IN>} with a user-provided serializer.
  * </ul>
  *
- * <p>TODO: implement batching and {@code ITableSession.insert(Tablet)} in the writer.
+ * <p>The writer owns the IoTDB session and batches serialized tablets before insertion.
  *
  * @param <IN> input record type
  */
@@ -48,8 +48,7 @@ public class IoTDBSink<IN> implements Sink<IN> {
   private final IoTDBRelationalOptions options;
   private final IoTDBTabletSerializer<IN> serializer;
 
-  public IoTDBSink(
-      IoTDBRelationalOptions options, IoTDBTabletSerializer<IN> serializer) {
+  public IoTDBSink(IoTDBRelationalOptions options, IoTDBTabletSerializer<IN> serializer) {
     this.options = options;
     this.serializer = serializer;
   }
