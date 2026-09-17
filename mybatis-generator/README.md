@@ -33,6 +33,8 @@ From the repository root:
 mvn -pl mybatis-generator,mybatis-support -am clean install
 ```
 
+`mvn package -Pwith-mybatis` additionally builds `distributions/target/apache-iotdb-<version>-mybatis-generator-plugin-bin.zip`, which bundles the generator plugin jar together with the `mybatis-support` runtime jar.
+
 ## Configure the generator
 
 Both the plugin and JDBC driver must be in the generator's plugin classloader. No absolute `classPathEntry` or manually copied JDBC jar is needed:
@@ -86,7 +88,7 @@ Applications also need [mybatis-support](../mybatis-support/README.md), includin
 
 - `IoTDBJavaTypeResolver` maps TIMESTAMP to **Long**. Values use the server's configured ms/us/ns precision without conversion. Set `jdbcType.FLOAT=java.lang.Float`; do not map high-precision timestamps to `Date`.
 - The logical row identity is **TIME plus every TAG**. Keep `virtualKeyColumns` synchronized with the real schema; `IoTDBKeyPlugin` emits `IS NULL` for nullable TAG components in generated SELECT/DELETE predicates. ATTRIBUTE and FIELD columns are not keys.
-- Disable `enableUpdateByPrimaryKey` and `enableUpdateByExample`. IoTDB 2.0.11 UPDATE changes ATTRIBUTE columns only. To change FIELD values, INSERT the same key and the desired fields; omitted/null fields do not erase existing values. ATTRIBUTE updates affect the device across timestamps.
+- Disable `enableUpdateByPrimaryKey` and `enableUpdateByExample`. IoTDB 2.0.11 UPDATE changes ATTRIBUTE columns only and rejects `time` in its predicate, so MBG's key-based UPDATE statements cannot run; `IoTDBKeyPlugin` drops them and reports a generator warning if they are left enabled. To change FIELD values, INSERT the same key and the desired fields; omitted/null fields do not erase existing values. ATTRIBUTE updates affect the device across timestamps.
 - Add DATE/BLOB `columnOverride` entries from [runtime support](../mybatis-support/README.md), so the same handlers apply to inserts, batch parameters and result maps.
 - Use `delimitIdentifiers` / `delimitAllColumns` for SQL identifiers requiring quotes. Batch SQL uses MBG's formatting helpers and preserves configured handlers and escaping.
 - Lombok/Swagger plugins require the corresponding annotation dependencies in the consuming application. Lombok is applied to primary-key and BLOB model classes as well as base records.

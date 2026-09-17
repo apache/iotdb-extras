@@ -143,6 +143,12 @@ IoTDB-Extras uses Maven profiles to configure different build options. You can c
   mvn clean package -Pwith-flink -DskipTests
   ```
 
+- **with-mybatis**: Package the MyBatis generator plugin and runtime support as a distribution zip
+
+  ```bash
+  mvn clean package -Pwith-mybatis -DskipTests
+  ```
+
 - **with-grafana**: Build Grafana connectors and plugins
 
   ```bash

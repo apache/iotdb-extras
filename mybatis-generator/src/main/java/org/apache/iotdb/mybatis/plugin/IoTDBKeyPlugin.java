@@ -24,14 +24,40 @@ import org.mybatis.generator.api.dom.xml.Attribute;
 import org.mybatis.generator.api.dom.xml.TextElement;
 import org.mybatis.generator.api.dom.xml.XmlElement;
 import org.mybatis.generator.codegen.mybatis3.MyBatis3FormattingUtilities;
+import org.mybatis.generator.config.TableConfiguration;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/** Preserves nullable TAG components in generated TIME + TAG key predicates. */
+/**
+ * Adapts MBG's key-based statements to the IoTDB table model: nullable TAG components of the TIME +
+ * TAG key become {@code IS NULL} predicates in SELECT/DELETE, and the UPDATE statements are dropped
+ * because IoTDB UPDATE accepts neither {@code time} in the predicate nor FIELD columns in SET.
+ */
 public class IoTDBKeyPlugin extends PluginAdapter {
+  // MBG hands the shared warnings list to validate() before any table callback.
+  private List<String> warnings = new ArrayList<>();
+
   @Override
   public boolean validate(List<String> warnings) {
+    this.warnings = warnings;
     return true;
+  }
+
+  @Override
+  public void initialized(IntrospectedTable table) {
+    TableConfiguration configuration = table.getTableConfiguration();
+    if (configuration.isUpdateByPrimaryKeyStatementEnabled()
+        || configuration.isUpdateByExampleStatementEnabled()) {
+      warnings.add(
+          "IoTDBKeyPlugin: not generating UPDATE statements for "
+              + table.getFullyQualifiedTable()
+              + "; IoTDB UPDATE cannot use time in the predicate or FIELD columns in SET. INSERT"
+              + " the same key to change FIELD values and set enableUpdateByPrimaryKey and"
+              + " enableUpdateByExample to false.");
+      configuration.setUpdateByPrimaryKeyStatementEnabled(false);
+      configuration.setUpdateByExampleStatementEnabled(false);
+    }
   }
 
   @Override

@@ -31,6 +31,8 @@ From the repository root:
 mvn -pl mybatis-support -am install
 ```
 
+The `with-mybatis` distribution profile (`mvn package -Pwith-mybatis`) also ships this jar next to the generator plugin in `apache-iotdb-<version>-mybatis-generator-plugin-bin.zip`.
+
 Add this application dependency (it is separate from the build-time generator plugin):
 
 ```xml

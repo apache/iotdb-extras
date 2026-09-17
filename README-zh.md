@@ -142,6 +142,12 @@ IoTDB-Extras 使用 Maven profiles 配置不同的构建选项。您可以组合
   mvn clean package -Pwith-flink -DskipTests
   ```
 
+- **with-mybatis**：将 MyBatis 生成插件和运行时适配打包为分发 zip
+
+  ```bash
+  mvn clean package -Pwith-mybatis -DskipTests
+  ```
+
 - **with-grafana**：构建 Grafana 连接器和插件
 
   ```bash

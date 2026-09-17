@@ -31,6 +31,8 @@
 mvn -pl mybatis-generator,mybatis-support -am clean install
 ```
 
+`mvn package -Pwith-mybatis` 还会生成 `distributions/target/apache-iotdb-<version>-mybatis-generator-plugin-bin.zip`，其中同时打包生成插件和 `mybatis-support` 运行时 jar。
+
 生成时，`mybatis-generator-maven-plugin:1.4.2` 的 `dependencies` 中必须包含：
 
 | 依赖 | 版本 |
@@ -61,7 +63,7 @@ mvn mybatis-generator:generate
 - 行键由 **TIME 与全部 TAG** 组成，`virtualKeyColumns` 必须与表结构一致。`IoTDBKeyPlugin` 在查询、删除的键谓词中为 NULL TAG 生成 `IS NULL`。
 - `IoTDBJavaTypeResolver` 将 TIMESTAMP 映射为 **Long**；数值单位跟随服务端 ms/us/ns，适配层不转换单位。FLOAT 配置为 `java.lang.Float`。不要用 `Date` 承接高精度时间戳。
 - DATE 使用 `LocalDate + IoTDBLocalDateTypeHandler`，BLOB 使用 `byte[] + IoTDBBlobTypeHandler`。通过 `columnOverride` 同时生成参数及结果映射，详见[运行时适配文档](../mybatis-support/README.md)。
-- 设置 `enableUpdateByPrimaryKey=false` 和 `enableUpdateByExample=false`。2.0.11 的 UPDATE 只支持 ATTRIBUTE；修改 FIELD 要按相同行键执行 INSERT。省略或为 NULL 的 FIELD 不会清除已有值。
+- 设置 `enableUpdateByPrimaryKey=false` 和 `enableUpdateByExample=false`。2.0.11 的 UPDATE 只支持 ATTRIBUTE，且谓词中不能出现 `time`，MBG 按主键生成的 UPDATE 无法执行；若仍开启，`IoTDBKeyPlugin` 会跳过这些语句并输出生成警告。修改 FIELD 要按相同行键执行 INSERT。省略或为 NULL 的 FIELD 不会清除已有值。
 - ATTRIBUTE 属于设备，更新会影响该设备所有时间点。普通关系数据库的通用 UPDATE 不能直接套用。
 - 批量 SQL 保留 MBG 的标识符转义和 TypeHandler。保留字使用 `delimitIdentifiers` / `delimitAllColumns`。
 - 示例使用 `ignoreQualifiersAtRuntime=true`：生成读取配置中的 schema，运行时由 JDBC URL 选择数据库。
