@@ -78,7 +78,9 @@ class IoTDBTableAttributesDaoIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1); bind to all
           // interfaces so the Testcontainers port-mapped session handshake succeeds.

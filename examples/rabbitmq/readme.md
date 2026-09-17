@@ -28,7 +28,7 @@ The example is to show how to send data from localhost to IoTDB through RabbitMQ
 
 |          | Version |
 |----------|---------|
-| IoTDB    | 2.0.5   |  
+| IoTDB    | 2.0.11   |
 | RabbitMQ | 5.26.0  |
 
 ### Dependencies with Maven
@@ -38,7 +38,7 @@ The example is to show how to send data from localhost to IoTDB through RabbitMQ
     <dependency>
         <groupId>org.apache.iotdb</groupId>
         <artifactId>iotdb-session</artifactId>
-        <version>2.0.5</version>
+        <version>2.0.11</version>
     </dependency>
     <dependency>
         <groupId>com.rabbitmq</groupId>
@@ -139,4 +139,3 @@ Step 1: Run `RabbitMQProducer.java`
 Step 2: Run `RabbitMQConsumer.java`
 
 > This class consumes data from RabbitMQ and sends the data to IoTDB-table.
-

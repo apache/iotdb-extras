@@ -28,11 +28,12 @@ import org.apache.iotdb.rpc.subscription.config.ConsumerConstant;
 import org.apache.iotdb.session.subscription.consumer.tree.SubscriptionTreePullConsumer;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessageType;
-import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 
+import org.apache.tsfile.write.record.Tablet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
@@ -101,11 +102,14 @@ public class IoTDBPushSource extends PushSource {
         final List<SubscriptionMessage> messages = consumer.poll(timeout);
         for (final SubscriptionMessage message : messages) {
           final short messageType = message.getMessageType();
-          if (SubscriptionMessageType.isValidatedMessageType(messageType)) {
-            for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
-              final SubDemoEvent event = new SubDemoEvent(dataSet.getTablet(), deviceId);
-              supply(event);
+          if (messageType == SubscriptionMessageType.RECORD_HANDLER.getType()) {
+            final Iterator<Tablet> tablets = message.getRecordTabletIterator();
+            while (tablets.hasNext()) {
+              supply(new SubDemoEvent(tablets.next(), deviceId));
             }
+          } else if (messageType != SubscriptionMessageType.WATERMARK.getType()) {
+            throw new UnsupportedOperationException(
+                "Collector IoTDB source requires record-format subscription messages");
           }
         }
       }

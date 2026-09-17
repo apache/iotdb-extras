@@ -67,20 +67,19 @@ TsFile versions are inherited from the `iotdb-extras` parent reactor.
 | --- | --- | --- | --- |
 | Module | `org.apache.iotdb:iotdb-thingsboard-table` | `2.0.4-SNAPSHOT` (parent version) | module `pom.xml` `<parent>` |
 | Parent reactor | `org.apache.iotdb:iotdb-extras-parent` | `2.0.4-SNAPSHOT` | module `pom.xml` `<parent>` |
-| IoTDB session client | `org.apache.iotdb:iotdb-session` | `2.0.5` | inherited from parent `iotdb.version`; module declares the dependency with no `<version>` |
-| TsFile | `org.apache.tsfile:tsfile` | `2.1.1` | inherited from parent `tsfile.version` (transitive of `iotdb-session`) |
+| IoTDB session client | `org.apache.iotdb:iotdb-session` | `2.0.11` | inherited from parent `iotdb.version`; module declares the dependency with no `<version>` |
+| TsFile | `org.apache.tsfile:tsfile` | `2.4.0` | inherited from parent `tsfile.version` (transitive of `iotdb-session`) |
 | Guava | `com.google.guava:guava` | `32.1.2-jre` | inherited from parent `guava.version`; `provided` scope |
 | Bean-validation API | `jakarta.validation:jakarta.validation-api` | `3.0.2` | module override (`jakarta.* ` namespace, `provided` scope) to match the Spring Boot 3 runtime host |
 | ThingsBoard host | (ThingsBoard distribution) | `4.3.1.2` | module `pom.xml` `thingsboard.version`; SPI surface verified against this tag |
-| IoTDB server (tested) | `apache/iotdb` standalone image | `2.0.8` | integration tests run against `apache/iotdb:2.0.8-standalone` |
+| IoTDB server (test default) | `apache/iotdb` standalone image | `2.0.11` | integration tests select `apache/iotdb:2.0.11-standalone` |
 
 Notes:
 
-- The module compiles against the **2.0.5** table-session client; its
-  integration tests exercise the real write path against an **IoTDB 2.0.8**
-  standalone server, so the 2.0.5-client / 2.0.8-server RPC path is the
-  validated pairing. Any IoTDB 2.x server that speaks the same table-session RPC
-  is a candidate, but 2.0.8 is the version the module is tested against.
+- The module compiles against the **2.0.11** table-session client. Integration
+  tests default to an **IoTDB 2.0.11** standalone server and allow overriding
+  `iotdb.test.image`. Run the profile to validate your actual client/server pairing;
+  a configured version is not evidence of successful container execution.
 - The build parent itself targets an older Spring line; the module deploys into
   ThingsBoard 4.3.x, which runs Spring Boot 3.5.x / Spring 6 / JDK 17 (the
   `jakarta.*` namespace). That is why `jakarta.validation-api` is overridden to

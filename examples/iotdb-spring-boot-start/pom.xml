@@ -30,7 +30,7 @@
     </parent>
     <groupId>org.apache.iotdb</groupId>
     <artifactId>iotdb-spring-boot-start-example</artifactId>
-    <version>2.0.4-SNAPHOT</version>
+    <version>2.0.4-SNAPSHOT</version>
     <name>IoTDB: Example: SpringBoot Starter</name>
     <description>iotdb-spring-boot-start</description>
     <properties>
@@ -38,7 +38,7 @@
         <version>3.5.1</version>
         <google.java.format.version>1.22.0</google.java.format.version>
         <spotless.version>2.43.0</spotless.version>
-        <iotdb.version>2.0.5</iotdb.version>
+        <iotdb.version>2.0.11</iotdb.version>
     </properties>
     <dependencies>
         <dependency>

@@ -20,32 +20,76 @@ package org.apache.iotdb.config;
 import org.apache.iotdb.isession.SessionConfig;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 
 import java.time.ZoneId;
 
 @ConfigurationProperties(prefix = "iotdb.session")
 public class IoTDBSessionProperties {
-  private String node_urls;
-  private String username;
-  private String password;
+  /** Semicolon-separated RPC endpoints in host:port form. */
+  private String node_urls = "127.0.0.1:6667";
+
+  /** Username shared by the tree and table pools. */
+  private String username = "root";
+
+  /** Password shared by the tree and table pools. */
+  private String password = "root";
+
+  /** Default database for the table pool only; does not create a database. */
   private String database;
+
+  /** Legacy property; both pool types are created regardless of this value. */
   private String sql_dialect = "table";
+
+  /** Maximum number of sessions in each pool. */
   private Integer max_size = 5;
-  private Integer fetch_size = 1024;
+
+  /** Rows fetched per query batch; defaults to the IoTDB client value (5000 in 2.0.11). */
+  private Integer fetch_size = SessionConfig.DEFAULT_FETCH_SIZE;
+
+  /** Query timeout in milliseconds; negative uses the server default, zero disables the timeout. */
   private long query_timeout_in_ms = 60000L;
+
+  /** Refresh available DataNode endpoints in the background. */
   private boolean enable_auto_fetch = true;
+
+  /** Maximum connection retries; zero disables retries. */
   private Integer max_retry_count = 60;
+
+  /** Maximum time in milliseconds to wait for a session from a full pool. */
   private long wait_to_get_session_timeout_in_ms = 60000L;
+
+  /** Enable Thrift compact protocol; independent of IoTDB RPC compression. */
   private boolean enable_compression = false;
+
+  /** Delay between connection retries in milliseconds (500 in IoTDB 2.0.11). */
   private long retry_interval_in_ms = SessionConfig.RETRY_INTERVAL_IN_MS;
+
+  /** Enable TLS for client connections. */
   private boolean use_ssl = false;
+
+  /** Trust store path for TLS connections. */
   private String trust_store;
+
+  /** Trust store password for TLS connections. */
   private String trust_store_pwd;
-  private Integer connection_timeout_in_ms;
-  private ZoneId zone_id;
+
+  /** Connection timeout in milliseconds; zero means no timeout. */
+  private Integer connection_timeout_in_ms = SessionConfig.DEFAULT_CONNECTION_TIMEOUT_MS;
+
+  /** Session timezone; defaults to the JVM timezone. */
+  private ZoneId zone_id = ZoneId.systemDefault();
+
+  /** Initial Thrift buffer size in bytes. */
   private Integer thrift_default_buffer_size = 1024;
+
+  /** Maximum Thrift frame size in bytes. */
   private Integer thrift_max_frame_size = 67108864;
+
+  /** Redirect writes to the relevant leader; the starter retains its historical false default. */
   private boolean enable_redirection;
+
+  /** Automatically convert records to tablets in the tree pool (true in IoTDB 2.0.11). */
   private boolean enable_records_auto_convert_tablet =
       SessionConfig.DEFAULT_RECORDS_AUTO_CONVERT_TABLET;
 
@@ -81,10 +125,21 @@ public class IoTDBSessionProperties {
     this.database = database;
   }
 
+  /**
+   * @deprecated Both pool types are exposed; select the dialect by injecting the required type.
+   */
+  @Deprecated
+  @DeprecatedConfigurationProperty(
+      reason =
+          "Both pool types are exposed; select the dialect by injecting the required pool type.")
   public String getSql_dialect() {
     return sql_dialect;
   }
 
+  /**
+   * @deprecated Retained for configuration compatibility; this does not select a pool type.
+   */
+  @Deprecated
   public void setSql_dialect(String sql_dialect) {
     this.sql_dialect = sql_dialect;
   }

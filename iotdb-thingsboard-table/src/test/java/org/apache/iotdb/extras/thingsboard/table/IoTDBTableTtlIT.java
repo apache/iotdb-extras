@@ -42,8 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Validates the table-level TTL mechanism against real IoTDB 2.0.8. IoTDB Table Mode TTL is a table
- * property expressed in milliseconds; this IT proves the two operator-facing paths the README
+ * Validates the table-level TTL mechanism against real IoTDB 2.0.11. IoTDB Table Mode TTL is a
+ * table property expressed in milliseconds; this IT proves the two operator-facing paths the README
  * documents work as described:
  *
  * <ul>
@@ -72,7 +72,9 @@ class IoTDBTableTtlIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1); bind to all
           // interfaces so the Testcontainers port-mapped session handshake succeeds.

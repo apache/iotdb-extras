@@ -62,7 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>TC-1 is defined with two profiles. This class is the <b>smoke profile</b>: a local, fast,
  * JUnit-driven run that exercises the real {@link IoTDBTableTimeseriesDao#save} path (bounded queue
  * &rarr; single flush worker &rarr; multi-row {@code Tablet} insert &rarr; real IoTDB) against the
- * same {@code apache/iotdb:2.0.8-standalone} Testcontainer the functional ITs use, then reports
+ * same {@code apache/iotdb:2.0.11-standalone} Testcontainer the functional ITs use, then reports
  * records/sec, error rate, and writer stats.
  *
  * <p><b>The &gt;10K writes/sec headline target is the FULL profile number on a dedicated host.</b>
@@ -110,7 +110,9 @@ class IoTDBTableIngestionBenchmarkIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1), so it would
           // only listen on the container loopback and reject the Testcontainers port-mapped session

@@ -608,9 +608,9 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
   private static String aggregationProjection(Aggregation aggregation) {
     return switch (aggregation) {
       case AVG -> "AVG(" + NUMERIC_VALUE + ") AS " + AGG_NUM_COLUMN;
-        // SUM keeps the ThingsBoard 4.3.1.2 result type: long-only buckets stay LONG, mixed buckets
-        // promote to DOUBLE. Project the partial long/double sums plus the long/double non-null
-        // counts so the row mapper can pick the type without re-reading the raw rows.
+      // SUM keeps the ThingsBoard 4.3.1.2 result type: long-only buckets stay LONG, mixed buckets
+      // promote to DOUBLE. Project the partial long/double sums plus the long/double non-null
+      // counts so the row mapper can pick the type without re-reading the raw rows.
       case SUM ->
           // IoTDB 2.0.8 computes SUM over an INT64 column with a DOUBLE accumulator and returns a
           // DOUBLE. Project the long partial as SUM(CAST(long_v AS DOUBLE)) -- a plain DOUBLE --
@@ -635,14 +635,14 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
               + ", "
               + numericCountProjection();
       case COUNT -> countProjection();
-        // MIN/MAX keep the mixed/double numeric value via MIN/MAX(NUMERIC_VALUE) (the COALESCE
-        // promotes long_v to DOUBLE, correct for mixed and double-only buckets) and the string
-        // fallback via MIN/MAX(str_v). A long-only bucket instead reads the direct MIN(long_v)/
-        // MAX(long_v) channel, which SELECTs a stored long with no accumulation and is therefore
-        // exact for every long (even > 2^53) -- routing it through agg_num's DOUBLE would
-        // round-trip
-        // a large long and lose precision. The long/double non-null counts pick the populated
-        // channel.
+      // MIN/MAX keep the mixed/double numeric value via MIN/MAX(NUMERIC_VALUE) (the COALESCE
+      // promotes long_v to DOUBLE, correct for mixed and double-only buckets) and the string
+      // fallback via MIN/MAX(str_v). A long-only bucket instead reads the direct MIN(long_v)/
+      // MAX(long_v) channel, which SELECTs a stored long with no accumulation and is therefore
+      // exact for every long (even > 2^53) -- routing it through agg_num's DOUBLE would
+      // round-trip
+      // a large long and lose precision. The long/double non-null counts pick the populated
+      // channel.
       case MIN ->
           "MIN("
               + NUMERIC_VALUE
@@ -654,20 +654,20 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
               + AGG_STR_COLUMN
               + ", "
               + numericCountProjection();
-        // The numeric MAX is projected as -MIN(-x) rather than MAX(x). IoTDB's GROUPED max
-        // accumulator seeds FLOAT/DOUBLE state with Float/Double.MIN_VALUE -- the smallest
-        // POSITIVE value, not the most negative one -- and only marks a group initialized when
-        // `value >= state`, so a bucket whose numeric maximum is zero or negative comes back
-        // NULL. This DAO reads a NULL aggregate as "empty bucket" and skips it, so a MAX
-        // downsampling query over e.g. a sub-zero sensor would silently lose whole buckets
-        // instead of failing. Every release up to and including 2.0.10 is affected; fixed on
-        // master by apache/iotdb#18300, which is not in a released version yet. The grouped MIN
-        // accumulator seeds with MAX_VALUE and is not affected, and IEEE-754 negation is exact,
-        // so -MIN(-x) is an exact substitute for MAX(x) over finite values, on affected and
-        // fixed servers alike. This projection is shared with the calendar path, whose
-        // non-grouped accumulators track an explicit initialized flag rather than a sentinel, so
-        // the substitution is exact there too and an empty bucket still yields NULL. MAX(long_v)
-        // and MAX(str_v) are already correct (true Long.MIN_VALUE seed / flag-based) and stay.
+      // The numeric MAX is projected as -MIN(-x) rather than MAX(x). IoTDB's GROUPED max
+      // accumulator seeds FLOAT/DOUBLE state with Float/Double.MIN_VALUE -- the smallest
+      // POSITIVE value, not the most negative one -- and only marks a group initialized when
+      // `value >= state`, so a bucket whose numeric maximum is zero or negative comes back
+      // NULL. This DAO reads a NULL aggregate as "empty bucket" and skips it, so a MAX
+      // downsampling query over e.g. a sub-zero sensor would silently lose whole buckets
+      // instead of failing. Every release up to and including 2.0.10 is affected; fixed on
+      // master by apache/iotdb#18300, which is not in a released version yet. The grouped MIN
+      // accumulator seeds with MAX_VALUE and is not affected, and IEEE-754 negation is exact,
+      // so -MIN(-x) is an exact substitute for MAX(x) over finite values, on affected and
+      // fixed servers alike. This projection is shared with the calendar path, whose
+      // non-grouped accumulators track an explicit initialized flag rather than a sentinel, so
+      // the substitution is exact there too and an empty bucket still yields NULL. MAX(long_v)
+      // and MAX(str_v) are already correct (true Long.MIN_VALUE seed / flag-based) and stay.
       case MAX ->
           "-1 * MIN(-1 * ("
               + NUMERIC_VALUE

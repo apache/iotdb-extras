@@ -18,6 +18,9 @@
 
 -->
 <configuration>
+    <plugins>
+        <plugin interceptor="org.apache.iotdb.mybatis.IoTDBQueryInterceptor"/>
+    </plugins>
     <environments default="dev">
         <environment id="dev">
             <transactionManager type="JDBC"/>

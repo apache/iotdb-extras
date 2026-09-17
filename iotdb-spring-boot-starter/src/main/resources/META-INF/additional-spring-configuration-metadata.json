@@ -1,0 +1,20 @@
+{
+  "properties": [
+    {
+      "name": "iotdb.session.fetch-size",
+      "defaultValue": 5000
+    },
+    {
+      "name": "iotdb.session.connection-timeout-in-ms",
+      "defaultValue": 0
+    },
+    {
+      "name": "iotdb.session.retry-interval-in-ms",
+      "defaultValue": 500
+    },
+    {
+      "name": "iotdb.session.enable-records-auto-convert-tablet",
+      "defaultValue": true
+    }
+  ]
+}

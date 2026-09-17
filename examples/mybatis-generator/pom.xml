@@ -29,8 +29,33 @@
     </parent>
     <artifactId>mybatis-generator-example</artifactId>
     <name>IoTDB: Example: Mybatis Generator</name>
-    <version>2.0.4-SNAPHOT</version>
+    <version>2.0.4-SNAPSHOT</version>
+    <properties>
+        <mybatis.generator.configurationFile>src/main/resources/generatorConfig.xml</mybatis.generator.configurationFile>
+    </properties>
     <dependencies>
+        <dependency>
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>mybatis-generator-plugin</artifactId>
+            <version>2.0.4-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mybatis.generator</groupId>
+            <artifactId>mybatis-generator-core</artifactId>
+            <version>1.4.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>mybatis-support</artifactId>
+            <version>2.0.4-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
@@ -70,10 +95,25 @@
         </resources>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.mybatis.generator</groupId>
                 <artifactId>mybatis-generator-maven-plugin</artifactId>
                 <version>1.4.2</version>
                 <dependencies>
+                    <dependency>
+                        <groupId>org.apache.iotdb</groupId>
+                        <artifactId>iotdb-jdbc</artifactId>
+                        <version>${iotdb.version}</version>
+                    </dependency>
                     <dependency>
                         <groupId>org.apache.iotdb</groupId>
                         <artifactId>mybatis-generator-plugin</artifactId>
@@ -83,7 +123,7 @@
                 <configuration>
                     <verbose>true</verbose>
                     <overwrite>true</overwrite>
-                    <configurationFile>src/main/resources/generatorConfig.xml</configurationFile>
+                    <configurationFile>${mybatis.generator.configurationFile}</configurationFile>
                 </configuration>
             </plugin>
             <plugin>
@@ -94,6 +134,10 @@
                         <!-- These are used at runtime in tests -->
                         <usedDependency>org.apache.iotdb:iotdb-jdbc</usedDependency>
                     </usedDependencies>
+                    <ignoredNonTestScopedDependencies>
+                        <!-- The production mapper XML also uses these handlers. -->
+                        <ignoredNonTestScopedDependency>org.apache.iotdb:mybatis-support</ignoredNonTestScopedDependency>
+                    </ignoredNonTestScopedDependencies>
                 </configuration>
             </plugin>
             <plugin>
@@ -105,4 +149,26 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>iotdb-mybatis-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.5.3</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -36,9 +36,9 @@ Cassandra / SQL backends. It implements ThingsBoard's `TimeseriesDao`,
 auto-configuration, so it activates inside a real ThingsBoard deployment without
 the host application having to component-scan the module's package.
 
-The module is built against the reactor's IoTDB 2.0.5 table-session client and
+The module is built against the reactor's IoTDB 2.0.11 table-session client and
 its integration tests exercise the real write path against an
-`apache/iotdb:2.0.8-standalone` server. It targets ThingsBoard `4.3.1.2` and
+`apache/iotdb:2.0.11-standalone` server. It targets ThingsBoard `4.3.1.2` and
 requires JDK 17+.
 
 **It is default-inert.** None of the three DAOs activate unless the operator

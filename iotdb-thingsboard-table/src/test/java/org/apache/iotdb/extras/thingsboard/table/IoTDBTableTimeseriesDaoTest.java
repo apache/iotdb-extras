@@ -2746,9 +2746,9 @@ class IoTDBTableTimeseriesDaoTest {
         case "sum_double" -> sumDouble == null;
         case "min_long" -> minLong == null;
         case "max_long" -> maxLong == null;
-          // MAX(time) is NULL iff the bounded window matched zero rows (time is never null). A real
-          // empty calendar bucket (emptyAggRow) returns one row with MAX(time) NULL; every other
-          // bucket has matching data, so its max_ts is non-null.
+        // MAX(time) is NULL iff the bounded window matched zero rows (time is never null). A real
+        // empty calendar bucket (emptyAggRow) returns one row with MAX(time) NULL; every other
+        // bucket has matching data, so its max_ts is non-null.
         case "max_ts" -> emptyAgg;
         default -> true;
       };

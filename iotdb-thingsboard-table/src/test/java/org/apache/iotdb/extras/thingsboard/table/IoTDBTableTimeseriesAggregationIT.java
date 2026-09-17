@@ -55,13 +55,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Real-Docker integration test that proves the IoTDB 2.0.8 Table Mode native three-argument {@code
+ * Real-Docker integration test that proves the IoTDB 2.0.11 Table Mode native three-argument {@code
  * date_bin(<interval>ms, time, <startTs>)} + {@code GROUP BY} time-bucketed aggregation path
  * matches ThingsBoard 4.3.1.2's contract: buckets anchored at {@code startTs} (not epoch 1970),
  * entries stamped at the bucket midpoint, every non-empty bucket returned ascending regardless of
  * query order/limit, and typed COUNT semantics -- all against hand-computed expected values. Reuses
  * the testcontainer harness from {@link IoTDBTableTimeseriesDaoIT}: {@code
- * apache/iotdb:2.0.8-standalone}, {@code dn_rpc_address=0.0.0.0}, exposed port 6667, short-prefix
+ * apache/iotdb:2.0.11-standalone}, {@code dn_rpc_address=0.0.0.0}, exposed port 6667, short-prefix
  * unique database, schema bootstrap from {@code schema-iotdb-table.sql}.
  */
 @Tag("integration")
@@ -75,7 +75,9 @@ class IoTDBTableTimeseriesAggregationIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           .withEnv("dn_rpc_address", "0.0.0.0")
           .waitingFor(Wait.forListeningPort().withStartupTimeout(IOTDB_STARTUP_TIMEOUT));

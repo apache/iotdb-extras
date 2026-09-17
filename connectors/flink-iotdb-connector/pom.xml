@@ -25,7 +25,7 @@
     <artifactId>flink-iotdb-connector</artifactId>
     <name>IoTDB: Connector: Apache Flink</name>
     <properties>
-        <compile.version>1.8</compile.version>
+        <compile.version>17</compile.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>

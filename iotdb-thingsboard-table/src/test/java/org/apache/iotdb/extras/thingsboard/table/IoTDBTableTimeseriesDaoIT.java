@@ -59,7 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Integration tests for the IoTDB Table Mode timeseries DAO against a real IoTDB 2.0.8 container:
+ * Integration tests for the IoTDB Table Mode timeseries DAO against a real IoTDB 2.0.11 container:
  * the WRITE path (verified by reading the telemetry table back through raw table-session SQL) plus
  * the RAW (non-aggregated) READ path, a millisecond time-bucketed aggregation smoke read and the
  * DELETE path exercised through the DAO.
@@ -78,7 +78,9 @@ class IoTDBTableTimeseriesDaoIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1), so it would
           // only listen on the container loopback and reject the Testcontainers port-mapped session
@@ -101,7 +103,7 @@ class IoTDBTableTimeseriesDaoIT {
   }
 
   /**
-   * Pins the IoTDB 2.0.8 engine behavior that a database-bound table-session pool can bootstrap a
+   * Pins the IoTDB 2.0.11 engine behavior that a database-bound table-session pool can bootstrap a
    * not-yet-existing database. If a future IoTDB image changes that behavior, this test fails
    * before first boot breaks in production.
    */

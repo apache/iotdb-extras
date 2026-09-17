@@ -19,96 +19,16 @@
 
 package org.apache.iotdb;
 
-import org.apache.iotdb.jdbc.IoTDBDataSource;
-
-import com.baomidou.mybatisplus.generator.FastAutoGenerator;
-import com.baomidou.mybatisplus.generator.config.DataSourceConfig;
-import com.baomidou.mybatisplus.generator.config.OutputFile;
-import com.baomidou.mybatisplus.generator.config.rules.DateType;
-import com.baomidou.mybatisplus.generator.config.rules.DbColumnType;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import java.sql.Types;
-import java.util.Collections;
-
 @SpringBootApplication
-@MapperScan("org.apache.iotdb.mapper")
+@MapperScan(
+    value = "org.apache.iotdb.mapper",
+    annotationClass = org.apache.ibatis.annotations.Mapper.class)
 public class Main {
   public static void main(String[] args) {
     SpringApplication.run(Main.class, args);
-    IoTDBDataSource dataSource = new IoTDBDataSource();
-    dataSource.setUrl("jdbc:iotdb://127.0.0.1:6667/database1?sql_dialect=table");
-    dataSource.setUser("root");
-    dataSource.setPassword("root");
-    FastAutoGenerator generator =
-        FastAutoGenerator.create(
-            new DataSourceConfig.Builder(dataSource)
-                .driverClassName("org.apache.iotdb.jdbc.IoTDBDriver"));
-    generator
-        .globalConfig(
-            builder -> {
-              builder
-                  .author("IoTDB")
-                  .enableSwagger()
-                  .dateType(DateType.ONLY_DATE)
-                  .outputDir("src/main/java");
-            })
-        .packageConfig(
-            builder -> {
-              builder
-                  .parent("org.apache.iotdb")
-                  .mapper("mapper")
-                  .pathInfo(
-                      Collections.singletonMap(
-                          OutputFile.xml, "src/main/java/org/apache/iotdb/xml"));
-            })
-        .dataSourceConfig(
-            builder -> {
-              builder.typeConvertHandler(
-                  (globalConfig, typeRegistry, metaInfo) -> {
-                    int typeCode = metaInfo.getJdbcType().TYPE_CODE;
-                    switch (typeCode) {
-                      case Types.FLOAT:
-                        return DbColumnType.FLOAT;
-                      default:
-                        return typeRegistry.getColumnType(metaInfo);
-                    }
-                  });
-            })
-        .strategyConfig(
-            builder -> {
-              builder.addInclude("table1");
-              builder
-                  .entityBuilder()
-                  .enableLombok()
-                  //                            .addIgnoreColumns("create_time")
-                  .enableFileOverride();
-              builder
-                  .serviceBuilder()
-                  .formatServiceFileName("%sService")
-                  .formatServiceImplFileName("%sServiceImpl")
-                  .convertServiceFileName((entityName -> entityName + "Service"))
-                  .enableFileOverride();
-              builder.controllerBuilder().enableRestStyle().enableFileOverride();
-            })
-        .strategyConfig(
-            builder -> {
-              builder.addInclude("table2");
-              builder
-                  .entityBuilder()
-                  .enableLombok()
-                  //                            .addIgnoreColumns("create_time")
-                  .enableFileOverride();
-              builder
-                  .serviceBuilder()
-                  .formatServiceFileName("%sService")
-                  .formatServiceImplFileName("%sServiceImpl")
-                  .convertServiceFileName((entityName -> entityName + "Service"))
-                  .enableFileOverride();
-              builder.controllerBuilder().enableRestStyle().enableFileOverride();
-            })
-        .execute();
   }
 }
