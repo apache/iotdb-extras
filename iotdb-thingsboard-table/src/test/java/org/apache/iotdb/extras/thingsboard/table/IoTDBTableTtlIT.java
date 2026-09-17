@@ -23,6 +23,7 @@ import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
@@ -34,6 +35,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class IoTDBTableTtlIT {
+  private final List<String> createdDatabases = new ArrayList<>();
   private static final Duration IOTDB_STARTUP_TIMEOUT = Duration.ofMinutes(3);
   private static final Duration IOTDB_READY_TIMEOUT = Duration.ofSeconds(60);
   private static final Duration IOTDB_READY_POLL_INTERVAL = Duration.ofMillis(500);
@@ -210,9 +213,25 @@ class IoTDBTableTtlIT {
         "IoTDB did not accept table-session statements within " + IOTDB_READY_TIMEOUT, lastFailure);
   }
 
+  @AfterEach
+  void dropCreatedDatabases() throws Exception {
+    // Every test provisions its own database. Drop them once the test is done: the shared
+    // container has a fixed region memory budget, and leaving dozens of databases behind makes
+    // later tests in the class fail schema-region creation ("Total allocated memory for direct
+    // buffer ... is greater than limit mem cost") and time out on their first write.
+    try (ITableSessionPool pool = newPool(null);
+        ITableSession session = pool.getSession()) {
+      for (String database : createdDatabases) {
+        session.executeNonQueryStatement("DROP DATABASE IF EXISTS " + database);
+      }
+    }
+  }
+
   private String uniqueDatabase(String prefix) {
     String shortPrefix = prefix.length() > 12 ? prefix.substring(0, 12) : prefix;
     String shortUuid = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    return "tb_it_" + shortPrefix + "_" + shortUuid;
+    String database = "tb_it_" + shortPrefix + "_" + shortUuid;
+    createdDatabases.add(database);
+    return database;
   }
 }

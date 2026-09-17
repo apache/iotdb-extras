@@ -23,6 +23,7 @@ import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
@@ -67,6 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class IoTDBTableTimeseriesAggregationIT {
+  private final List<String> createdDatabases = new ArrayList<>();
   private static final int FUTURE_TIMEOUT_SECONDS = 30;
   private static final Duration IOTDB_STARTUP_TIMEOUT = Duration.ofMinutes(3);
   private static final Duration IOTDB_READY_TIMEOUT = Duration.ofSeconds(60);
@@ -1111,10 +1113,26 @@ class IoTDBTableTimeseriesAggregationIT {
         new TestEntityId(UUID.fromString(entityId), EntityType.DEVICE));
   }
 
+  @AfterEach
+  void dropCreatedDatabases() throws Exception {
+    // Every test provisions its own database. Drop them once the test is done: the shared
+    // container has a fixed region memory budget, and leaving dozens of databases behind makes
+    // later tests in the class fail schema-region creation ("Total allocated memory for direct
+    // buffer ... is greater than limit mem cost") and time out on their first write.
+    try (ITableSessionPool pool = newPool(null);
+        ITableSession session = pool.getSession()) {
+      for (String database : createdDatabases) {
+        session.executeNonQueryStatement("DROP DATABASE IF EXISTS " + database);
+      }
+    }
+  }
+
   private String uniqueDatabase(String prefix) {
     String shortPrefix = prefix.length() > 12 ? prefix.substring(0, 12) : prefix;
     String shortUuid = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    return "tb_it_" + shortPrefix + "_" + shortUuid;
+    String database = "tb_it_" + shortPrefix + "_" + shortUuid;
+    createdDatabases.add(database);
+    return database;
   }
 
   private TestTsKvEntry entry(long ts, String key, DataType dataType, Object value) {

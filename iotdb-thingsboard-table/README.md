@@ -236,7 +236,7 @@ a retention window in **milliseconds**, and the accepted forms are narrow:
 | `TTL='INF'` | Never expire. The **quoted** string is the only accepted spelling; this is the form `entity_attributes` and `telemetry_latest` ship with. |
 | `TTL=DEFAULT` | Inherit the database default, which is `INF` on a fresh node. |
 
-Anything else is rejected by IoTDB 2.0.8: an unquoted `TTL=INF` is parsed as an
+Anything else is rejected by IoTDB 2.0.11 (and 2.0.8): an unquoted `TTL=INF` is parsed as an
 identifier (`ttl value must be a LongLiteral, but now is Identifier`), and any
 other quoted value — including a quoted number (`'604800000'`) or a duration
 (`'7d'`) — fails with `ttl value must be 'INF' or a long literal`.

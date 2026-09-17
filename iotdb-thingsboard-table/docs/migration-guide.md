@@ -92,7 +92,7 @@ Notes:
 ## Before you begin
 
 - A reachable IoTDB 2.x server in **Table Mode** (the tested server is IoTDB
-  2.0.8). Have its host, port, and credentials ready.
+  2.0.11). Have its host, port, and credentials ready.
 - A ThingsBoard 4.3.1.2 build you control (the module is consumed as a
   compile/runtime dependency of the ThingsBoard application; it is not a
   drop-in for a pre-built binary distribution).
@@ -227,7 +227,7 @@ ALTER TABLE telemetry SET PROPERTIES TTL=DEFAULT;      -- back to the db default
 ```
 
 Quoted numbers (`'604800000'`) and duration forms (`'7d'`) are rejected by IoTDB
-2.0.8. The `telemetry_latest` overlay table is created `WITH (TTL='INF')` and is
+2.0.11 (and 2.0.8). The `telemetry_latest` overlay table is created `WITH (TTL='INF')` and is
 **exempt** from the `telemetry` TTL: setting a retention window on `telemetry`
 does not evict overlay rows, so bound the overlay separately if needed (see
 *Limitations*).

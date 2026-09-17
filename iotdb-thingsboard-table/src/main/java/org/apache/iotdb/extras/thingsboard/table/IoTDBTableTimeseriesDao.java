@@ -612,18 +612,17 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
       // promote to DOUBLE. Project the partial long/double sums plus the long/double non-null
       // counts so the row mapper can pick the type without re-reading the raw rows.
       case SUM ->
-          // IoTDB 2.0.8 computes SUM over an INT64 column with a DOUBLE accumulator and returns a
-          // DOUBLE. Project the long partial as SUM(CAST(long_v AS DOUBLE)) -- a plain DOUBLE --
-          // and
-          // NEVER cast it back to INT64 in SQL: CAST(SUM(long_v) AS INT64) THROWS a "Double value
-          // out of range of long value" error at the IoTDB level when the long-only sum exceeds
-          // Long.MAX, which would fail the whole aggregate query before the Java
-          // bound-check/fallback
-          // could run. The DOUBLE accumulator only keeps the sum bit-exact while every partial sum
-          // stays within +/-2^53, so the row mapper reads MIN(long_v)/MAX(long_v) to bound the sum,
-          // returns the DOUBLE cast back to long (lossless within the bound) for the provably-exact
-          // long-only case, and falls back to an exact Java re-sum when the bound exceeds 2^53 (see
-          // aggregatedSumEntry). The double partial stays DOUBLE.
+          // IoTDB (verified on 2.0.8 and 2.0.11) computes SUM over an INT64 column with a DOUBLE
+          // accumulator and returns a DOUBLE. Project the long partial as
+          // SUM(CAST(long_v AS DOUBLE)) -- a plain DOUBLE -- and NEVER cast it back to INT64 in
+          // SQL: CAST(SUM(long_v) AS INT64) THROWS a "Double value out of range of long value"
+          // error at the IoTDB level when the long-only sum exceeds Long.MAX, which would fail
+          // the whole aggregate query before the Java bound-check/fallback could run. The DOUBLE
+          // accumulator only keeps the sum bit-exact while every partial sum stays within
+          // +/-2^53, so the row mapper reads MIN(long_v)/MAX(long_v) to bound the sum, returns
+          // the DOUBLE cast back to long (lossless within the bound) for the provably-exact
+          // long-only case, and falls back to an exact Java re-sum when the bound exceeds 2^53
+          // (see aggregatedSumEntry). The double partial stays DOUBLE.
           "SUM(CAST(long_v AS DOUBLE)) AS "
               + SUM_LONG_COLUMN
               + ", SUM(double_v) AS "
@@ -660,14 +659,15 @@ public class IoTDBTableTimeseriesDao extends IoTDBTableBaseDao
       // `value >= state`, so a bucket whose numeric maximum is zero or negative comes back
       // NULL. This DAO reads a NULL aggregate as "empty bucket" and skips it, so a MAX
       // downsampling query over e.g. a sub-zero sensor would silently lose whole buckets
-      // instead of failing. Every release up to and including 2.0.10 is affected; fixed on
-      // master by apache/iotdb#18300, which is not in a released version yet. The grouped MIN
-      // accumulator seeds with MAX_VALUE and is not affected, and IEEE-754 negation is exact,
-      // so -MIN(-x) is an exact substitute for MAX(x) over finite values, on affected and
-      // fixed servers alike. This projection is shared with the calendar path, whose
-      // non-grouped accumulators track an explicit initialized flag rather than a sentinel, so
-      // the substitution is exact there too and an empty bucket still yields NULL. MAX(long_v)
-      // and MAX(str_v) are already correct (true Long.MIN_VALUE seed / flag-based) and stay.
+      // instead of failing. Every release up to and including 2.0.10 is affected; the fix
+      // (apache/iotdb#18300) ships in 2.0.11. The substitution is kept because the pool can be
+      // pointed at any 2.x server: the grouped MIN accumulator seeds with MAX_VALUE and is not
+      // affected, and IEEE-754 negation is exact, so -MIN(-x) is an exact substitute for MAX(x)
+      // over finite values, on affected and fixed servers alike. This projection is shared with
+      // the calendar path, whose non-grouped accumulators track an explicit initialized flag
+      // rather than a sentinel, so the substitution is exact there too and an empty bucket still
+      // yields NULL. MAX(long_v) and MAX(str_v) are already correct (true Long.MIN_VALUE seed /
+      // flag-based) and stay.
       case MAX ->
           "-1 * MIN(-1 * ("
               + NUMERIC_VALUE
