@@ -102,6 +102,9 @@ The default `fetch-size` changes from `1024` to the IoTDB client default of `500
 configured `iotdb.session.fetch-size` still overrides it. The Thrift buffer default remains `1024`
 bytes; this is a separate setting.
 
+`connection-timeout-in-ms` now defaults to `0` (no timeout). Earlier starters left it unset and
+failed at startup with a `NullPointerException` unless the property was configured explicitly.
+
 `enable-compression` maps to `enableThriftCompression` for the table builder and
 `enableThriftRpcCompaction` for the tree builder. IoTDB RPC compression is a separate setting and
 retains the driver's default (`true` in 2.0.11), even when `enable-compression=false`.

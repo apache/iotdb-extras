@@ -29,7 +29,6 @@
     <artifactId>hive-connector</artifactId>
     <name>IoTDB: Connector: Apache Hive</name>
     <properties>
-        <compile.version>17</compile.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
