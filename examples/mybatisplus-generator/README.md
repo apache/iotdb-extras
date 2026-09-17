@@ -21,7 +21,7 @@
 
 # MyBatis-Plus example
 
-An IoTDB **table-model** example using **JDK 17+, MyBatis-Plus 3.5.15 and JDBC 2.0.11**. The default build uses Spring Boot 3.5.1; `spring-boot4` selects Boot 4.1.1 and `mybatis-plus-spring-boot4-starter`. Each build uses one Boot BOM for its complete dependency set. Velocity 2.4.1 is declared explicitly for code generation.
+An IoTDB **table-model** example using **JDK 17+, MyBatis-Plus 3.5.15 and JDBC 2.0.11**. The default build uses Spring Boot 3.5.1; `spring-boot4` selects Boot 4.1.1 and `mybatis-plus-spring-boot4-starter`. Each build imports one Boot BOM; the module inherits the reactor parent, so the reactor's Spring, Jackson and Mockito management is re-pointed at the selected Boot line in the pom, and the reactor quality gates (Spotless, Checkstyle, RAT) run on it like on every other module. Velocity 2.4.1 is declared explicitly for code generation.
 
 ## Prepare and run
 
