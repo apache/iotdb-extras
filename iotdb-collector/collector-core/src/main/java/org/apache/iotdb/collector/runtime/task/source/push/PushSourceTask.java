@@ -81,8 +81,10 @@ public class PushSourceTask extends SourceTask {
           pushSources[i].close();
         } catch (final Exception ex) {
           LOGGER.warn("Failed to close source on creation failure", ex);
-          throw e;
         }
+        // Like SinkTask/ProcessorTask: a source that cannot start must fail task creation
+        // instead of being swallowed when its cleanup succeeds.
+        throw e;
       }
     }
 

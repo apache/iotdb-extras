@@ -99,8 +99,10 @@ public class PullSourceTask extends SourceTask {
           consumers[i].consumer().close();
         } catch (final Exception ex) {
           LOGGER.warn("Failed to close source on creation failure", ex);
-          throw e;
         }
+        // Like SinkTask/ProcessorTask: a source that cannot start must fail task creation
+        // instead of being swallowed when its cleanup succeeds.
+        throw e;
       }
 
       int finalI = i;
