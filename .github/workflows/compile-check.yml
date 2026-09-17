@@ -67,6 +67,9 @@ jobs:
         image: apache/iotdb:2.0.11-standalone
         env:
           MEMORY_SIZE: 1G
+          # The image binds the client RPC service to 127.0.0.1 by default, which the
+          # published port cannot reach; bind to all interfaces like the Testcontainers ITs do.
+          dn_rpc_address: 0.0.0.0
         ports:
           - 6667:6667
     steps:
@@ -76,19 +79,21 @@ jobs:
           distribution: liberica
           java-version: 17
           cache: maven
-      - name: Wait for IoTDB RPC
+      - name: Wait for IoTDB to accept client sessions
+        # A TCP probe passes as soon as the port is published, several seconds before the
+        # DataNode can open a session, so wait for a real client round trip instead.
         run: |
-          python3 - <<'PY'
-          import socket, time
-          for attempt in range(120):
-              try:
-                  with socket.create_connection(('127.0.0.1', 6667), timeout=1):
-                      break
-              except OSError:
-                  time.sleep(1)
-          else:
-              raise SystemExit('IoTDB RPC did not become ready')
-          PY
+          for attempt in $(seq 1 120); do
+            if docker exec "${{ job.services.iotdb.id }}" timeout 15 /iotdb/sbin/start-cli.sh \
+                -h 127.0.0.1 -p 6667 -u root -pw root -e 'SHOW VERSION' >/dev/null 2>&1; then
+              echo "IoTDB accepted a client session after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'IoTDB did not accept a client session within 4 minutes' >&2
+          docker logs "${{ job.services.iotdb.id }}" 2>&1 | tail -n 100
+          exit 1
       - name: Generate, compile and execute MyBatis mappers
         run: >-
           mvn verify -Pwith-examples,with-springboot,${{ matrix.profiles }}
