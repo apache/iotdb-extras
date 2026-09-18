@@ -19,8 +19,7 @@
 
 package org.apache.iotdb.relational.flink.source.pushdown;
 
-import org.apache.iotdb.relational.flink.utils.IoTDBIdentifierUtils;
-import org.apache.iotdb.relational.flink.utils.IoTDBRelationalTypeUtils;
+import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
 import org.apache.flink.table.expressions.CallExpression;
 import org.apache.flink.table.expressions.Expression;
@@ -111,7 +110,7 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
     if (fieldReference == null || fieldReference.getInputIndex() != 0) {
       return null;
     }
-    return IoTDBIdentifierUtils.quoteIdentifier(fieldReference.getName());
+    return IoTDBUtils.quoteIdentifier(fieldReference.getName());
   }
 
   @Override
@@ -441,7 +440,7 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
       return null;
     }
     try {
-      return IoTDBRelationalTypeUtils.toIoTDBDataType(expression.getOutputDataType()).name();
+      return IoTDBUtils.toIoTDBDataType(expression.getOutputDataType()).name();
     } catch (RuntimeException e) {
       return null;
     }

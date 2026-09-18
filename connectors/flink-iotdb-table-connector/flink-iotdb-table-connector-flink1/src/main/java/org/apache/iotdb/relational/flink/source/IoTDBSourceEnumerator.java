@@ -19,10 +19,10 @@
 
 package org.apache.iotdb.relational.flink.source;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
 import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
-import org.apache.iotdb.relational.flink.utils.IoTDBSQLBuilder;
+import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
@@ -44,7 +44,7 @@ public class IoTDBSourceEnumerator
     implements SplitEnumerator<IoTDBSourceSplit, IoTDBSourceEnumeratorState> {
 
   private final SplitEnumeratorContext<IoTDBSourceSplit> context;
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private final DataType rowDataType;
   private final List<String> filterQueries;
   private final long limit;
@@ -57,7 +57,7 @@ public class IoTDBSourceEnumerator
 
   public IoTDBSourceEnumerator(
       SplitEnumeratorContext<IoTDBSourceSplit> context,
-      IoTDBRelationalOptions options,
+      IoTDBOptions options,
       DataType rowDataType,
       List<String> filterQueries,
       long limit) {
@@ -66,7 +66,7 @@ public class IoTDBSourceEnumerator
 
   public IoTDBSourceEnumerator(
       SplitEnumeratorContext<IoTDBSourceSplit> context,
-      IoTDBRelationalOptions options,
+      IoTDBOptions options,
       DataType rowDataType,
       List<String> filterQueries,
       long limit,
@@ -146,7 +146,7 @@ public class IoTDBSourceEnumerator
   private IoTDBSourceSplit createSingleSplit() {
     String splitId = UUID.randomUUID().toString();
     String sql =
-        IoTDBSQLBuilder.buildSelectQuery(
+        IoTDBUtils.buildSelectQuery(
             options.getTable(), rowDataType, filterQueries, limit);
     return new IoTDBSourceSplit(splitId, options.getDatabase(), options.getTable(), sql);
   }

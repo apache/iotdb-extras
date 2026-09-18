@@ -19,8 +19,8 @@
 
 package org.apache.iotdb.relational.flink.catalog;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
-import org.apache.iotdb.relational.flink.utils.IoTDBRelationalTypeUtils;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
+import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.AbstractCatalog;
@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,10 +65,10 @@ import java.util.Set;
  */
 public class IoTDBCatalog extends AbstractCatalog {
 
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private final IoTDBCatalogClient catalogClient;
 
-  public IoTDBCatalog(String catalogName, String defaultDatabase, IoTDBRelationalOptions options) {
+  public IoTDBCatalog(String catalogName, String defaultDatabase, IoTDBOptions options) {
     super(catalogName, defaultDatabase);
     this.options = options;
     this.catalogClient = new IoTDBCatalogClient(options);
@@ -343,10 +342,10 @@ public class IoTDBCatalog extends AbstractCatalog {
     Map<String, String> tableOptions = table.getOptions();
     String timeColumn = getRequiredTimeColumn(tableOptions);
     Set<String> tagColumns =
-        parseColumnNames(tableOptions.get(IoTDBRelationalOptions.TAG_COLUMNS.key()), "tag-columns");
+        parseColumnNames(tableOptions.get(IoTDBOptions.TAG_COLUMNS.key()), "tag-columns");
     Set<String> attributeColumns =
         parseColumnNames(
-            tableOptions.get(IoTDBRelationalOptions.ATTRIBUTE_COLUMNS.key()), "attribute-columns");
+            tableOptions.get(IoTDBOptions.ATTRIBUTE_COLUMNS.key()), "attribute-columns");
 
     List<String> columnNames = new ArrayList<>();
     List<TSDataType> dataTypes = new ArrayList<>();
@@ -363,30 +362,30 @@ public class IoTDBCatalog extends AbstractCatalog {
       }
 
       String columnName = column.getName();
-      TSDataType dataType = IoTDBRelationalTypeUtils.toIoTDBDataType((DataType) abstractDataType);
+      TSDataType dataType = IoTDBUtils.toIoTDBDataType((DataType) abstractDataType);
       columnNames.add(columnName);
       dataTypes.add(dataType);
-      dataTypesByColumn.put(normalizeColumnName(columnName), dataType);
+      dataTypesByColumn.put(IoTDBUtils.normalizeColumnName(columnName), dataType);
     }
     if (columnNames.isEmpty()) {
       throw new CatalogException("An IoTDB table must contain at least one column.");
     }
-    validateColumnCategories(timeColumn, tagColumns, attributeColumns, dataTypesByColumn);
+    IoTDBUtils.validateColumnCategories(
+        timeColumn, tagColumns, attributeColumns, dataTypesByColumn);
 
-    List<ColumnCategory> categories = new ArrayList<>();
-    for (String columnName : columnNames) {
-      categories.add(toColumnCategory(columnName, timeColumn, tagColumns, attributeColumns));
-    }
+    List<ColumnCategory> categories =
+        IoTDBUtils.resolveColumnCategories(
+            columnNames, timeColumn, tagColumns, attributeColumns);
     return new TableSchema(tablePath.getObjectName(), columnNames, dataTypes, categories);
   }
 
   private static String getRequiredTimeColumn(Map<String, String> tableOptions) {
-    String timeColumn = tableOptions.get(IoTDBRelationalOptions.TIME_COLUMN.key());
+    String timeColumn = tableOptions.get(IoTDBOptions.TIME_COLUMN.key());
     if (timeColumn == null || timeColumn.trim().isEmpty()) {
       throw new CatalogException(
           "Table option 'time-column' must specify the IoTDB TIME column for CREATE TABLE.");
     }
-    return normalizeColumnName(timeColumn);
+    return IoTDBUtils.normalizeColumnName(timeColumn);
   }
 
   private static Set<String> parseColumnNames(String value, String optionName) {
@@ -399,70 +398,13 @@ public class IoTDBCatalog extends AbstractCatalog {
         throw new CatalogException(
             "Table option '" + optionName + "' contains an empty column name.");
       }
-      String normalizedColumnName = normalizeColumnName(columnName);
+      String normalizedColumnName = IoTDBUtils.normalizeColumnName(columnName);
       if (!columnNames.add(normalizedColumnName)) {
         throw new CatalogException(
             "Table option '" + optionName + "' contains duplicate column: " + columnName);
       }
     }
     return columnNames;
-  }
-
-  private static void validateColumnCategories(
-      String timeColumn,
-      Set<String> tagColumns,
-      Set<String> attributeColumns,
-      Map<String, TSDataType> dataTypesByColumn) {
-    if (tagColumns.contains(timeColumn) || attributeColumns.contains(timeColumn)) {
-      throw new CatalogException("The TIME column cannot also be a TAG or ATTRIBUTE column.");
-    }
-    Set<String> overlappingColumns = new HashSet<>(tagColumns);
-    overlappingColumns.retainAll(attributeColumns);
-    if (!overlappingColumns.isEmpty()) {
-      throw new CatalogException(
-          "TAG and ATTRIBUTE columns must not overlap: " + overlappingColumns.iterator().next());
-    }
-    validateColumnExists(timeColumn, "time-column", dataTypesByColumn);
-    for (String columnName : tagColumns) {
-      validateColumnExists(columnName, "tag-columns", dataTypesByColumn);
-    }
-    for (String columnName : attributeColumns) {
-      validateColumnExists(columnName, "attribute-columns", dataTypesByColumn);
-    }
-    if (dataTypesByColumn.get(timeColumn) != TSDataType.TIMESTAMP) {
-      throw new CatalogException("The IoTDB TIME column must use the TIMESTAMP data type.");
-    }
-  }
-
-  private static void validateColumnExists(
-      String columnName, String optionName, Map<String, TSDataType> dataTypesByColumn) {
-    if (!dataTypesByColumn.containsKey(columnName)) {
-      throw new CatalogException(
-          "Column '"
-              + columnName
-              + "' declared by table option '"
-              + optionName
-              + "' does not exist.");
-    }
-  }
-
-  private static ColumnCategory toColumnCategory(
-      String columnName, String timeColumn, Set<String> tagColumns, Set<String> attributeColumns) {
-    String normalizedColumnName = normalizeColumnName(columnName);
-    if (timeColumn.equals(normalizedColumnName)) {
-      return ColumnCategory.TIME;
-    }
-    if (tagColumns.contains(normalizedColumnName)) {
-      return ColumnCategory.TAG;
-    }
-    if (attributeColumns.contains(normalizedColumnName)) {
-      return ColumnCategory.ATTRIBUTE;
-    }
-    return ColumnCategory.FIELD;
-  }
-
-  private static String normalizeColumnName(String columnName) {
-    return columnName.trim().toLowerCase(Locale.ROOT);
   }
 
   private CatalogTable toCatalogTable(
@@ -476,7 +418,7 @@ public class IoTDBCatalog extends AbstractCatalog {
     for (int i = 0; i < columns.size(); i++) {
       IMeasurementSchema column = columns.get(i);
       schemaBuilder.column(
-          column.getMeasurementName(), IoTDBRelationalTypeUtils.toFlinkDataType(column.getType()));
+          column.getMeasurementName(), IoTDBUtils.toFlinkDataType(column.getType()));
       switch (categories.get(i)) {
         case TIME:
           timeColumn = column.getMeasurementName();
@@ -497,26 +439,26 @@ public class IoTDBCatalog extends AbstractCatalog {
     }
 
     Map<String, String> tableOptions = new HashMap<>();
-    tableOptions.put(FactoryUtil.CONNECTOR.key(), IoTDBRelationalOptions.IDENTIFIER);
+    tableOptions.put(FactoryUtil.CONNECTOR.key(), IoTDBOptions.IDENTIFIER);
     tableOptions.put(
-        IoTDBRelationalOptions.NODE_URLS.key(), String.join(",", options.getNodeUrls()));
-    tableOptions.put(IoTDBRelationalOptions.USER.key(), options.getUsername());
-    tableOptions.put(IoTDBRelationalOptions.PASSWORD.key(), options.getPassword());
-    tableOptions.put(IoTDBRelationalOptions.DATABASE.key(), databaseName);
-    tableOptions.put(IoTDBRelationalOptions.TABLE.key(), tableName);
-    tableOptions.put(IoTDBRelationalOptions.TIME_COLUMN.key(), timeColumn);
+        IoTDBOptions.NODE_URLS.key(), String.join(",", options.getNodeUrls()));
+    tableOptions.put(IoTDBOptions.USER.key(), options.getUsername());
+    tableOptions.put(IoTDBOptions.PASSWORD.key(), options.getPassword());
+    tableOptions.put(IoTDBOptions.DATABASE.key(), databaseName);
+    tableOptions.put(IoTDBOptions.TABLE.key(), tableName);
+    tableOptions.put(IoTDBOptions.TIME_COLUMN.key(), timeColumn);
     if (!tagColumns.isEmpty()) {
-      tableOptions.put(IoTDBRelationalOptions.TAG_COLUMNS.key(), String.join(",", tagColumns));
+      tableOptions.put(IoTDBOptions.TAG_COLUMNS.key(), String.join(",", tagColumns));
     }
     if (!attributeColumns.isEmpty()) {
       tableOptions.put(
-          IoTDBRelationalOptions.ATTRIBUTE_COLUMNS.key(), String.join(",", attributeColumns));
+          IoTDBOptions.ATTRIBUTE_COLUMNS.key(), String.join(",", attributeColumns));
     }
 
     return CatalogTable.of(schemaBuilder.build(), null, Collections.emptyList(), tableOptions);
   }
 
-  public IoTDBRelationalOptions getOptions() {
+  public IoTDBOptions getOptions() {
     return options;
   }
 

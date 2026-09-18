@@ -22,8 +22,8 @@ package org.apache.iotdb.relational.flink.catalog;
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
-import org.apache.iotdb.relational.flink.utils.IoTDBIdentifierUtils;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
+import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -60,10 +60,10 @@ public class IoTDBCatalogClient implements AutoCloseable {
   private static final String COLUMN_DATA_TYPE = "DataType";
   private static final String COLUMN_CATEGORY = "Category";
 
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private volatile ITableSessionPool sessionPool;
 
-  public IoTDBCatalogClient(IoTDBRelationalOptions options) {
+  public IoTDBCatalogClient(IoTDBOptions options) {
     this.options = options;
   }
 
@@ -147,7 +147,7 @@ public class IoTDBCatalogClient implements AutoCloseable {
     }
   }
 
-  public IoTDBRelationalOptions getOptions() {
+  public IoTDBOptions getOptions() {
     return options;
   }
 
@@ -231,7 +231,7 @@ public class IoTDBCatalogClient implements AutoCloseable {
   }
 
   private static String quoteIdentifier(String identifier) {
-    return IoTDBIdentifierUtils.quoteIdentifier(identifier);
+    return IoTDBUtils.quoteIdentifier(identifier);
   }
 
   private ITableSessionPool getSessionPool() {

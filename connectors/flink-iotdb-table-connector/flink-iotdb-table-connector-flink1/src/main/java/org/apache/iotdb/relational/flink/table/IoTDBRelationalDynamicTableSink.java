@@ -19,10 +19,10 @@
 
 package org.apache.iotdb.relational.flink.table;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.sink.IoTDBSink;
-import org.apache.iotdb.relational.flink.sink.serializer.IoTDBTabletSerializer;
-import org.apache.iotdb.relational.flink.sink.serializer.RowDataIoTDBTabletSerializer;
+import org.apache.iotdb.relational.flink.sink.RowDataSinkDataConverter;
+import org.apache.iotdb.relational.flink.sink.SinkDataConverter;
 
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
@@ -38,10 +38,10 @@ import org.apache.flink.table.data.RowData;
  */
 public class IoTDBRelationalDynamicTableSink implements DynamicTableSink {
 
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private final ResolvedSchema schema;
 
-  public IoTDBRelationalDynamicTableSink(IoTDBRelationalOptions options, ResolvedSchema schema) {
+  public IoTDBRelationalDynamicTableSink(IoTDBOptions options, ResolvedSchema schema) {
     this.options = options;
     this.schema = schema;
   }
@@ -53,8 +53,9 @@ public class IoTDBRelationalDynamicTableSink implements DynamicTableSink {
 
   @Override
   public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
-    IoTDBTabletSerializer<RowData> serializer = new RowDataIoTDBTabletSerializer(options, schema);
-    return SinkV2Provider.of(new IoTDBSink<>(options, serializer));
+    SinkDataConverter<RowData> converter = new RowDataSinkDataConverter();
+    return SinkV2Provider.of(
+        new IoTDBSink<>(options, schema.toPhysicalRowDataType(), converter));
   }
 
   @Override

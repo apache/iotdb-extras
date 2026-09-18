@@ -21,7 +21,7 @@ package org.apache.iotdb.relational.flink.source;
 
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.deserializer.IoTDBDeserializationSchema;
 import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
 import org.apache.iotdb.session.TableSessionBuilder;
@@ -42,7 +42,7 @@ import java.util.concurrent.CompletableFuture;
 public class IoTDBSourceReader<OUT> implements SourceReader<OUT, IoTDBSourceSplit> {
 
   private final SourceReaderContext context;
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private final DataType rowDataType;
   private final IoTDBDeserializationSchema<OUT> deserializer;
   private final Deque<IoTDBSourceSplit> pendingSplits = new ArrayDeque<>();
@@ -57,7 +57,7 @@ public class IoTDBSourceReader<OUT> implements SourceReader<OUT, IoTDBSourceSpli
 
   public IoTDBSourceReader(
       SourceReaderContext context,
-      IoTDBRelationalOptions options,
+      IoTDBOptions options,
       DataType rowDataType,
       IoTDBDeserializationSchema<OUT> deserializer) {
     this.context = context;

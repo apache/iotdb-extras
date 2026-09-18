@@ -32,7 +32,7 @@ import java.util.List;
  * <p>The static {@link org.apache.flink.configuration.ConfigOption} constants define the keys used
  * in the Flink table DDL; the instance fields hold the resolved options passed to the runtime.
  */
-public class IoTDBRelationalOptions implements Serializable {
+public class IoTDBOptions implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
@@ -75,7 +75,7 @@ public class IoTDBRelationalOptions implements Serializable {
   private final List<String> tagColumns;
   private final List<String> attributeColumns;
 
-  private IoTDBRelationalOptions(Builder builder) {
+  private IoTDBOptions(Builder builder) {
     this.nodeUrls = builder.nodeUrls;
     this.username = builder.username;
     this.password = builder.password;
@@ -157,7 +157,7 @@ public class IoTDBRelationalOptions implements Serializable {
     return new Builder();
   }
 
-  /** Builder of {@link IoTDBRelationalOptions}. */
+  /** Builder of {@link IoTDBOptions}. */
   public static class Builder {
 
     private List<String> nodeUrls;
@@ -218,8 +218,8 @@ public class IoTDBRelationalOptions implements Serializable {
     /**
      * @return the built options
      */
-    public IoTDBRelationalOptions build() {
-      return new IoTDBRelationalOptions(this);
+    public IoTDBOptions build() {
+      return new IoTDBOptions(this);
     }
   }
 }

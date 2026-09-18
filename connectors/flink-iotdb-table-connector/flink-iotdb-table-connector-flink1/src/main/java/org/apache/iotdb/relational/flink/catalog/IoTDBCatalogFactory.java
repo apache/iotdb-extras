@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.relational.flink.catalog;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
@@ -36,38 +36,38 @@ public class IoTDBCatalogFactory implements CatalogFactory {
 
   @Override
   public String factoryIdentifier() {
-    return IoTDBRelationalOptions.IDENTIFIER;
+    return IoTDBOptions.IDENTIFIER;
   }
 
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
-    return new HashSet<>(Arrays.asList(IoTDBRelationalOptions.NODE_URLS));
+    return new HashSet<>(Arrays.asList(IoTDBOptions.NODE_URLS));
   }
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
     return new HashSet<>(
         Arrays.asList(
-            IoTDBRelationalOptions.USER,
-            IoTDBRelationalOptions.PASSWORD,
-            IoTDBRelationalOptions.DEFAULT_DATABASE));
+            IoTDBOptions.USER,
+            IoTDBOptions.PASSWORD,
+            IoTDBOptions.DEFAULT_DATABASE));
   }
 
   @Override
   public Catalog createCatalog(Context context) {
     FactoryUtil.CatalogFactoryHelper helper = FactoryUtil.createCatalogFactoryHelper(this, context);
     helper.validate();
-    IoTDBRelationalOptions options = toOptions(helper.getOptions());
+    IoTDBOptions options = toOptions(helper.getOptions());
     return new IoTDBCatalog(context.getName(), options.getDefaultDatabase(), options);
   }
 
-  private static IoTDBRelationalOptions toOptions(ReadableConfig config) {
-    return IoTDBRelationalOptions.builder()
+  private static IoTDBOptions toOptions(ReadableConfig config) {
+    return IoTDBOptions.builder()
         .withNodeUrls(
-            Arrays.asList(((String) config.get(IoTDBRelationalOptions.NODE_URLS)).split(",")))
-        .withUsername(config.get(IoTDBRelationalOptions.USER))
-        .withPassword(config.get(IoTDBRelationalOptions.PASSWORD))
-        .withDefaultDatabase(config.get(IoTDBRelationalOptions.DEFAULT_DATABASE))
+            Arrays.asList(((String) config.get(IoTDBOptions.NODE_URLS)).split(",")))
+        .withUsername(config.get(IoTDBOptions.USER))
+        .withPassword(config.get(IoTDBOptions.PASSWORD))
+        .withDefaultDatabase(config.get(IoTDBOptions.DEFAULT_DATABASE))
         .build();
   }
 }

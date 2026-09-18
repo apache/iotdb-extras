@@ -19,11 +19,11 @@
 
 package org.apache.iotdb.relational.flink.sink;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
-import org.apache.iotdb.relational.flink.sink.serializer.IoTDBTabletSerializer;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.table.types.DataType;
 
 import java.io.IOException;
 
@@ -34,10 +34,12 @@ import java.io.IOException;
  *
  * <ul>
  *   <li>Table API/SQL creates {@code IoTDBSink<RowData>}.
- *   <li>DataStream API can create {@code IoTDBSink<IN>} with a user-provided serializer.
+ *   <li>DataStream API can create {@code IoTDBSink<IN>} with a user-provided {@link
+ *       SinkDataConverter}.
  * </ul>
  *
- * <p>The writer owns the IoTDB session and batches serialized tablets before insertion.
+ * <p>The sink only carries serializable state (options, the physical row {@link DataType} and the
+ * converter); the writer owns the IoTDB session and the buffered tablet.
  *
  * @param <IN> input record type
  */
@@ -45,17 +47,22 @@ public class IoTDBSink<IN> implements Sink<IN> {
 
   private static final long serialVersionUID = 1L;
 
-  private final IoTDBRelationalOptions options;
-  private final IoTDBTabletSerializer<IN> serializer;
+  private final IoTDBOptions options;
+  private final DataType physicalRowDataType;
+  private final SinkDataConverter<IN> converter;
 
-  public IoTDBSink(IoTDBRelationalOptions options, IoTDBTabletSerializer<IN> serializer) {
+  public IoTDBSink(
+      IoTDBOptions options,
+      DataType physicalRowDataType,
+      SinkDataConverter<IN> converter) {
     this.options = options;
-    this.serializer = serializer;
+    this.physicalRowDataType = physicalRowDataType;
+    this.converter = converter;
   }
 
   @Override
   public SinkWriter<IN> createWriter(InitContext context) throws IOException {
-    return new IoTDBSinkWriter<>(options, serializer);
+    return new IoTDBSinkWriter<>(options, physicalRowDataType, converter);
   }
 
   public static <IN> Builder<IN> builder() {
@@ -65,21 +72,27 @@ public class IoTDBSink<IN> implements Sink<IN> {
   /** Builder for the DataStream API entry point. */
   public static class Builder<IN> {
 
-    private IoTDBRelationalOptions options;
-    private IoTDBTabletSerializer<IN> serializer;
+    private IoTDBOptions options;
+    private DataType physicalRowDataType;
+    private SinkDataConverter<IN> converter;
 
-    public Builder<IN> setOptions(IoTDBRelationalOptions options) {
+    public Builder<IN> setOptions(IoTDBOptions options) {
       this.options = options;
       return this;
     }
 
-    public Builder<IN> setSerializer(IoTDBTabletSerializer<IN> serializer) {
-      this.serializer = serializer;
+    public Builder<IN> setPhysicalRowDataType(DataType physicalRowDataType) {
+      this.physicalRowDataType = physicalRowDataType;
+      return this;
+    }
+
+    public Builder<IN> setConverter(SinkDataConverter<IN> converter) {
+      this.converter = converter;
       return this;
     }
 
     public IoTDBSink<IN> build() {
-      return new IoTDBSink<>(options, serializer);
+      return new IoTDBSink<>(options, physicalRowDataType, converter);
     }
   }
 }

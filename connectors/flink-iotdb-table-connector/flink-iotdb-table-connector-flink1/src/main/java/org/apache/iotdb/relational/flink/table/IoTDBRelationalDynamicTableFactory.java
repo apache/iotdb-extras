@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.relational.flink.table;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
@@ -63,40 +63,40 @@ public class IoTDBRelationalDynamicTableFactory
 
   @Override
   public String factoryIdentifier() {
-    return IoTDBRelationalOptions.IDENTIFIER;
+    return IoTDBOptions.IDENTIFIER;
   }
 
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
     return new HashSet<>(
         Arrays.asList(
-            IoTDBRelationalOptions.NODE_URLS,
-            IoTDBRelationalOptions.DATABASE,
-            IoTDBRelationalOptions.TABLE));
+            IoTDBOptions.NODE_URLS,
+            IoTDBOptions.DATABASE,
+            IoTDBOptions.TABLE));
   }
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
     return new HashSet<>(
         Arrays.asList(
-            IoTDBRelationalOptions.USER,
-            IoTDBRelationalOptions.PASSWORD,
-            IoTDBRelationalOptions.TIME_COLUMN,
-            IoTDBRelationalOptions.TAG_COLUMNS,
-            IoTDBRelationalOptions.ATTRIBUTE_COLUMNS));
+            IoTDBOptions.USER,
+            IoTDBOptions.PASSWORD,
+            IoTDBOptions.TIME_COLUMN,
+            IoTDBOptions.TAG_COLUMNS,
+            IoTDBOptions.ATTRIBUTE_COLUMNS));
   }
 
-  private static IoTDBRelationalOptions toOptions(ReadableConfig config) {
-    return IoTDBRelationalOptions.builder()
-        .withNodeUrls(Arrays.asList(config.get(IoTDBRelationalOptions.NODE_URLS).split(",")))
-        .withUsername(config.get(IoTDBRelationalOptions.USER))
-        .withPassword(config.get(IoTDBRelationalOptions.PASSWORD))
-        .withDatabase(config.get(IoTDBRelationalOptions.DATABASE))
-        .withTable(config.get(IoTDBRelationalOptions.TABLE))
-        .withTimeColumn(config.get(IoTDBRelationalOptions.TIME_COLUMN))
-        .withTagColumns(parseColumnNames(config.get(IoTDBRelationalOptions.TAG_COLUMNS)))
+  private static IoTDBOptions toOptions(ReadableConfig config) {
+    return IoTDBOptions.builder()
+        .withNodeUrls(Arrays.asList(config.get(IoTDBOptions.NODE_URLS).split(",")))
+        .withUsername(config.get(IoTDBOptions.USER))
+        .withPassword(config.get(IoTDBOptions.PASSWORD))
+        .withDatabase(config.get(IoTDBOptions.DATABASE))
+        .withTable(config.get(IoTDBOptions.TABLE))
+        .withTimeColumn(config.get(IoTDBOptions.TIME_COLUMN))
+        .withTagColumns(parseColumnNames(config.get(IoTDBOptions.TAG_COLUMNS)))
         .withAttributeColumns(
-            parseColumnNames(config.get(IoTDBRelationalOptions.ATTRIBUTE_COLUMNS)))
+            parseColumnNames(config.get(IoTDBOptions.ATTRIBUTE_COLUMNS)))
         .build();
   }
 

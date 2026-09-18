@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.relational.flink.table;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.IoTDBSource;
 import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
 import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
@@ -52,13 +52,13 @@ public class IoTDBRelationalDynamicTableSource
         SupportsLimitPushDown,
         SupportsProjectionPushDown {
 
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private final ResolvedSchema schema;
   private DataType physicalRowDataType;
   private final List<String> resolvedFilterQueries = new ArrayList<>();
   private long limit = -1L;
 
-  public IoTDBRelationalDynamicTableSource(IoTDBRelationalOptions options, ResolvedSchema schema) {
+  public IoTDBRelationalDynamicTableSource(IoTDBOptions options, ResolvedSchema schema) {
     this.options = options;
     this.schema = schema;
     this.physicalRowDataType = schema.toPhysicalRowDataType();

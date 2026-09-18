@@ -19,7 +19,7 @@
 
 package org.apache.iotdb.relational.flink.source;
 
-import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
+import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.deserializer.IoTDBDeserializationSchema;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorStateSerializer;
@@ -49,22 +49,14 @@ public class IoTDBSource<OUT> implements Source<OUT, IoTDBSourceSplit, IoTDBSour
 
   private static final long serialVersionUID = 1L;
 
-  private final IoTDBRelationalOptions options;
+  private final IoTDBOptions options;
   private final DataType rowDataType;
   private final IoTDBDeserializationSchema<OUT> deserializer;
   private final List<String> filterQueries;
   private final long limit;
 
   public IoTDBSource(
-      IoTDBRelationalOptions options,
-      DataType rowDataType,
-      IoTDBDeserializationSchema<OUT> deserializer,
-      List<String> filterQueries) {
-    this(options, rowDataType, deserializer, filterQueries, -1L);
-  }
-
-  public IoTDBSource(
-      IoTDBRelationalOptions options,
+      IoTDBOptions options,
       DataType rowDataType,
       IoTDBDeserializationSchema<OUT> deserializer,
       List<String> filterQueries,
