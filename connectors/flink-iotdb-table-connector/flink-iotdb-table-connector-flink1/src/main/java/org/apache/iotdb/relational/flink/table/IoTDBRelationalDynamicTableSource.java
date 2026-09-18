@@ -26,11 +26,13 @@ import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
 
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.Projection;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
+import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
 import org.apache.flink.table.expressions.ResolvedExpression;
 import org.apache.flink.table.types.DataType;
 
@@ -41,11 +43,14 @@ import java.util.List;
 /**
  * Dynamic table source of the IoTDB relational (table model) Flink connector.
  *
- * <p>Only scan reads are exposed for now. Projection pushdown and lookup reads are intentionally
- * disabled until their runtime behavior is implemented.
+ * <p>Only scan reads are exposed for now. Projection pushdown is supported for top-level fields.
+ * Lookup reads are intentionally disabled until their runtime behavior is implemented.
  */
 public class IoTDBRelationalDynamicTableSource
-    implements ScanTableSource, SupportsFilterPushDown, SupportsLimitPushDown {
+    implements ScanTableSource,
+        SupportsFilterPushDown,
+        SupportsLimitPushDown,
+        SupportsProjectionPushDown {
 
   private final IoTDBRelationalOptions options;
   private final ResolvedSchema schema;
@@ -71,7 +76,18 @@ public class IoTDBRelationalDynamicTableSource
             options,
             physicalRowDataType,
             new RowDataDeserializationSchema(physicalRowDataType),
-            resolvedFilterQueries));
+            resolvedFilterQueries,
+            limit));
+  }
+
+  @Override
+  public boolean supportsNestedProjection() {
+    return false;
+  }
+
+  @Override
+  public void applyProjection(int[][] projectedFields, DataType producedDataType) {
+    this.physicalRowDataType = Projection.of(projectedFields).project(physicalRowDataType);
   }
 
   @Override
@@ -97,7 +113,6 @@ public class IoTDBRelationalDynamicTableSource
 
   @Override
   public void applyLimit(long limit) {
-    // TODO: push this limit into the single-split SQL when the optimization is enabled.
     this.limit = limit;
   }
 

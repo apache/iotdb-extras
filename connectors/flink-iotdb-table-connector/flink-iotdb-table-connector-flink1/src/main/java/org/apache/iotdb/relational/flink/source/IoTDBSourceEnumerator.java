@@ -22,7 +22,7 @@ package org.apache.iotdb.relational.flink.source;
 import org.apache.iotdb.relational.flink.cfg.IoTDBRelationalOptions;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
 import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
-import org.apache.iotdb.relational.flink.utils.IoTDBIdentifierUtils;
+import org.apache.iotdb.relational.flink.utils.IoTDBSQLBuilder;
 
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
@@ -47,6 +47,7 @@ public class IoTDBSourceEnumerator
   private final IoTDBRelationalOptions options;
   private final DataType rowDataType;
   private final List<String> filterQueries;
+  private final long limit;
   private final Deque<IoTDBSourceSplit> pendingSplits = new ArrayDeque<>();
   private final Deque<Integer> readersAwaitingSplit = new ArrayDeque<>();
   private final Set<Integer> assignedReaders = new HashSet<>();
@@ -58,8 +59,9 @@ public class IoTDBSourceEnumerator
       SplitEnumeratorContext<IoTDBSourceSplit> context,
       IoTDBRelationalOptions options,
       DataType rowDataType,
-      List<String> filterQueries) {
-    this(context, options, rowDataType, filterQueries, null);
+      List<String> filterQueries,
+      long limit) {
+    this(context, options, rowDataType, filterQueries, limit, null);
   }
 
   public IoTDBSourceEnumerator(
@@ -67,11 +69,13 @@ public class IoTDBSourceEnumerator
       IoTDBRelationalOptions options,
       DataType rowDataType,
       List<String> filterQueries,
+      long limit,
       @Nullable IoTDBSourceEnumeratorState checkpoint) {
     this.context = context;
     this.options = options;
     this.rowDataType = rowDataType;
     this.filterQueries = filterQueries == null ? new ArrayList<>() : new ArrayList<>(filterQueries);
+    this.limit = limit;
     if (checkpoint != null) {
       pendingSplits.addAll(checkpoint.getRemainingSplits());
       allSplitsCreated = true;
@@ -140,31 +144,10 @@ public class IoTDBSourceEnumerator
   }
 
   private IoTDBSourceSplit createSingleSplit() {
-    List<String> fieldNames = DataType.getFieldNames(rowDataType);
-    StringBuilder columns = new StringBuilder();
-    for (String fieldName : fieldNames) {
-      if (columns.length() > 0) {
-        columns.append(", ");
-      }
-      columns.append(quoteIdentifier(fieldName));
-    }
-    if (columns.length() == 0) {
-      throw new IllegalArgumentException("IoTDB source requires at least one selected column.");
-    }
-
     String splitId = UUID.randomUUID().toString();
-    StringBuilder sql =
-        new StringBuilder("SELECT ")
-            .append(columns)
-            .append(" FROM ")
-            .append(quoteIdentifier(options.getTable()));
-    if (!filterQueries.isEmpty()) {
-      sql.append(" WHERE ").append(String.join(" AND ", filterQueries));
-    }
-    return new IoTDBSourceSplit(splitId, options.getDatabase(), options.getTable(), sql.toString());
-  }
-
-  private static String quoteIdentifier(String identifier) {
-    return IoTDBIdentifierUtils.quoteIdentifier(identifier);
+    String sql =
+        IoTDBSQLBuilder.buildSelectQuery(
+            options.getTable(), rowDataType, filterQueries, limit);
+    return new IoTDBSourceSplit(splitId, options.getDatabase(), options.getTable(), sql);
   }
 }

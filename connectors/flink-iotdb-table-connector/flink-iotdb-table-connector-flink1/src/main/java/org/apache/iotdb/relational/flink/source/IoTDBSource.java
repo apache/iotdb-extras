@@ -53,16 +53,27 @@ public class IoTDBSource<OUT> implements Source<OUT, IoTDBSourceSplit, IoTDBSour
   private final DataType rowDataType;
   private final IoTDBDeserializationSchema<OUT> deserializer;
   private final List<String> filterQueries;
+  private final long limit;
 
   public IoTDBSource(
       IoTDBRelationalOptions options,
       DataType rowDataType,
       IoTDBDeserializationSchema<OUT> deserializer,
       List<String> filterQueries) {
+    this(options, rowDataType, deserializer, filterQueries, -1L);
+  }
+
+  public IoTDBSource(
+      IoTDBRelationalOptions options,
+      DataType rowDataType,
+      IoTDBDeserializationSchema<OUT> deserializer,
+      List<String> filterQueries,
+      long limit) {
     this.options = options;
     this.rowDataType = rowDataType;
     this.deserializer = deserializer;
     this.filterQueries = filterQueries == null ? new ArrayList<>() : new ArrayList<>(filterQueries);
+    this.limit = limit;
   }
 
   @Override
@@ -78,13 +89,14 @@ public class IoTDBSource<OUT> implements Source<OUT, IoTDBSourceSplit, IoTDBSour
   @Override
   public SplitEnumerator<IoTDBSourceSplit, IoTDBSourceEnumeratorState> createEnumerator(
       SplitEnumeratorContext<IoTDBSourceSplit> enumContext) {
-    return new IoTDBSourceEnumerator(enumContext, options, rowDataType, filterQueries);
+    return new IoTDBSourceEnumerator(enumContext, options, rowDataType, filterQueries, limit);
   }
 
   @Override
   public SplitEnumerator<IoTDBSourceSplit, IoTDBSourceEnumeratorState> restoreEnumerator(
       SplitEnumeratorContext<IoTDBSourceSplit> enumContext, IoTDBSourceEnumeratorState checkpoint) {
-    return new IoTDBSourceEnumerator(enumContext, options, rowDataType, filterQueries, checkpoint);
+    return new IoTDBSourceEnumerator(
+        enumContext, options, rowDataType, filterQueries, limit, checkpoint);
   }
 
   @Override
