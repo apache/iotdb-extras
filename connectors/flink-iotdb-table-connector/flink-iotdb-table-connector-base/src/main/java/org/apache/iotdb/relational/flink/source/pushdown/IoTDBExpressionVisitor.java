@@ -66,13 +66,11 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
     functionNames.put("log10", "log10");
     functionNames.put("lower", "lower");
     functionNames.put("lowercase", "lower");
-    functionNames.put("ltrim", "ltrim");
     functionNames.put("pi", "pi");
     functionNames.put("radians", "radians");
     functionNames.put("regexp", "regexp_like");
     functionNames.put("replace", "replace");
     functionNames.put("round", "round");
-    functionNames.put("rtrim", "rtrim");
     functionNames.put("sign", "sign");
     functionNames.put("sin", "sin");
     functionNames.put("sinh", "sinh");
@@ -84,6 +82,20 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
     functionNames.put("trim", "trim");
     functionNames.put("upper", "upper");
     functionNames.put("uppercase", "upper");
+    functionNames.put("bitand", "bitwise_and");
+    functionNames.put("bitor", "bitwise_or");
+    functionNames.put("bitxor", "bitwise_xor");
+    functionNames.put("bitnot", "bitwise_not");
+    functionNames.put("bitshiftleft", "bitwise_left_shift");
+    functionNames.put("bitshiftright", "bitwise_right_shift");
+    functionNames.put("to_base64", "to_base64");
+    functionNames.put("from_base64", "from_base64");
+    functionNames.put("to_hex", "to_hex");
+    functionNames.put("from_hex", "from_hex");
+    functionNames.put("md5", "md5");
+    functionNames.put("sha1", "sha1");
+    functionNames.put("sha256", "sha256");
+    functionNames.put("sha512", "sha512");
     FLINK_TO_IOTDB_FUNCTION_NAMES = Collections.unmodifiableMap(functionNames);
   }
 
@@ -184,18 +196,19 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
         return visitLocate(children);
       case "instr":
         return visitInstr(children);
-      case "current_database":
-        return visitCurrentTime("CURRENT_DATABASE", children);
+      case "ltrim":
+        return visitTrim("LEADING", children);
+      case "rtrim":
+        return visitTrim("TRAILING", children);
       case "current_date":
-        return visitCurrentTime("CURRENT_DATE", children);
-      case "current_time":
-        return visitCurrentTime("CURRENT_TIME", children);
+        return visitCurrentValue("CAST(now() AS DATE)", children);
       case "current_timestamp":
-        return visitCurrentTime("CURRENT_TIMESTAMP", children);
-      case "localtime":
-        return visitCurrentTime("LOCALTIME", children);
       case "localtimestamp":
-        return visitCurrentTime("LOCALTIMESTAMP", children);
+        return visitCurrentValue("now()", children);
+      case "current_database":
+      case "current_time":
+      case "localtime":
+        return null;
       default:
         return visitScalarFunction(expressionName, children);
     }
@@ -377,8 +390,26 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
     return builder.append(')').toString();
   }
 
-  private String visitCurrentTime(String keyword, List<ResolvedExpression> children) {
-    return children == null || children.isEmpty() ? keyword : null;
+  private String visitCurrentValue(String sql, List<ResolvedExpression> children) {
+    return children == null || children.isEmpty() ? sql : null;
+  }
+
+  private String visitTrim(String specification, List<ResolvedExpression> children) {
+    if (children == null || (children.size() != 1 && children.size() != 2)) {
+      return null;
+    }
+    String value = buildIoTDBExpressionSQL(children.get(0));
+    if (value == null) {
+      return null;
+    }
+    if (children.size() == 1) {
+      return "trim(" + specification + " FROM " + value + ")";
+    }
+    String trimCharacter = buildIoTDBExpressionSQL(children.get(1));
+    if (trimCharacter == null) {
+      return null;
+    }
+    return "trim(" + specification + " " + trimCharacter + " FROM " + value + ")";
   }
 
   private String visitBinary(String operator, List<ResolvedExpression> children) {
@@ -550,8 +581,7 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
     }
 
     String functionName = normalizeFunctionName(call.getFunctionName());
-    String mappedFunctionName = FLINK_TO_IOTDB_FUNCTION_NAMES.get(functionName);
-    return mappedFunctionName == null ? functionName : mappedFunctionName;
+    return functionName;
   }
 
   private static String normalizeFunctionName(String functionName) {

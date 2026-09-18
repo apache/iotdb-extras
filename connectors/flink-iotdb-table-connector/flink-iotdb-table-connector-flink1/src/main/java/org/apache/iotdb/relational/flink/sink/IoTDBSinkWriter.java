@@ -65,9 +65,7 @@ public class IoTDBSinkWriter<IN> implements SinkWriter<IN> {
   private int timeColumnIndex;
 
   public IoTDBSinkWriter(
-      IoTDBOptions options,
-      DataType physicalRowDataType,
-      SinkDataConverter<IN> converter)
+      IoTDBOptions options, DataType physicalRowDataType, SinkDataConverter<IN> converter)
       throws IOException {
     this.options = options;
     this.physicalRowDataType = physicalRowDataType;
@@ -251,7 +249,8 @@ public class IoTDBSinkWriter<IN> implements SinkWriter<IN> {
   }
 
   private Object readValue(
-      SinkDataConverter.Iterator iterator, int columnIndex, TSDataType dataType) throws IOException {
+      SinkDataConverter.Iterator iterator, int columnIndex, TSDataType dataType)
+      throws IOException {
     if (iterator.isNull(columnIndex)) {
       return null;
     }

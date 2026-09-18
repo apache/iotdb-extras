@@ -23,10 +23,10 @@ import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.IoTDBSource;
 import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
 import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
+import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
-import org.apache.flink.table.connector.Projection;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceProvider;
@@ -87,7 +87,7 @@ public class IoTDBRelationalDynamicTableSource
 
   @Override
   public void applyProjection(int[][] projectedFields, DataType producedDataType) {
-    this.physicalRowDataType = Projection.of(projectedFields).project(physicalRowDataType);
+    this.physicalRowDataType = producedDataType;
   }
 
   @Override
@@ -128,5 +128,26 @@ public class IoTDBRelationalDynamicTableSource
   @Override
   public String asSummaryString() {
     return "IoTDB Relational Dynamic Table Source";
+  }
+
+  /**
+   * Builds the IoTDB query that this source would execute. Exposed for tests so the pushed-down
+   * projection, filters and limit can be verified without executing any query.
+   */
+  String buildQuery() {
+    return IoTDBUtils.buildSelectQuery(
+        options.getTable(), physicalRowDataType, resolvedFilterQueries, limit);
+  }
+
+  List<String> getResolvedFilterQueries() {
+    return resolvedFilterQueries;
+  }
+
+  long getLimit() {
+    return limit;
+  }
+
+  DataType getPhysicalRowDataType() {
+    return physicalRowDataType;
   }
 }
