@@ -22,20 +22,26 @@ package org.apache.iotdb.relational.flink.table;
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.IoTDBSource;
 import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.lookup.IoTDBAsyncLookupFunction;
+import org.apache.iotdb.relational.flink.source.lookup.IoTDBLookupFunction;
 import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
 import org.apache.iotdb.relational.flink.source.pushdown.IoTDBAggregatePushDownUtils;
 import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
+import org.apache.flink.table.connector.source.LookupTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsAggregatePushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
+import org.apache.flink.table.connector.source.lookup.AsyncLookupFunctionProvider;
+import org.apache.flink.table.connector.source.lookup.LookupFunctionProvider;
 import org.apache.flink.table.expressions.AggregateExpression;
 import org.apache.flink.table.expressions.ResolvedExpression;
 import org.apache.flink.table.types.DataType;
@@ -47,11 +53,12 @@ import java.util.List;
 /**
  * Dynamic table source of the IoTDB relational (table model) Flink connector.
  *
- * <p>Only scan reads are exposed for now. Projection pushdown is supported for top-level fields.
- * Lookup reads are intentionally disabled until their runtime behavior is implemented.
+ * <p>Scan reads are fully implemented. Lookup reads are declared through {@link LookupTableSource}
+ * but their runtime behavior is still a stub.
  */
 public class IoTDBRelationalDynamicTableSource
     implements ScanTableSource,
+        LookupTableSource,
         SupportsFilterPushDown,
         SupportsLimitPushDown,
         SupportsProjectionPushDown,
@@ -85,6 +92,33 @@ public class IoTDBRelationalDynamicTableSource
             resolvedFilterQueries,
             limit,
             aggregateSpec));
+  }
+
+  @Override
+  public LookupRuntimeProvider getLookupRuntimeProvider(LookupContext lookupContext) {
+    // Lookup key indices refer to the scan's current row type, i.e. after any projection that has
+    // already been pushed into this source.
+    DataType lookupRowDataType = physicalRowDataType;
+    List<String> fieldNames = DataType.getFieldNames(lookupRowDataType);
+    int[][] keys = lookupContext.getKeys();
+    int[] keyIndices = new int[keys.length];
+    for (int i = 0; i < keys.length; i++) {
+      if (keys[i] == null || keys[i].length != 1) {
+        throw new TableException("IoTDB lookup supports only top-level lookup keys.");
+      }
+      int keyIndex = keys[i][0];
+      if (keyIndex < 0 || keyIndex >= fieldNames.size()) {
+        throw new TableException("Invalid IoTDB lookup key index: " + keyIndex);
+      }
+      keyIndices[i] = keyIndex;
+    }
+    if (options.isLookupAsync()) {
+      return AsyncLookupFunctionProvider.of(
+          new IoTDBAsyncLookupFunction(
+              options, lookupRowDataType, keyIndices, options.getLookupThreadSize()));
+    }
+    return LookupFunctionProvider.of(
+        new IoTDBLookupFunction(options, lookupRowDataType, keyIndices));
   }
 
   @Override

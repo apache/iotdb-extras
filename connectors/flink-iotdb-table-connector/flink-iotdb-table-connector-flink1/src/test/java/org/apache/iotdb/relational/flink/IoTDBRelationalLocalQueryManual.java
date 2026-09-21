@@ -19,9 +19,11 @@
 
 package org.apache.iotdb.relational.flink;
 
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
@@ -30,7 +32,7 @@ import org.apache.flink.util.CloseableIterator;
  * committed as a production test.
  *
  * <p>The flow is write first and then query: rows are inserted through the connector and read back
- * with a SELECT.
+ * with a SELECT, followed by a lookup join (both sync and async) executed as Flink SQL.
  *
  * <p>Run with system properties such as:
  *
@@ -59,24 +61,7 @@ public class IoTDBRelationalLocalQueryManual {
     tableEnvironment.executeSql("DROP TABLE IF EXISTS iotdb_table");
 
     // Replace these columns with the actual columns and categories in the local IoTDB table.
-    String ddl =
-        String.format(
-            "CREATE TABLE iotdb_table (\n"
-                + "  `time` TIMESTAMP(3),\n"
-                + "  `device_id` STRING,\n"
-                + "  `temperature` DOUBLE\n"
-                + ") WITH (\n"
-                + "  'connector' = 'iotdb-relational',\n"
-                + "  'nodeUrls' = '%s',\n"
-                + "  'user' = '%s',\n"
-                + "  'password' = '%s',\n"
-                + "  'database' = '%s',\n"
-                + "  'table' = '%s',\n"
-                + "  'time-column' = 'time',\n"
-                + "  'tag-columns' = 'device_id'\n"
-                + ")",
-            nodeUrls, user, password, database, table);
-
+    String ddl = buildDdl("iotdb_table", nodeUrls, user, password, database, table, null);
     System.out.println("DDL:\n" + ddl);
     tableEnvironment.executeSql(ddl);
 
@@ -96,9 +81,87 @@ public class IoTDBRelationalLocalQueryManual {
     run(
         tableEnvironment,
         "SELECT device_id, temperature FROM iotdb_table WHERE temperature > 0 LIMIT 1");
-    run(
-        tableEnvironment,
-        "SELECT temperature FROM iotdb_table WHERE temperature + 1 > 21 LIMIT 5");
+    run(tableEnvironment, "SELECT temperature FROM iotdb_table WHERE temperature + 1 > 21 LIMIT 5");
+
+    // 3) Lookup: run a temporal join through SQL for both sync and async lookup.
+    verifyLookupJoin(nodeUrls, user, password, database, table, false);
+    verifyLookupJoin(nodeUrls, user, password, database, table, true);
+  }
+
+  private static void verifyLookupJoin(
+      String nodeUrls, String user, String password, String database, String table, boolean async)
+      throws Exception {
+    StreamExecutionEnvironment environment = StreamExecutionEnvironment.getExecutionEnvironment();
+    environment.setParallelism(1);
+    StreamTableEnvironment tableEnvironment = StreamTableEnvironment.create(environment);
+
+    String flinkTable = "iotdb_lookup_" + (async ? "async" : "sync");
+    tableEnvironment.executeSql("DROP TABLE IF EXISTS " + flinkTable);
+    tableEnvironment.executeSql(
+        buildDdl(flinkTable, nodeUrls, user, password, database, table, async));
+
+    tableEnvironment.executeSql(
+        "CREATE TEMPORARY VIEW probe AS "
+            + "SELECT device_id, PROCTIME() AS proc_time FROM "
+            + flinkTable);
+
+    System.out.println("\n=== LOOKUP " + (async ? "ASYNC" : "SYNC") + " ===");
+    String sql =
+        "SELECT p.device_id, d.temperature FROM probe AS p "
+            + "JOIN "
+            + flinkTable
+            + " FOR SYSTEM_TIME AS OF p.proc_time AS d "
+            + "ON p.device_id = d.device_id";
+    System.out.println(sql);
+
+    TableResult result = tableEnvironment.executeSql(sql);
+    try (CloseableIterator<Row> iterator = result.collect()) {
+      while (iterator.hasNext()) {
+        System.out.println(iterator.next());
+      }
+    }
+  }
+
+  private static String buildDdl(
+      String flinkTable,
+      String nodeUrls,
+      String user,
+      String password,
+      String database,
+      String table,
+      Boolean async) {
+    StringBuilder ddl =
+        new StringBuilder()
+            .append("CREATE TABLE ")
+            .append(flinkTable)
+            .append(" (\n")
+            .append("  `time` TIMESTAMP(3),\n")
+            .append("  `device_id` STRING,\n")
+            .append("  `temperature` DOUBLE\n")
+            .append(") WITH (\n")
+            .append("  'connector' = 'iotdb-relational',\n")
+            .append("  'nodeUrls' = '")
+            .append(nodeUrls)
+            .append("',\n")
+            .append("  'user' = '")
+            .append(user)
+            .append("',\n")
+            .append("  'password' = '")
+            .append(password)
+            .append("',\n")
+            .append("  'database' = '")
+            .append(database)
+            .append("',\n")
+            .append("  'table' = '")
+            .append(table)
+            .append("',\n")
+            .append("  'time-column' = 'time',\n")
+            .append("  'tag-columns' = 'device_id'");
+    if (async != null) {
+      ddl.append(",\n  'lookup.async' = '").append(async).append("'");
+    }
+    ddl.append("\n)");
+    return ddl.toString();
   }
 
   private static void execute(TableEnvironment tableEnvironment, String sql) throws Exception {

@@ -69,10 +69,7 @@ public class IoTDBRelationalDynamicTableFactory
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
     return new HashSet<>(
-        Arrays.asList(
-            IoTDBOptions.NODE_URLS,
-            IoTDBOptions.DATABASE,
-            IoTDBOptions.TABLE));
+        Arrays.asList(IoTDBOptions.NODE_URLS, IoTDBOptions.DATABASE, IoTDBOptions.TABLE));
   }
 
   @Override
@@ -83,7 +80,9 @@ public class IoTDBRelationalDynamicTableFactory
             IoTDBOptions.PASSWORD,
             IoTDBOptions.TIME_COLUMN,
             IoTDBOptions.TAG_COLUMNS,
-            IoTDBOptions.ATTRIBUTE_COLUMNS));
+            IoTDBOptions.ATTRIBUTE_COLUMNS,
+            IoTDBOptions.LOOKUP_ASYNC,
+            IoTDBOptions.LOOKUP_THREAD_SIZE));
   }
 
   private static IoTDBOptions toOptions(ReadableConfig config) {
@@ -95,8 +94,9 @@ public class IoTDBRelationalDynamicTableFactory
         .withTable(config.get(IoTDBOptions.TABLE))
         .withTimeColumn(config.get(IoTDBOptions.TIME_COLUMN))
         .withTagColumns(parseColumnNames(config.get(IoTDBOptions.TAG_COLUMNS)))
-        .withAttributeColumns(
-            parseColumnNames(config.get(IoTDBOptions.ATTRIBUTE_COLUMNS)))
+        .withAttributeColumns(parseColumnNames(config.get(IoTDBOptions.ATTRIBUTE_COLUMNS)))
+        .withLookupAsync(config.get(IoTDBOptions.LOOKUP_ASYNC))
+        .withLookupThreadSize(config.get(IoTDBOptions.LOOKUP_THREAD_SIZE))
         .build();
   }
 

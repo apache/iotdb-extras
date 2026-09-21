@@ -65,6 +65,12 @@ public class IoTDBOptions implements Serializable {
   public static final ConfigOption<String> ATTRIBUTE_COLUMNS =
       ConfigOptions.key("attribute-columns").stringType().defaultValue("");
 
+  public static final ConfigOption<Boolean> LOOKUP_ASYNC =
+      ConfigOptions.key("lookup.async").booleanType().defaultValue(false);
+
+  public static final ConfigOption<Integer> LOOKUP_THREAD_SIZE =
+      ConfigOptions.key("lookup.thread-size").intType().defaultValue(5);
+
   private final List<String> nodeUrls;
   private final String username;
   private final String password;
@@ -74,6 +80,8 @@ public class IoTDBOptions implements Serializable {
   private final String timeColumn;
   private final List<String> tagColumns;
   private final List<String> attributeColumns;
+  private final boolean lookupAsync;
+  private final int lookupThreadSize;
 
   private IoTDBOptions(Builder builder) {
     this.nodeUrls = builder.nodeUrls;
@@ -85,6 +93,8 @@ public class IoTDBOptions implements Serializable {
     this.timeColumn = builder.timeColumn;
     this.tagColumns = builder.tagColumns;
     this.attributeColumns = builder.attributeColumns;
+    this.lookupAsync = builder.lookupAsync;
+    this.lookupThreadSize = builder.lookupThreadSize;
   }
 
   /**
@@ -151,6 +161,20 @@ public class IoTDBOptions implements Serializable {
   }
 
   /**
+   * @return whether an asynchronous lookup function is used for lookup joins.
+   */
+  public boolean isLookupAsync() {
+    return lookupAsync;
+  }
+
+  /**
+   * @return the number of concurrent lookup query threads, also the lookup session pool size.
+   */
+  public int getLookupThreadSize() {
+    return lookupThreadSize;
+  }
+
+  /**
    * @return a new builder
    */
   public static Builder builder() {
@@ -169,6 +193,8 @@ public class IoTDBOptions implements Serializable {
     private String timeColumn;
     private List<String> tagColumns = Collections.emptyList();
     private List<String> attributeColumns = Collections.emptyList();
+    private boolean lookupAsync = false;
+    private int lookupThreadSize = 5;
 
     public Builder withNodeUrls(List<String> nodeUrls) {
       this.nodeUrls = nodeUrls;
@@ -212,6 +238,16 @@ public class IoTDBOptions implements Serializable {
 
     public Builder withAttributeColumns(List<String> attributeColumns) {
       this.attributeColumns = attributeColumns;
+      return this;
+    }
+
+    public Builder withLookupAsync(boolean lookupAsync) {
+      this.lookupAsync = lookupAsync;
+      return this;
+    }
+
+    public Builder withLookupThreadSize(int lookupThreadSize) {
+      this.lookupThreadSize = lookupThreadSize;
       return this;
     }
 
