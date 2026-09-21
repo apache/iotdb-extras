@@ -21,6 +21,7 @@ package org.apache.iotdb.relational.flink.source;
 
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
+import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
 import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
@@ -48,6 +49,7 @@ public class IoTDBSourceEnumerator
   private final DataType rowDataType;
   private final List<String> filterQueries;
   private final long limit;
+  private final AggregateSpec aggregateSpec;
   private final Deque<IoTDBSourceSplit> pendingSplits = new ArrayDeque<>();
   private final Deque<Integer> readersAwaitingSplit = new ArrayDeque<>();
   private final Set<Integer> assignedReaders = new HashSet<>();
@@ -60,8 +62,9 @@ public class IoTDBSourceEnumerator
       IoTDBOptions options,
       DataType rowDataType,
       List<String> filterQueries,
-      long limit) {
-    this(context, options, rowDataType, filterQueries, limit, null);
+      long limit,
+      AggregateSpec aggregateSpec) {
+    this(context, options, rowDataType, filterQueries, limit, aggregateSpec, null);
   }
 
   public IoTDBSourceEnumerator(
@@ -70,12 +73,14 @@ public class IoTDBSourceEnumerator
       DataType rowDataType,
       List<String> filterQueries,
       long limit,
+      AggregateSpec aggregateSpec,
       @Nullable IoTDBSourceEnumeratorState checkpoint) {
     this.context = context;
     this.options = options;
     this.rowDataType = rowDataType;
     this.filterQueries = filterQueries == null ? new ArrayList<>() : new ArrayList<>(filterQueries);
     this.limit = limit;
+    this.aggregateSpec = aggregateSpec;
     if (checkpoint != null) {
       pendingSplits.addAll(checkpoint.getRemainingSplits());
       allSplitsCreated = true;
@@ -145,9 +150,17 @@ public class IoTDBSourceEnumerator
 
   private IoTDBSourceSplit createSingleSplit() {
     String splitId = UUID.randomUUID().toString();
-    String sql =
-        IoTDBUtils.buildSelectQuery(
-            options.getTable(), rowDataType, filterQueries, limit);
-    return new IoTDBSourceSplit(splitId, options.getDatabase(), options.getTable(), sql);
+    return new IoTDBSourceSplit(splitId, options.getDatabase(), options.getTable(), buildSql());
+  }
+
+  private String buildSql() {
+    if (aggregateSpec != null) {
+      return IoTDBUtils.buildAggregateQuery(
+          options.getTable(),
+          aggregateSpec.getSelectExpressions(),
+          filterQueries,
+          aggregateSpec.getGroupByExpressions());
+    }
+    return IoTDBUtils.buildSelectQuery(options.getTable(), rowDataType, filterQueries, limit);
   }
 }

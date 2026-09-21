@@ -22,6 +22,8 @@ package org.apache.iotdb.relational.flink.table;
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.IoTDBSource;
 import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
+import org.apache.iotdb.relational.flink.source.pushdown.IoTDBAggregatePushDownUtils;
 import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
@@ -30,9 +32,11 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsAggregatePushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
+import org.apache.flink.table.expressions.AggregateExpression;
 import org.apache.flink.table.expressions.ResolvedExpression;
 import org.apache.flink.table.types.DataType;
 
@@ -50,13 +54,15 @@ public class IoTDBRelationalDynamicTableSource
     implements ScanTableSource,
         SupportsFilterPushDown,
         SupportsLimitPushDown,
-        SupportsProjectionPushDown {
+        SupportsProjectionPushDown,
+        SupportsAggregatePushDown {
 
   private final IoTDBOptions options;
   private final ResolvedSchema schema;
   private DataType physicalRowDataType;
   private final List<String> resolvedFilterQueries = new ArrayList<>();
   private long limit = -1L;
+  private AggregateSpec aggregateSpec;
 
   public IoTDBRelationalDynamicTableSource(IoTDBOptions options, ResolvedSchema schema) {
     this.options = options;
@@ -77,7 +83,8 @@ public class IoTDBRelationalDynamicTableSource
             physicalRowDataType,
             new RowDataDeserializationSchema(physicalRowDataType),
             resolvedFilterQueries,
-            limit));
+            limit,
+            aggregateSpec));
   }
 
   @Override
@@ -87,7 +94,9 @@ public class IoTDBRelationalDynamicTableSource
 
   @Override
   public void applyProjection(int[][] projectedFields, DataType producedDataType) {
-    this.physicalRowDataType = producedDataType;
+    if (aggregateSpec == null) {
+      this.physicalRowDataType = producedDataType;
+    }
   }
 
   @Override
@@ -112,8 +121,28 @@ public class IoTDBRelationalDynamicTableSource
   }
 
   @Override
+  public boolean applyAggregates(
+      List<int[]> groupingSets,
+      List<AggregateExpression> aggregateExpressions,
+      DataType producedDataType) {
+    // Grouping and argument indices refer to the scan's current row type, which is the row type
+    // after any projection that has already been pushed into this source.
+    AggregateSpec spec =
+        IoTDBAggregatePushDownUtils.translate(
+            groupingSets, aggregateExpressions, physicalRowDataType, producedDataType);
+    if (spec == null) {
+      return false;
+    }
+    this.aggregateSpec = spec;
+    this.physicalRowDataType = producedDataType;
+    return true;
+  }
+
+  @Override
   public void applyLimit(long limit) {
-    this.limit = limit;
+    if (aggregateSpec == null) {
+      this.limit = limit;
+    }
   }
 
   @Override
@@ -122,6 +151,7 @@ public class IoTDBRelationalDynamicTableSource
     copy.physicalRowDataType = physicalRowDataType;
     copy.resolvedFilterQueries.addAll(resolvedFilterQueries);
     copy.limit = limit;
+    copy.aggregateSpec = aggregateSpec;
     return copy;
   }
 
@@ -132,11 +162,22 @@ public class IoTDBRelationalDynamicTableSource
 
   /**
    * Builds the IoTDB query that this source would execute. Exposed for tests so the pushed-down
-   * projection, filters and limit can be verified without executing any query.
+   * projection, filters, limit and aggregation can be verified without executing any query.
    */
   String buildQuery() {
+    if (aggregateSpec != null) {
+      return IoTDBUtils.buildAggregateQuery(
+          options.getTable(),
+          aggregateSpec.getSelectExpressions(),
+          resolvedFilterQueries,
+          aggregateSpec.getGroupByExpressions());
+    }
     return IoTDBUtils.buildSelectQuery(
         options.getTable(), physicalRowDataType, resolvedFilterQueries, limit);
+  }
+
+  AggregateSpec getAggregateSpec() {
+    return aggregateSpec;
   }
 
   List<String> getResolvedFilterQueries() {

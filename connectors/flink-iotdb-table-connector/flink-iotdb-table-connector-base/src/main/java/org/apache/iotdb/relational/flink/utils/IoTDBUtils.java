@@ -245,6 +245,39 @@ public final class IoTDBUtils {
     return sql.toString();
   }
 
+  /**
+   * Builds a table-model aggregation query.
+   *
+   * @param table IoTDB table name
+   * @param selectExpressions already-rendered SELECT expressions (grouping columns and aggregates)
+   * @param filterQueries already-rendered IoTDB predicate fragments
+   * @param groupByExpressions already-rendered GROUP BY expressions, or {@code null} for a global
+   *     aggregation
+   * @return IoTDB SELECT SQL
+   */
+  public static String buildAggregateQuery(
+      String table,
+      List<String> selectExpressions,
+      List<String> filterQueries,
+      List<String> groupByExpressions) {
+    if (selectExpressions == null || selectExpressions.isEmpty()) {
+      throw new IllegalArgumentException("IoTDB aggregate query requires at least one column.");
+    }
+
+    StringBuilder sql =
+        new StringBuilder("SELECT ")
+            .append(String.join(", ", selectExpressions))
+            .append(" FROM ")
+            .append(quoteIdentifier(table));
+    if (filterQueries != null && !filterQueries.isEmpty()) {
+      sql.append(" WHERE ").append(String.join(" AND ", filterQueries));
+    }
+    if (groupByExpressions != null && !groupByExpressions.isEmpty()) {
+      sql.append(" GROUP BY ").append(String.join(", ", groupByExpressions));
+    }
+    return sql.toString();
+  }
+
   private static void validateColumnExists(
       String columnName, String optionName, Map<String, TSDataType> dataTypesByColumn) {
     if (!dataTypesByColumn.containsKey(columnName)) {

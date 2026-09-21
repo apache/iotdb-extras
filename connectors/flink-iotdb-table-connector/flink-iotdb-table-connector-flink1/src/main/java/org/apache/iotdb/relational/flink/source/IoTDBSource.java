@@ -23,6 +23,7 @@ import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.source.deserializer.IoTDBDeserializationSchema;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
 import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorStateSerializer;
+import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
 import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
 import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplitSerializer;
 
@@ -54,18 +55,21 @@ public class IoTDBSource<OUT> implements Source<OUT, IoTDBSourceSplit, IoTDBSour
   private final IoTDBDeserializationSchema<OUT> deserializer;
   private final List<String> filterQueries;
   private final long limit;
+  private final AggregateSpec aggregateSpec;
 
   public IoTDBSource(
       IoTDBOptions options,
       DataType rowDataType,
       IoTDBDeserializationSchema<OUT> deserializer,
       List<String> filterQueries,
-      long limit) {
+      long limit,
+      AggregateSpec aggregateSpec) {
     this.options = options;
     this.rowDataType = rowDataType;
     this.deserializer = deserializer;
     this.filterQueries = filterQueries == null ? new ArrayList<>() : new ArrayList<>(filterQueries);
     this.limit = limit;
+    this.aggregateSpec = aggregateSpec;
   }
 
   @Override
@@ -81,14 +85,15 @@ public class IoTDBSource<OUT> implements Source<OUT, IoTDBSourceSplit, IoTDBSour
   @Override
   public SplitEnumerator<IoTDBSourceSplit, IoTDBSourceEnumeratorState> createEnumerator(
       SplitEnumeratorContext<IoTDBSourceSplit> enumContext) {
-    return new IoTDBSourceEnumerator(enumContext, options, rowDataType, filterQueries, limit);
+    return new IoTDBSourceEnumerator(
+        enumContext, options, rowDataType, filterQueries, limit, aggregateSpec);
   }
 
   @Override
   public SplitEnumerator<IoTDBSourceSplit, IoTDBSourceEnumeratorState> restoreEnumerator(
       SplitEnumeratorContext<IoTDBSourceSplit> enumContext, IoTDBSourceEnumeratorState checkpoint) {
     return new IoTDBSourceEnumerator(
-        enumContext, options, rowDataType, filterQueries, limit, checkpoint);
+        enumContext, options, rowDataType, filterQueries, limit, aggregateSpec, checkpoint);
   }
 
   @Override

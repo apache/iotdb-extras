@@ -122,8 +122,7 @@ public class IoTDBRelationalSourcePushDownPlannerTest {
         optimize("SELECT device_id FROM iotdb_t WHERE temperature + humidity > 30.0E0");
 
     assertEquals(
-        "SELECT \"device_id\" FROM \"sensor\" "
-            + "WHERE ((\"temperature\" + \"humidity\") > 30.0)",
+        "SELECT \"device_id\" FROM \"sensor\" " + "WHERE ((\"temperature\" + \"humidity\") > 30.0)",
         source.buildQuery());
   }
 
@@ -174,8 +173,7 @@ public class IoTDBRelationalSourcePushDownPlannerTest {
         optimize("SELECT device_id FROM iotdb_t WHERE temperature <> 0.0E0");
 
     assertEquals(
-        "SELECT \"device_id\" FROM \"sensor\" WHERE (\"temperature\" <> 0.0)",
-        source.buildQuery());
+        "SELECT \"device_id\" FROM \"sensor\" WHERE (\"temperature\" <> 0.0)", source.buildQuery());
   }
 
   @Test
@@ -238,8 +236,7 @@ public class IoTDBRelationalSourcePushDownPlannerTest {
     assertEquals(
         Collections.singletonList("(\"device_id\" = 'd1')"), source.getResolvedFilterQueries());
     assertEquals(
-        "SELECT \"temperature\" FROM \"sensor\" WHERE (\"device_id\" = 'd1')",
-        source.buildQuery());
+        "SELECT \"temperature\" FROM \"sensor\" WHERE (\"device_id\" = 'd1')", source.buildQuery());
   }
 
   @Test
@@ -293,8 +290,7 @@ public class IoTDBRelationalSourcePushDownPlannerTest {
         optimize("SELECT device_id FROM iotdb_t WHERE `time` < NOW()");
 
     assertEquals(
-        "SELECT \"device_id\" FROM \"sensor\" WHERE (\"time\" < now())",
-        source.buildQuery());
+        "SELECT \"device_id\" FROM \"sensor\" WHERE (\"time\" < now())", source.buildQuery());
   }
 
   @Test
@@ -306,9 +302,202 @@ public class IoTDBRelationalSourcePushDownPlannerTest {
     assertEquals("SELECT \"device_id\" FROM \"sensor\"", source.buildQuery());
   }
 
+  @Test
+  public void testGlobalCountStarIsNotPushedDown() {
+    // Flink 1.17 feeds a global COUNT(*) through a constant Calc, and the pushdown rule only
+    // accepts field-projection Calcs, so it is intentionally left to Flink.
+    IoTDBRelationalDynamicTableSource source = optimize("SELECT COUNT(*) FROM iotdb_t");
+
+    assertEquals("SELECT \"time\" FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testCountColumnPushDown() {
+    IoTDBRelationalDynamicTableSource source = optimize("SELECT COUNT(temperature) FROM iotdb_t");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT CAST(COUNT(\"temperature\") AS INT64) FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testSumPushDown() {
+    IoTDBRelationalDynamicTableSource source = optimize("SELECT SUM(temperature) FROM iotdb_t");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT CAST(SUM(\"temperature\") AS DOUBLE) FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testAvgDecomposedPushDown() {
+    // AVG is decomposed by the planner into SUM0 + COUNT and both must be pushed down.
+    IoTDBRelationalDynamicTableSource source = optimize("SELECT AVG(temperature) FROM iotdb_t");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT CAST(SUM(\"temperature\") AS DOUBLE), CAST(COUNT(\"temperature\") AS INT64) "
+            + "FROM \"sensor\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testMaxAndMinPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT MAX(temperature), MIN(temperature) FROM iotdb_t");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT CAST(MAX(\"temperature\") AS DOUBLE), CAST(MIN(\"temperature\") AS DOUBLE) "
+            + "FROM \"sensor\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testMinStringPushDown() {
+    IoTDBRelationalDynamicTableSource source = optimize("SELECT MIN(device_id) FROM iotdb_t");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals("SELECT CAST(MIN(\"device_id\") AS STRING) FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testGroupByCountPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT device_id, COUNT(*) FROM iotdb_t GROUP BY device_id");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT \"device_id\", CAST(COUNT(*) AS INT64) FROM \"sensor\" GROUP BY \"device_id\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testGroupBySumPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT device_id, SUM(temperature) FROM iotdb_t GROUP BY device_id");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT \"device_id\", CAST(SUM(\"temperature\") AS DOUBLE) FROM \"sensor\" "
+            + "GROUP BY \"device_id\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testAggregateWithFilterPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT SUM(temperature) FROM iotdb_t WHERE temperature > 30.0E0");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        Collections.singletonList("(\"temperature\" > 30.0)"), source.getResolvedFilterQueries());
+    assertEquals(
+        "SELECT CAST(SUM(\"temperature\") AS DOUBLE) FROM \"sensor\" "
+            + "WHERE (\"temperature\" > 30.0)",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testMultipleAggregatesPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize(
+            "SELECT device_id, COUNT(*), SUM(temperature), MAX(humidity), MIN(temperature) "
+                + "FROM iotdb_t GROUP BY device_id");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT \"device_id\", CAST(COUNT(*) AS INT64), CAST(SUM(\"temperature\") AS DOUBLE), "
+            + "CAST(MAX(\"humidity\") AS DOUBLE), CAST(MIN(\"temperature\") AS DOUBLE) "
+            + "FROM \"sensor\" GROUP BY \"device_id\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testGroupByMultipleColumnsPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize(
+            "SELECT device_id, temperature, COUNT(*) FROM iotdb_t "
+                + "GROUP BY device_id, temperature");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT \"device_id\", \"temperature\", CAST(COUNT(*) AS INT64) FROM \"sensor\" "
+            + "GROUP BY \"device_id\", \"temperature\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testAggregateWithFilterAndGroupByPushDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize(
+            "SELECT device_id, AVG(temperature) FROM iotdb_t "
+                + "WHERE humidity > 10.0E0 GROUP BY device_id");
+
+    assertNotNull(source.getAggregateSpec());
+    assertEquals(
+        "SELECT \"device_id\", CAST(SUM(\"temperature\") AS DOUBLE), "
+            + "CAST(COUNT(\"temperature\") AS INT64) FROM \"sensor\" "
+            + "WHERE (\"humidity\" > 10.0) GROUP BY \"device_id\"",
+        source.buildQuery());
+  }
+
+  @Test
+  public void testSumOfExpressionIsNotPushedDown() {
+    // sum(a + b): the argument is an expression, which Flink evaluates in a Calc before the
+    // local aggregate, so the pushdown rule leaves it to Flink.
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT SUM(temperature + humidity) FROM iotdb_t");
+
+    assertEquals("SELECT \"temperature\", \"humidity\" FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testSumOfScalingExpressionIsNotPushedDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT SUM(temperature * 2.0E0) FROM iotdb_t");
+
+    assertEquals("SELECT \"temperature\" FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testAggregateOfFunctionIsNotPushedDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT MAX(LOWER(device_id)) FROM iotdb_t");
+
+    assertEquals("SELECT \"device_id\" FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testGroupByExpressionIsNotPushedDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT device_id || 'x', COUNT(*) FROM iotdb_t GROUP BY device_id || 'x'");
+
+    assertEquals("SELECT \"device_id\" FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testCountDistinctIsNotPushedDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT COUNT(DISTINCT device_id) FROM iotdb_t");
+
+    assertEquals("SELECT \"device_id\" FROM \"sensor\"", source.buildQuery());
+  }
+
+  @Test
+  public void testUnsupportedAggregateIsNotPushedDown() {
+    IoTDBRelationalDynamicTableSource source =
+        optimize("SELECT STDDEV_POP(temperature) FROM iotdb_t");
+
+    assertEquals("SELECT \"temperature\" FROM \"sensor\"", source.buildQuery());
+  }
+
   private static IoTDBRelationalDynamicTableSource optimize(String query) {
     TableEnvironmentImpl tableEnvironment =
         (TableEnvironmentImpl) TableEnvironment.create(EnvironmentSettings.inBatchMode());
+    // Aggregate pushdown is opt-in and needs a local (partial) aggregate to be generated.
+    tableEnvironment.getConfig().set("table.optimizer.source.aggregate-pushdown-enabled", "true");
+    tableEnvironment.getConfig().set("table.optimizer.agg-phase-strategy", "TWO_PHASE");
     tableEnvironment.executeSql(DDL);
     Table table = tableEnvironment.sqlQuery(query);
 
