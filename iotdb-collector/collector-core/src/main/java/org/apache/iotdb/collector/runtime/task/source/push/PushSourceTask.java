@@ -67,25 +67,16 @@ public class PushSourceTask extends SourceTask {
       pushSources[i] = (PushSource) pluginRuntime.constructSource(parameters);
       pushSources[i].setCollector(processorProducer);
       pushSources[i].setDispatch(dispatch);
-      try {
-        pushSources[i].validate(new PipeParameterValidator(parameters));
-        pushSources[i].customize(
-            parameters,
-            new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
-        if (TaskStateEnum.STOPPED.equals(taskState)) {
-          pushSources[i].pause();
-        }
-        pushSources[i].start();
-      } catch (final Exception e) {
-        try {
-          pushSources[i].close();
-        } catch (final Exception ex) {
-          LOGGER.warn("Failed to close source on creation failure", ex);
-        }
-        // Like SinkTask/ProcessorTask: a source that cannot start must fail task creation
-        // instead of being swallowed when its cleanup succeeds.
-        throw e;
+      // A failure propagates so that task creation fails; TaskCombiner then drops the task, which
+      // closes every source constructed so far, including those already started.
+      pushSources[i].validate(new PipeParameterValidator(parameters));
+      pushSources[i].customize(
+          parameters,
+          new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
+      if (TaskStateEnum.STOPPED.equals(taskState)) {
+        pushSources[i].pause();
       }
+      pushSources[i].start();
     }
 
     // register storage progress schedule job
@@ -160,6 +151,10 @@ public class PushSourceTask extends SourceTask {
   public void dropInternal() {
     if (pushSources != null) {
       for (int i = 0; i < parallelism; i++) {
+        // Slots after a creation failure were never constructed.
+        if (pushSources[i] == null) {
+          continue;
+        }
         try {
           pushSources[i].close();
         } catch (final Exception e) {

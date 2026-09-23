@@ -37,9 +37,23 @@ public class TaskCombiner {
   }
 
   public void create() throws Exception {
-    sink.create();
-    processor.create();
-    source.create();
+    try {
+      sink.create();
+      processor.create();
+      source.create();
+    } catch (final Exception | Error e) {
+      // A task that fails creation is never registered, so nothing would drop it later. Release
+      // what every stage already holds; a leaked executor would otherwise be reused by a retry
+      // under the same task id while its threads still run this attempt's workers.
+      for (final Task task : new Task[] {source, processor, sink}) {
+        try {
+          task.drop();
+        } catch (final Exception | Error dropException) {
+          e.addSuppressed(dropException);
+        }
+      }
+      throw e;
+    }
   }
 
   public void start() throws Exception {
@@ -56,6 +70,12 @@ public class TaskCombiner {
 
   public void drop() throws Exception {
     stop();
+
+    // Mark every stage dropped before draining any: a paused downstream stage would not consume
+    // what the stage upstream of it drains, and each drain would wait for its timeout instead.
+    source.markDropped();
+    processor.markDropped();
+    sink.markDropped();
 
     source.drop();
     processor.drop();

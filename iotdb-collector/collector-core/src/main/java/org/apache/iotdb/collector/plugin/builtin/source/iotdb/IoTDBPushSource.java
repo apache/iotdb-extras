@@ -26,7 +26,8 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.rpc.subscription.config.ConsumerConstant;
 import org.apache.iotdb.rpc.subscription.config.TopicConstant;
-import org.apache.iotdb.session.subscription.SubscriptionTreeSession;
+import org.apache.iotdb.session.subscription.ISubscriptionTreeSession;
+import org.apache.iotdb.session.subscription.SubscriptionTreeSessionBuilder;
 import org.apache.iotdb.session.subscription.consumer.tree.SubscriptionTreePullConsumer;
 import org.apache.iotdb.session.subscription.model.Topic;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
@@ -118,7 +119,8 @@ public class IoTDBPushSource extends PushSource {
   }
 
   private void requireRecordFormatTopic() throws Exception {
-    try (final SubscriptionTreeSession session = new SubscriptionTreeSession(host, port)) {
+    try (final ISubscriptionTreeSession session =
+        new SubscriptionTreeSessionBuilder().host(host).port(port).build()) {
       session.open();
       final Optional<Topic> found = session.getTopic(topic);
       if (!found.isPresent()) {

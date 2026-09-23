@@ -93,22 +93,14 @@ public class SinkTask extends Task {
     for (int i = 0; i < parallelism; i++) {
       consumers[i] = new SinkConsumer(pluginRuntime.constructSink(parameters));
       consumers[i].setDispatch(dispatch);
-      try {
-        consumers[i].consumer().validate(new PipeParameterValidator(parameters));
-        consumers[i]
-            .consumer()
-            .customize(
-                parameters,
-                new CollectorSinkRuntimeConfiguration(taskId, creationTime, parallelism, i));
-        consumers[i].consumer().handshake();
-      } catch (final Exception e) {
-        try {
-          consumers[i].consumer().close();
-        } catch (final Exception ex) {
-          LOGGER.warn("Failed to close sink on creation failure", ex);
-        }
-        throw e;
-      }
+      // A failure propagates; TaskCombiner then drops the task, closing every constructed sink.
+      consumers[i].consumer().validate(new PipeParameterValidator(parameters));
+      consumers[i]
+          .consumer()
+          .customize(
+              parameters,
+              new CollectorSinkRuntimeConfiguration(taskId, creationTime, parallelism, i));
+      consumers[i].consumer().handshake();
     }
     disruptor.handleEventsWithWorkerPool(consumers);
 
@@ -129,21 +121,21 @@ public class SinkTask extends Task {
 
   @Override
   public void dropInternal() {
+    // Stop the workers before closing the sinks they call.
+    stopWorkers(disruptor, REGISTERED_EXECUTOR_SERVICES.remove(taskId));
+
     if (consumers != null) {
       for (int i = 0; i < parallelism; i++) {
+        // Slots after a creation failure were never constructed.
+        if (consumers[i] == null) {
+          continue;
+        }
         try {
           consumers[i].consumer().close();
         } catch (final Exception e) {
           LOGGER.warn("Failed to close sink", e);
         }
       }
-    }
-
-    disruptor.shutdown();
-
-    final ExecutorService executorService = REGISTERED_EXECUTOR_SERVICES.remove(taskId);
-    if (executorService != null) {
-      executorService.shutdown();
     }
   }
 

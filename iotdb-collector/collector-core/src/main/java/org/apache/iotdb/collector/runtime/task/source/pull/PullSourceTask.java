@@ -86,24 +86,16 @@ public class PullSourceTask extends SourceTask {
       consumers[i] =
           new PullSourceConsumer(
               (PullSource) pluginRuntime.constructSource(parameters), processorProducer);
-      try {
-        consumers[i].consumer().validate(new PipeParameterValidator(parameters));
-        consumers[i]
-            .consumer()
-            .customize(
-                parameters,
-                new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
-        consumers[i].consumer().start();
-      } catch (final Exception e) {
-        try {
-          consumers[i].consumer().close();
-        } catch (final Exception ex) {
-          LOGGER.warn("Failed to close source on creation failure", ex);
-        }
-        // Like SinkTask/ProcessorTask: a source that cannot start must fail task creation
-        // instead of being swallowed when its cleanup succeeds.
-        throw e;
-      }
+      // A failure propagates so that task creation fails; TaskCombiner then drops the task, which
+      // stops the loops already submitted, closes every constructed source and releases the
+      // executor.
+      consumers[i].consumer().validate(new PipeParameterValidator(parameters));
+      consumers[i]
+          .consumer()
+          .customize(
+              parameters,
+              new CollectorSourceRuntimeConfiguration(taskId, creationTime, parallelism, i));
+      consumers[i].consumer().start();
 
       int finalI = i;
       REGISTERED_EXECUTOR_SERVICES
@@ -173,19 +165,25 @@ public class PullSourceTask extends SourceTask {
 
   @Override
   public void dropInternal() {
+    // The dropped dispatch ends every polling loop after its current supply(); wait for that
+    // before closing the sources those loops call.
+    final ExecutorService executorService = REGISTERED_EXECUTOR_SERVICES.remove(taskId);
+    if (executorService != null) {
+      awaitWorkers(executorService);
+    }
+
     if (consumers != null) {
       for (int i = 0; i < parallelism; i++) {
+        // Slots after a creation failure were never constructed.
+        if (consumers[i] == null) {
+          continue;
+        }
         try {
           consumers[i].consumer().close();
         } catch (final Exception e) {
           LOGGER.warn("Failed to close source", e);
         }
       }
-    }
-
-    final ExecutorService executorService = REGISTERED_EXECUTOR_SERVICES.remove(taskId);
-    if (executorService != null) {
-      executorService.shutdown();
     }
   }
 }

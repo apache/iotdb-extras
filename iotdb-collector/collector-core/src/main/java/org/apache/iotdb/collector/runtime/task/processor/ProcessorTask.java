@@ -102,21 +102,14 @@ public class ProcessorTask extends Task {
       processorConsumers[i] =
           new ProcessorConsumer(pluginRuntime.constructProcessor(parameters), sinkProducer);
       processorConsumers[i].setDispatch(dispatch);
-      try {
-        processorConsumers[i].consumer().validate(new PipeParameterValidator(parameters));
-        processorConsumers[i]
-            .consumer()
-            .customize(
-                parameters,
-                new CollectorProcessorRuntimeConfiguration(taskId, creationTime, parallelism, i));
-      } catch (final Exception e) {
-        try {
-          processorConsumers[i].consumer().close();
-        } catch (final Exception ex) {
-          LOGGER.warn("Failed to close sink on creation failure", ex);
-        }
-        throw e;
-      }
+      // A failure propagates; TaskCombiner then drops the task, closing every constructed
+      // processor.
+      processorConsumers[i].consumer().validate(new PipeParameterValidator(parameters));
+      processorConsumers[i]
+          .consumer()
+          .customize(
+              parameters,
+              new CollectorProcessorRuntimeConfiguration(taskId, creationTime, parallelism, i));
     }
     disruptor.handleEventsWithWorkerPool(processorConsumers);
 
@@ -148,25 +141,26 @@ public class ProcessorTask extends Task {
 
   @Override
   public void dropInternal() {
+    // Stop the workers before closing the processors they call, and before deregistering the
+    // heartbeat job, which throws when the schedule service has not started yet.
+    stopWorkers(disruptor, REGISTERED_EXECUTOR_SERVICES.remove(taskId));
+
     if (processorConsumers != null) {
       for (int i = 0; i < parallelism; i++) {
+        // Slots after a creation failure were never constructed.
+        if (processorConsumers[i] == null) {
+          continue;
+        }
         try {
           processorConsumers[i].consumer().close();
         } catch (final Exception e) {
-          LOGGER.warn("Failed to close sink", e);
+          LOGGER.warn("Failed to close processor", e);
         }
       }
     }
 
     // remove proactive sink actions
     ScheduleService.pushEvent().ifPresent(event -> event.deregister(taskId));
-
-    disruptor.shutdown();
-
-    final ExecutorService executorService = REGISTERED_EXECUTOR_SERVICES.remove(taskId);
-    if (executorService != null) {
-      executorService.shutdown();
-    }
   }
 
   public EventCollector makeProducer() {
