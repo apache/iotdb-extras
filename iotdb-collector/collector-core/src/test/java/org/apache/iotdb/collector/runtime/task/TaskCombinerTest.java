@@ -35,7 +35,6 @@ import org.apache.iotdb.collector.service.ScheduleService;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.PipeSource;
-import org.apache.iotdb.pipe.api.customizer.configuration.PipeConnectorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSinkRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
@@ -367,10 +366,6 @@ public class TaskCombinerTest {
 
     @Override
     public void validate(final PipeParameterValidator validator) {}
-
-    @Override
-    public void customize(
-        final PipeParameters parameters, final PipeConnectorRuntimeConfiguration configuration) {}
 
     @Override
     public void customize(
