@@ -24,6 +24,7 @@ import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>TC-1 is defined with two profiles. This class is the <b>smoke profile</b>: a local, fast,
  * JUnit-driven run that exercises the real {@link IoTDBTableTimeseriesDao#save} path (bounded queue
  * &rarr; single flush worker &rarr; multi-row {@code Tablet} insert &rarr; real IoTDB) against the
- * same {@code apache/iotdb:2.0.8-standalone} Testcontainer the functional ITs use, then reports
+ * same {@code apache/iotdb:2.0.11-standalone} Testcontainer the functional ITs use, then reports
  * records/sec, error rate, and writer stats.
  *
  * <p><b>The &gt;10K writes/sec headline target is the FULL profile number on a dedicated host.</b>
@@ -79,6 +80,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class IoTDBTableIngestionBenchmarkIT {
+  private final List<String> createdDatabases = new ArrayList<>();
   private static final Logger LOG = LoggerFactory.getLogger(IoTDBTableIngestionBenchmarkIT.class);
 
   // Smoke sizing: concurrency mirrors the TC-1 design (50 concurrent threads) but the total row
@@ -110,7 +112,9 @@ class IoTDBTableIngestionBenchmarkIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1), so it would
           // only listen on the container loopback and reject the Testcontainers port-mapped session
@@ -400,10 +404,26 @@ class IoTDBTableIngestionBenchmarkIT {
         uniqueDatabase(), new TenantId(UUID.fromString("55555555-5555-5555-5555-555555555501")));
   }
 
+  @AfterEach
+  void dropCreatedDatabases() throws Exception {
+    // Every test provisions its own database. Drop them once the test is done: the shared
+    // container has a fixed region memory budget, and leaving dozens of databases behind makes
+    // later tests in the class fail schema-region creation ("Total allocated memory for direct
+    // buffer ... is greater than limit mem cost") and time out on their first write.
+    try (ITableSessionPool pool = newPool(null);
+        ITableSession session = pool.getSession()) {
+      for (String database : createdDatabases) {
+        session.executeNonQueryStatement("DROP DATABASE IF EXISTS " + database);
+      }
+    }
+  }
+
   private String uniqueDatabase() {
     // IoTDB caps database names at 64 chars; keep the prefix short and append a trimmed UUID.
     String shortUuid = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    return "tb_bench_tc1_" + shortUuid;
+    String database = "tb_bench_tc1_" + shortUuid;
+    createdDatabases.add(database);
+    return database;
   }
 
   private static java.util.concurrent.ThreadFactory saverThreadFactory() {

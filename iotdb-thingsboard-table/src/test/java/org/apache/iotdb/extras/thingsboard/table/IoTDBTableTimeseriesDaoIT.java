@@ -25,6 +25,7 @@ import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Integration tests for the IoTDB Table Mode timeseries DAO against a real IoTDB 2.0.8 container:
+ * Integration tests for the IoTDB Table Mode timeseries DAO against a real IoTDB 2.0.11 container:
  * the WRITE path (verified by reading the telemetry table back through raw table-session SQL) plus
  * the RAW (non-aggregated) READ path, a millisecond time-bucketed aggregation smoke read and the
  * DELETE path exercised through the DAO.
@@ -67,6 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class IoTDBTableTimeseriesDaoIT {
+  private final List<String> createdDatabases = new ArrayList<>();
   // Cold testcontainer first writes are slower than a warm production node, so the per-future
   // assertion timeout is generous; production throughput is covered elsewhere, not here.
   private static final int FUTURE_TIMEOUT_SECONDS = 30;
@@ -78,7 +80,9 @@ class IoTDBTableTimeseriesDaoIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1), so it would
           // only listen on the container loopback and reject the Testcontainers port-mapped session
@@ -101,7 +105,7 @@ class IoTDBTableTimeseriesDaoIT {
   }
 
   /**
-   * Pins the IoTDB 2.0.8 engine behavior that a database-bound table-session pool can bootstrap a
+   * Pins the IoTDB 2.0.11 engine behavior that a database-bound table-session pool can bootstrap a
    * not-yet-existing database. If a future IoTDB image changes that behavior, this test fails
    * before first boot breaks in production.
    */
@@ -628,12 +632,28 @@ class IoTDBTableTimeseriesDaoIT {
         new TestEntityId(UUID.fromString(entityId), EntityType.DEVICE));
   }
 
+  @AfterEach
+  void dropCreatedDatabases() throws Exception {
+    // Every test provisions its own database. Drop them once the test is done: the shared
+    // container has a fixed region memory budget, and leaving dozens of databases behind makes
+    // later tests in the class fail schema-region creation ("Total allocated memory for direct
+    // buffer ... is greater than limit mem cost") and time out on their first write.
+    try (ITableSessionPool pool = newPool(null);
+        ITableSession session = pool.getSession()) {
+      for (String database : createdDatabases) {
+        session.executeNonQueryStatement("DROP DATABASE IF EXISTS " + database);
+      }
+    }
+  }
+
   private String uniqueDatabase(String prefix) {
     // IoTDB caps database names at 64 chars; keep the per-test prefix short and
     // append a trimmed UUID so the total length stays well within the limit.
     String shortPrefix = prefix.length() > 12 ? prefix.substring(0, 12) : prefix;
     String shortUuid = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    return "tb_it_" + shortPrefix + "_" + shortUuid;
+    String database = "tb_it_" + shortPrefix + "_" + shortUuid;
+    createdDatabases.add(database);
+    return database;
   }
 
   private int assertTelemetryRows(

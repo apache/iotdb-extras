@@ -23,6 +23,7 @@ import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
@@ -55,18 +56,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Real-Docker integration test that proves the IoTDB 2.0.8 Table Mode native three-argument {@code
+ * Real-Docker integration test that proves the IoTDB 2.0.11 Table Mode native three-argument {@code
  * date_bin(<interval>ms, time, <startTs>)} + {@code GROUP BY} time-bucketed aggregation path
  * matches ThingsBoard 4.3.1.2's contract: buckets anchored at {@code startTs} (not epoch 1970),
  * entries stamped at the bucket midpoint, every non-empty bucket returned ascending regardless of
  * query order/limit, and typed COUNT semantics -- all against hand-computed expected values. Reuses
  * the testcontainer harness from {@link IoTDBTableTimeseriesDaoIT}: {@code
- * apache/iotdb:2.0.8-standalone}, {@code dn_rpc_address=0.0.0.0}, exposed port 6667, short-prefix
+ * apache/iotdb:2.0.11-standalone}, {@code dn_rpc_address=0.0.0.0}, exposed port 6667, short-prefix
  * unique database, schema bootstrap from {@code schema-iotdb-table.sql}.
  */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class IoTDBTableTimeseriesAggregationIT {
+  private final List<String> createdDatabases = new ArrayList<>();
   private static final int FUTURE_TIMEOUT_SECONDS = 30;
   private static final Duration IOTDB_STARTUP_TIMEOUT = Duration.ofMinutes(3);
   private static final Duration IOTDB_READY_TIMEOUT = Duration.ofSeconds(60);
@@ -75,7 +77,9 @@ class IoTDBTableTimeseriesAggregationIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           .withEnv("dn_rpc_address", "0.0.0.0")
           .waitingFor(Wait.forListeningPort().withStartupTimeout(IOTDB_STARTUP_TIMEOUT));
@@ -1109,10 +1113,26 @@ class IoTDBTableTimeseriesAggregationIT {
         new TestEntityId(UUID.fromString(entityId), EntityType.DEVICE));
   }
 
+  @AfterEach
+  void dropCreatedDatabases() throws Exception {
+    // Every test provisions its own database. Drop them once the test is done: the shared
+    // container has a fixed region memory budget, and leaving dozens of databases behind makes
+    // later tests in the class fail schema-region creation ("Total allocated memory for direct
+    // buffer ... is greater than limit mem cost") and time out on their first write.
+    try (ITableSessionPool pool = newPool(null);
+        ITableSession session = pool.getSession()) {
+      for (String database : createdDatabases) {
+        session.executeNonQueryStatement("DROP DATABASE IF EXISTS " + database);
+      }
+    }
+  }
+
   private String uniqueDatabase(String prefix) {
     String shortPrefix = prefix.length() > 12 ? prefix.substring(0, 12) : prefix;
     String shortUuid = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    return "tb_it_" + shortPrefix + "_" + shortUuid;
+    String database = "tb_it_" + shortPrefix + "_" + shortUuid;
+    createdDatabases.add(database);
+    return database;
   }
 
   private TestTsKvEntry entry(long ts, String key, DataType dataType, Object value) {

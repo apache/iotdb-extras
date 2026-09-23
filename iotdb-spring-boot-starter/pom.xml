@@ -35,8 +35,9 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.1</spring-boot.version>
-        <spring.version>6.2.7</spring.version>
-        <iotdb-version>2.0.5</iotdb-version>
+        <spring-boot4.version>4.1.1</spring-boot4.version>
+        <!-- Override the root's legacy Boot 2 / Spring 5 dependency management. -->
+        <spring.version>6.2.8</spring.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -79,11 +80,32 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <version>${spring-boot.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-            <version>${spring.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-test</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <build>
@@ -105,4 +127,13 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>spring-boot4</id>
+            <properties>
+                <spring-boot.version>${spring-boot4.version}</spring-boot.version>
+                <spring.version>7.0.9</spring.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

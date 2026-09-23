@@ -142,7 +142,7 @@ public class TsFileSerDe extends AbstractSerDe {
         PrimitiveTypeInfo pti = (PrimitiveTypeInfo) ti;
         result = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(pti);
         break;
-        // these types is not supported in TsFile
+      // these types is not supported in TsFile
       case LIST:
       case MAP:
       case STRUCT:

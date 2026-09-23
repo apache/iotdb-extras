@@ -67,9 +67,13 @@ This repository includes:
 
 ## Prerequisites
 
-- Java 8+ (JDK 1.8 or later versions, springboot requires JDK 17+, Recommended JDK 17+)
+- JDK 17+ for building and running Java modules; CI covers JDK 17 and 21
 - Maven 3.6 or later
 - Git
+
+IoTDB Java dependencies use **2.0.11**, paired with **TsFile 2.4.0** and **Thrift 0.23.0**. Extras keeps its own artifact version (`2.0.4-SNAPSHOT`). The dependency baseline is the released IoTDB `v2.0.11` tag, not unreleased `master` snapshots.
+
+JDK 17 is the minimum supported version; CI also covers JDK 21. External engines must support the chosen JDK independently. In particular, the legacy Spark 2.4/Scala 2.11 modules still require a runtime migration before deployment on JDK 17.
 
 ## Building from Source
 
@@ -85,7 +89,7 @@ To build the project from source, follow these steps:
 2. Build the project with Maven:
 
    ```bash
-   # Build the entire project (includes distributions,iotdb-collector,metric-scrape,mybatis-generator)
+   # Build the entire project (includes distributions, iotdb-collector, metric-scrape, mybatis-generator, mybatis-support)
    mvn clean package -DskipTests
 
    # Or build all
@@ -105,6 +109,12 @@ IoTDB-Extras uses Maven profiles to configure different build options. You can c
 
   ```bash
   mvn clean package -Pwith-springboot -DskipTests
+  ```
+
+  The default starter build uses Spring Boot 3.5.1. Validate the same starter against Spring Boot 4.1.1 with:
+
+  ```bash
+  mvn clean test -Pwith-springboot,spring-boot4 -pl iotdb-spring-boot-starter -am
   ```
 
 - **with-examples**: Build example applications(Recommended for use in conjunction with Connector Profiles)
@@ -131,6 +141,12 @@ IoTDB-Extras uses Maven profiles to configure different build options. You can c
 
   ```bash
   mvn clean package -Pwith-flink -DskipTests
+  ```
+
+- **with-mybatis**: Package the MyBatis generator plugin and runtime support as a distribution zip
+
+  ```bash
+  mvn clean package -Pwith-mybatis -DskipTests
   ```
 
 - **with-grafana**: Build Grafana connectors and plugins
@@ -268,8 +284,9 @@ This repository includes a variety of examples demonstrating how to use IoTDB wi
 
 - **Introduction**: Shows how to use iotdb-spring-boot-starter
 - **Version**:
-  - IoTDB: 2.0.3
-  - iotdb-spring-boot-starter: 2.0.3
+  - IoTDB: 2.0.11
+  - iotdb-spring-boot-starter: 2.0.4-SNAPSHOT
+  - Starter build line: Spring Boot 3.5.1 by default; Spring Boot 4.1.1 is CI-validated
 - **Setup**:
   1. Install IoTDB
   2. Create necessary database and tables
@@ -294,8 +311,8 @@ This repository includes a variety of examples demonstrating how to use IoTDB wi
 
 - **Introduction**: Shows how to use IoTDB-Mybatis-Generator
 - **Version**:
-  - IoTDB: 2.0.2
-  - mybatis-generator-plugin: 1.3.2
+  - IoTDB: 2.0.11
+  - mybatis-generator-plugin: 2.0.4-SNAPSHOT
 - **Setup**:
   1. Install and start IoTDB
   2. Create necessary database and tables
@@ -306,6 +323,8 @@ For detailed usage instructions, please refer to the README files in the specifi
 - [Flink Examples](/examples/flink/README.md)
 - [Spark Table Examples](/examples/spark-table/README.md)
 - [MyBatis Generator Examples](/examples/mybatis-generator/README.md)
+- [MyBatis Runtime Support (query and type adapters)](/mybatis-support/README.md)
+- [MyBatis-Plus / Spring Boot 3 and 4 Example](/examples/mybatisplus-generator/README.md)
 - [IoTDB Spring Boot Starter Examples](/examples/iotdb-spring-boot-start/README.md)
 - [Kafka Examples](/examples/kafka/readme.md)
 

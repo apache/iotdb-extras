@@ -36,15 +36,9 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!--
-            Version policy: this module overrides NO shared reactor versions. iotdb-session, tsfile
-            and guava are inherited from the parent reactor (2.0.5 / 2.1.1 / 32.1.2-jre), exactly like
-            the sibling spark / flink IoTDB connectors. The Table-Mode client API this module uses
-            (TableSessionPoolBuilder / ITableSessionPool, Tablet with ColumnCategory TAG/FIELD,
-            TSDataType, TableSessionPoolBuilder#enableCompression) is present in iotdb-session 2.0.5 /
-            tsfile 2.1.1 — the parent's native pairing — so a full-reactor build keeps a SINGLE tsfile
-            version across all connectors. The integration test exercises the real write path against
-            the apache/iotdb:2.0.8-standalone server (the 2.0.5 client / 2.0.8 server RPC path is
-            covered by the container ITs).
+            IoTDB client, TsFile and Guava versions follow the reactor's released IoTDB 2.0.11
+            baseline. Optional container tests default to apache/iotdb:2.0.11-standalone;
+            use -Diotdb.test.image to check another released server version.
 
             The one deliberate override is jakarta.validation-api: this module deploys into
             ThingsBoard 4.3.1.2, which runs on Spring Boot 3.5.14 / Spring 6 / JDK 17 (the jakarta.*
@@ -75,7 +69,7 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>iotdb-session</artifactId>
-            <!-- version inherited from the parent reactor (iotdb.version = 2.0.5) -->
+            <!-- version inherited from the parent reactor (iotdb.version = 2.0.11) -->
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>

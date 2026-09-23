@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<mapper namespace="org.apache.iotdb.mapper.Table1Mapper">
+    <resultMap id="Row" type="org.apache.iotdb.entity.Table1">
+        <id column="time" property="time" jdbcType="TIMESTAMP"/>
+        <id column="region" property="region" jdbcType="VARCHAR"/>
+        <id column="plant_id" property="plantId" jdbcType="VARCHAR"/>
+        <id column="device_id" property="deviceId" jdbcType="VARCHAR"/>
+        <result column="model_id" property="modelId" jdbcType="VARCHAR"/>
+        <result column="maintenance" property="maintenance" jdbcType="VARCHAR"/>
+        <result column="temperature" property="temperature" jdbcType="FLOAT"/>
+        <result column="humidity" property="humidity" jdbcType="FLOAT"/>
+        <result column="status" property="status" jdbcType="BOOLEAN"/>
+        <result column="arrival_time" property="arrivalTime" jdbcType="TIMESTAMP"/>
+        <result column="reading_date" property="readingDate" jdbcType="DATE" typeHandler="org.apache.iotdb.mybatis.type.IoTDBLocalDateTypeHandler"/>
+        <result column="payload" property="payload" jdbcType="BLOB" typeHandler="org.apache.iotdb.mybatis.type.IoTDBBlobTypeHandler"/>
+    </resultMap>
+    <sql id="RowKey">"time" = #{key.time,jdbcType=TIMESTAMP}
+        <choose>
+            <when test="key.region != null">AND "region" = #{key.region,jdbcType=VARCHAR}</when>
+            <otherwise>AND "region" IS NULL</otherwise>
+        </choose>
+        <choose>
+            <when test="key.plantId != null">AND "plant_id" = #{key.plantId,jdbcType=VARCHAR}</when>
+            <otherwise>AND "plant_id" IS NULL</otherwise>
+        </choose>
+        <choose>
+            <when test="key.deviceId != null">AND "device_id" = #{key.deviceId,jdbcType=VARCHAR}</when>
+            <otherwise>AND "device_id" IS NULL</otherwise>
+        </choose>
+    </sql>
+    <select id="selectByKey" resultMap="Row">SELECT "time", "region", "plant_id", "device_id", "model_id", "maintenance", "temperature", "humidity", "status", "arrival_time", "reading_date", "payload" FROM "table1" WHERE
+        <include refid="RowKey"/>
+    </select>
+    <delete id="deleteByKey">DELETE FROM "table1" WHERE
+        <include refid="RowKey"/>
+    </delete>
+    <insert id="upsertFields">INSERT INTO "table1"
+        <trim prefix="(" suffix=")" suffixOverrides=",">"time", "region", "plant_id", "device_id",
+            <if test="row.temperature != null">"temperature",</if>
+            <if test="row.humidity != null">"humidity",</if>
+            <if test="row.status != null">"status",</if>
+            <if test="row.arrivalTime != null">"arrival_time",</if>
+            <if test="row.readingDate != null">"reading_date",</if>
+            <if test="row.payload != null">"payload",</if>
+        </trim>VALUES
+        <trim prefix="(" suffix=")" suffixOverrides=",">#{row.time,jdbcType=TIMESTAMP}, #{row.region,jdbcType=VARCHAR}, #{row.plantId,jdbcType=VARCHAR}, #{row.deviceId,jdbcType=VARCHAR},
+            <if test="row.temperature != null">#{row.temperature,jdbcType=FLOAT},</if>
+            <if test="row.humidity != null">#{row.humidity,jdbcType=FLOAT},</if>
+            <if test="row.status != null">#{row.status,jdbcType=BOOLEAN},</if>
+            <if test="row.arrivalTime != null">#{row.arrivalTime,jdbcType=TIMESTAMP},</if>
+            <if test="row.readingDate != null">#{row.readingDate,jdbcType=DATE,typeHandler=org.apache.iotdb.mybatis.type.IoTDBLocalDateTypeHandler},</if>
+            <if test="row.payload != null">#{row.payload,jdbcType=BLOB,typeHandler=org.apache.iotdb.mybatis.type.IoTDBBlobTypeHandler},</if>
+        </trim>
+    </insert>
+    <update id="updateAttributes">UPDATE "table1" SET "model_id" = #{row.modelId,jdbcType=VARCHAR}, "maintenance" = #{row.maintenance,jdbcType=VARCHAR}
+        <where>
+            <choose>
+                <when test="row.region != null">AND "region" = #{row.region,jdbcType=VARCHAR}</when>
+                <otherwise>AND "region" IS NULL</otherwise>
+            </choose>
+            <choose>
+                <when test="row.plantId != null">AND "plant_id" = #{row.plantId,jdbcType=VARCHAR}</when>
+                <otherwise>AND "plant_id" IS NULL</otherwise>
+            </choose>
+            <choose>
+                <when test="row.deviceId != null">AND "device_id" = #{row.deviceId,jdbcType=VARCHAR}</when>
+                <otherwise>AND "device_id" IS NULL</otherwise>
+            </choose>
+        </where>
+    </update>
+</mapper>

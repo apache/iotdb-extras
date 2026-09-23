@@ -40,32 +40,31 @@ public class IoTDBService {
   @Autowired private ISessionPool sessionPool;
 
   public void queryTableSessionPool() throws IoTDBConnectionException, StatementExecutionException {
-    ITableSession tableSession = ioTDBSessionPool.getSession();
-    final SessionDataSet sessionDataSet =
-        tableSession.executeQueryStatement("select * from power_data_set limit 10");
-    while (sessionDataSet.hasNext()) {
-      final RowRecord rowRecord = sessionDataSet.next();
-      final List<Field> fields = rowRecord.getFields();
-      for (Field field : fields) {
-        System.out.print(field.getStringValue());
+    try (ITableSession tableSession = ioTDBSessionPool.getSession();
+        SessionDataSet sessionDataSet =
+            tableSession.executeQueryStatement("select * from power_data_set limit 10")) {
+      while (sessionDataSet.hasNext()) {
+        final RowRecord rowRecord = sessionDataSet.next();
+        final List<Field> fields = rowRecord.getFields();
+        for (Field field : fields) {
+          System.out.print(field.getStringValue());
+        }
+        System.out.println();
       }
-      System.out.println();
     }
-    sessionDataSet.close();
-    tableSession.close();
   }
 
   public void querySessionPool() throws IoTDBConnectionException, StatementExecutionException {
-    final SessionDataSetWrapper sessionDataSetWrapper =
-        sessionPool.executeQueryStatement("show databases");
-    while (sessionDataSetWrapper.hasNext()) {
-      final RowRecord rowRecord = sessionDataSetWrapper.next();
-      final List<Field> fields = rowRecord.getFields();
-      for (Field field : fields) {
-        System.out.print(field.getStringValue());
+    try (SessionDataSetWrapper sessionDataSetWrapper =
+        sessionPool.executeQueryStatement("show databases")) {
+      while (sessionDataSetWrapper.hasNext()) {
+        final RowRecord rowRecord = sessionDataSetWrapper.next();
+        final List<Field> fields = rowRecord.getFields();
+        for (Field field : fields) {
+          System.out.print(field.getStringValue());
+        }
+        System.out.println();
       }
-      System.out.println();
     }
-    sessionDataSetWrapper.close();
   }
 }

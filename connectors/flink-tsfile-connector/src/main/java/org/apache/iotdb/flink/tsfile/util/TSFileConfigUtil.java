@@ -40,6 +40,7 @@ public class TSFileConfigUtil {
     globalConfig.setDfsNameServices(config.getDfsNameServices());
     globalConfig.setDftSatisfyRate(config.getDftSatisfyRate());
     globalConfig.setEndian(config.getEndian());
+    globalConfig.setEncryptSalt(config.getEncryptSalt());
     globalConfig.setFloatPrecision(config.getFloatPrecision());
     globalConfig.setFreqType(config.getFreqType());
     globalConfig.setGroupSizeInByte(config.getGroupSizeInByte());

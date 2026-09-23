@@ -19,100 +19,25 @@
 
 -->
 
-# IoTDB-Spring-Boot-Starter Demo
+# Spring Boot Session example
 
-## Introduction
+This application uses Spring Boot 3.5.1, JDK 17+ and IoTDB client 2.0.11 through the locally built Extras starter (`2.0.4-SNAPSHOT`).
 
-    This demo shows how to use iotdb-spring-boot-starter
+Build from the repository root:
 
-### Version usage
+```sh
+mvn -Pwith-springboot,with-examples -pl examples/iotdb-spring-boot-start -am clean install
+```
 
-    IoTDB: 2.0.3
-    iotdb-spring-boot-starter: 2.0.3
+Start IoTDB 2.0.11. In the table dialect, create the database/table used by `IoTDBService`:
 
-### 1. Install IoTDB
+```sql
+CREATE DATABASE IF NOT EXISTS wind;
+USE wind;
+CREATE TABLE IF NOT EXISTS power_data_set (device STRING TAG, value DOUBLE FIELD);
+INSERT INTO power_data_set(time, device, value) VALUES (1, 'demo', 42.0);
+```
 
-    please refer to [https://iotdb.apache.org/#/Download](https://iotdb.apache.org/#/Download)
+Edit `src/main/resources/application.properties` for your endpoints and credentials, then run `IoTDBSpringBootStartApplication` from the IDE or `mvn spring-boot:run` in this directory. The service exposes `queryTableSessionPool()` and `querySessionPool()` for invocation from application code; startup itself does not issue those queries.
 
-### 2. Startup IoTDB
-
-    please refer to [Quick Start](http://iotdb.apache.org/UserGuide/Master/Get%20Started/QuickStart.html)
-
-    Then we need to create a database 'wind' by cli in table model
-    ```
-    create database wind;
-    use wind;
-    ```
-    Then we need to create a database 'table'
-    ```
-    CREATE TABLE table1 (
-        time TIMESTAMP TIME,
-        region STRING TAG,
-        plant_id STRING TAG,
-        device_id STRING TAG,
-        model_id STRING ATTRIBUTE,
-        maintenance STRING ATTRIBUTE,
-        temperature FLOAT FIELD,
-        humidity FLOAT FIELD,
-        status Boolean FIELD,
-        arrival_time TIMESTAMP FIELD
-    ) WITH (TTL=31536000000);
-    ```
-
-### 3. Build Dependencies with Maven in your Project
-
-    ```
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter</artifactId>
-            </dependency>
-
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-test</artifactId>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.iotdb</groupId>
-                <artifactId>iotdb-spring-boot-starter</artifactId>
-                <version>2.0.3</version>
-            </dependency>
-        </dependencies>
-    ```
-
-### 4、Use The target Bean with @Autowired
-
-    You can use the target Bean in your Project,like:
-    ```
-        @Autowired
-        private ITableSessionPool ioTDBSessionPool;
-        @Autowired
-        private SessionPool sessionPool;
-
-        public void queryTableSessionPool() throws IoTDBConnectionException, StatementExecutionException {
-            ITableSession tableSession = ioTDBSessionPool.getSession();
-            final SessionDataSet sessionDataSet = tableSession.executeQueryStatement("select * from power_data_set limit 10");
-            while (sessionDataSet.hasNext()) {
-                final RowRecord rowRecord = sessionDataSet.next();
-                final List<Field> fields = rowRecord.getFields();
-                for (Field field : fields) {
-                    System.out.print(field.getStringValue());
-                }
-                System.out.println();
-            }
-        }
-
-        public void querySessionPool() throws IoTDBConnectionException, StatementExecutionException {
-            final SessionDataSetWrapper sessionDataSetWrapper = sessionPool.executeQueryStatement("show databases");
-            while (sessionDataSetWrapper.hasNext()) {
-                final RowRecord rowRecord = sessionDataSetWrapper.next();
-                final List<Field> fields = rowRecord.getFields();
-                for (Field field : fields) {
-                    System.out.print(field.getStringValue());
-                }
-                System.out.println();
-            }
-        }
-
-    ```
+Both methods close results and return borrowed sessions even on exceptions. The commented live-query test requires a server and is not part of the offline unit-test suite. See the [starter reference](../../iotdb-spring-boot-starter/README.md) for configuration defaults, custom pools and transaction limitations.

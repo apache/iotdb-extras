@@ -65,9 +65,13 @@ IoTDB (物联网数据库) 是一个专为物联网 (IoT) 场景设计的时序�
 
 7. **示例**：展示 IoTDB 与各种技术结合使用的示例应用程序和代码示例
 
+IoTDB Java 依赖统一为 **2.0.11**，配套 **TsFile 2.4.0**、**Thrift 0.23.0**。Extras 自身版本仍为 `2.0.4-SNAPSHOT`，依赖基准为主仓库已发布的 `v2.0.11` 标签。
+
+JDK 17 是最低要求，JDK 21 也纳入 CI。外部引擎需要单独确认对所选 JDK 的支持情况，尤其是 Spark 2.4/Scala 2.11 模块，部署到 JDK 17 前仍需完成运行时迁移。
+
 ## 环境要求
 
-- Java 8+ (JDK 1.8 或更高版本，springboot 需要 JDK 17+，推荐使用 JDK 17+)
+- JDK 17+：所有 Java 模块的构建和运行基线，CI 覆盖 JDK 17 和 21
 - Maven 3.6 或更高版本
 - Git
 
@@ -85,7 +89,7 @@ IoTDB (物联网数据库) 是一个专为物联网 (IoT) 场景设计的时序�
 2. 使用 Maven 构建项目：
 
    ```bash
-   # 构建整个项目（包括 distributions、iotdb-collector、metric-scrape、mybatis-generator）
+   # 构建整个项目（包括 distributions、iotdb-collector、metric-scrape、mybatis-generator、mybatis-support）
    mvn clean package -DskipTests
 
    # 或者构建所有组件
@@ -104,6 +108,12 @@ IoTDB-Extras 使用 Maven profiles 配置不同的构建选项。您可以组合
 
   ```bash
   mvn clean package -Pwith-springboot -DskipTests
+  ```
+
+  Starter 默认使用 Spring Boot 3.5.1。使用下面的命令验证同一个 starter 在 Spring Boot 4.1.1 下的兼容性：
+
+  ```bash
+  mvn clean test -Pwith-springboot,spring-boot4 -pl iotdb-spring-boot-starter -am
   ```
 
 - **with-examples**：构建示例应用程序（建议与连接器 Profiles 一起使用）
@@ -130,6 +140,12 @@ IoTDB-Extras 使用 Maven profiles 配置不同的构建选项。您可以组合
 
   ```bash
   mvn clean package -Pwith-flink -DskipTests
+  ```
+
+- **with-mybatis**：将 MyBatis 生成插件和运行时适配打包为分发 zip
+
+  ```bash
+  mvn clean package -Pwith-mybatis -DskipTests
   ```
 
 - **with-grafana**：构建 Grafana 连接器和插件
@@ -266,8 +282,9 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 
 - **简介**：展示如何使用 iotdb-spring-boot-starter
 - **版本**：
-  - IoTDB: 2.0.3
-  - iotdb-spring-boot-starter: 2.0.3
+  - IoTDB: 2.0.11
+  - iotdb-spring-boot-starter: 2.0.4-SNAPSHOT
+  - Starter 构建线：默认 Spring Boot 3.5.1；CI 已验证 Spring Boot 4.1.1
 - **设置**：
   1. 安装 IoTDB
   2. 创建必要的数据库和表
@@ -292,8 +309,8 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 
 - **简介**：展示如何使用 IoTDB-Mybatis-Generator
 - **版本**：
-  - IoTDB: 2.0.2
-  - mybatis-generator-plugin: 1.3.2
+  - IoTDB: 2.0.11
+  - mybatis-generator-plugin: 2.0.4-SNAPSHOT
 - **设置**：
   1. 安装并启动 IoTDB
   2. 创建必要的数据库和表
@@ -304,6 +321,8 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 - [Flink 示例](/examples/flink/README.md)
 - [Spark 表示例](/examples/spark-table/README.md)
 - [MyBatis 生成器示例](/examples/mybatis-generator/README.md)
+- [MyBatis 运行时查询与类型适配](/mybatis-support/README.md)
+- [MyBatis-Plus / Spring Boot 3、4 示例](/examples/mybatisplus-generator/README.md)
 - [IoTDB Spring Boot Starter 示例](/examples/iotdb-spring-boot-start/README.md)
 - [Kafka 示例](/examples/kafka/readme.md)
 

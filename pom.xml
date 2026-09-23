@@ -38,32 +38,30 @@
         <module>iotdb-collector</module>
         <module>metric-scrape</module>
         <module>mybatis-generator</module>
+        <module>mybatis-support</module>
     </modules>
     <properties>
         <!-- Explicitly set a variable used by all dependencies to the IoTDB dependencies, as the
     release plugin will not update these on a release -->
-        <!-- This was the last version to support Java 8 -->
         <airlift-units.version>1.7</airlift-units.version>
         <airlift.version>206</airlift.version>
         <!--airlift-stats.version>235</airlift-stats.version-->
         <airline.version>0.9</airline.version>
-        <!-- This was the last version to support Java 8 -->
-        <antlr4.version>4.9.3</antlr4.version>
+        <antlr4.version>4.13.2</antlr4.version>
         <!-- By default, the argLine is empty-->
         <argLine/>
         <awaitility.version>4.2.0</awaitility.version>
         <boost.include.dir/>
-        <!-- This was the last version to support Java 8 -->
         <caffeine.version>2.9.3</caffeine.version>
         <cglib.version>3.3.0</cglib.version>
         <checker-qual.version>3.38.0</checker-qual.version>
         <cmake.build.type>Release</cmake.build.type>
         <commons-cli.version>1.5.0</commons-cli.version>
-        <commons-codec.version>1.16.0</commons-codec.version>
+        <commons-codec.version>1.16.1</commons-codec.version>
         <commons-csv.version>1.10.0</commons-csv.version>
         <commons-io.version>2.14.0</commons-io.version>
         <commons-jexl3.version>3.3</commons-jexl3.version>
-        <commons-lang3.version>3.13.0</commons-lang3.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <commons-math3.version>3.6.1</commons-math3.version>
         <commons-pool2.version>2.11.1</commons-pool2.version>
         <commons.collections4.version>4.4</commons.collections4.version>
@@ -79,8 +77,8 @@
         <flink-shaded-zookeeper-3.version>3.8.1-17.0</flink-shaded-zookeeper-3.version>
         <flink.version>1.17.1</flink.version>
         <fusesource-mqtt-client.version>1.16</fusesource-mqtt-client.version>
-        <google.java.format.version>1.22.0</google.java.format.version>
-        <gson.version>2.10.1</gson.version>
+        <google.java.format.version>1.28.0</google.java.format.version>
+        <gson.version>2.13.1</gson.version>
         <guava.version>32.1.2-jre</guava.version>
         <hadoop.version>3.3.6</hadoop.version>
         <hive.version>3.1.3</hive.version>
@@ -90,9 +88,9 @@
       This is the version of the thrift binary, that we release separately from here:
       https://github.com/apache/iotdb-bin-resources/tree/main/iotdb-tools-thrift
     -->
-        <iotdb-tools-thrift.version>0.14.1.0</iotdb-tools-thrift.version>
-        <iotdb.version>2.0.5</iotdb.version>
-        <jackson.version>2.16.2</jackson.version>
+        <iotdb-tools-thrift.version>0.23.0.0</iotdb-tools-thrift.version>
+        <iotdb.version>2.0.11</iotdb.version>
+        <jackson.version>2.18.6</jackson.version>
         <!-- This is the last version to support the javax namespace -->
         <jakarta.servlet-api.version>4.0.4</jakarta.servlet-api.version>
         <!-- This is the last version to support the javax namespace -->
@@ -103,48 +101,39 @@
         <jcip-annotations.version>1.0-1</jcip-annotations.version>
         <!-- This is the last version to support the javax namespace -->
         <jersey.version>2.40</jersey.version>
-        <!-- This was the last version to support Java 8 -->
         <jetty.version>9.4.57.v20241219</jetty.version>
         <jjwt.version>0.11.5</jjwt.version>
-        <jline.version>3.23.0</jline.version>
+        <jline.version>3.26.2</jline.version>
         <jna.version>5.14.0</jna.version>
         <json-smart.version>2.5.0</json-smart.version>
         <jtransforms.version>3.1</jtransforms.version>
         <junit.version>4.13.2</junit.version>
         <kafka.version>2.8.2</kafka.version>
-        <!-- This was the last version to support Java 8 -->
-        <logback.version>1.3.15</logback.version>
-        <lz4-java.version>1.8.0</lz4-java.version>
+        <logback.version>1.5.34</logback.version>
+        <lz4-java.version>1.10.1</lz4-java.version>
         <maven.assembly.version>3.6.0</maven.assembly.version>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
         <micrometer.version>1.11.4</micrometer.version>
-        <milo.version>0.6.11</milo.version>
+        <milo.version>0.6.14</milo.version>
         <!-- It seems that powermock is having issues with the newest mockito versions -->
         <mockito.version>2.23.4</mockito.version>
-        <!-- This was the last version to support Java 8 -->
         <!--mockito.version>4.11.0</mockito.version-->
-        <moquette.version>0.17</moquette.version>
-        <netty.version>4.1.97.Final</netty.version>
+        <moquette.version>0.18.0</moquette.version>
+        <netty.version>4.1.134.Final</netty.version>
         <nimbus-jose-jwt.version>9.37.2</nimbus-jose-jwt.version>
         <oauth2-oidc-sdk.version>10.15</oauth2-oidc-sdk.version>
-        <!-- This was the last version to support Java 8 -->
-        <openapi.generator.version>6.6.0</openapi.generator.version>
+        <openapi.generator.version>7.10.0</openapi.generator.version>
         <orc-core.version>1.9.1</orc-core.version>
         <osgi.version>7.0.0</osgi.version>
         <pax-jdbc-common.version>1.5.6</pax-jdbc-common.version>
         <powermock.version>2.0.9</powermock.version>
-        <ratis-thirdparty-misc.version>1.0.5</ratis-thirdparty-misc.version>
-        <!--
-      This is an unreleased version of a custom branch. The 8-character part after the version number
-      This is an unreleased version of a custom branch. The 8-character part after the version number
-      is for ensuring the SNAPSHOT will stay available. We should however have the Ratis folks do a
-      new release soon, as releasing with this version is more than sub-ideal.
-    -->
-        <ratis.version>3.1.0-a6a21d5-SNAPSHOT</ratis.version>
+        <ratis-thirdparty-misc.version>1.1.0</ratis-thirdparty-misc.version>
+        <ratis.version>3.3.0</ratis.version>
         <reactive-streams.version>1.0.4</reactive-streams.version>
-        <reactor-netty.version>1.1.13</reactor-netty.version>
-        <reactor.version>3.5.10</reactor.version>
+        <reactor-netty.version>1.2.9</reactor-netty.version>
+        <reactor.version>3.7.9</reactor.version>
         <reflections.version>0.10.2</reflections.version>
         <rocketmq-client.version>5.1.3</rocketmq-client.version>
         <scala.library.version>2.12.19</scala.library.version>
@@ -152,7 +141,7 @@
         <!-- Newer version requires refactoring of testsuite -->
         <scalatest.version>3.0.9</scalatest.version>
         <slf4j.version>2.0.9</slf4j.version>
-        <snappy-java.version>1.1.10.4</snappy-java.version>
+        <snappy-java.version>1.1.10.5</snappy-java.version>
         <sonar.coverage.jacoco.xmlReportPaths>target/jacoco-merged-reports/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <!-- Exclude all generated code -->
         <sonar.exclusions>**/generated-sources</sonar.exclusions>
@@ -165,29 +154,22 @@
         <spark-scala.2.12.version>3.5.0</spark-scala.2.12.version>
         <!-- Override this to `true`, if you want to disable spotless -->
         <spotless.skip>false</spotless.skip>
-        <spotless.version>2.43.0</spotless.version>
-        <!-- This is the matching version of spring-boot for spring 5.3.30 -->
+        <spotless.version>2.44.5</spotless.version>
+        <!-- Legacy Grafana WAR uses Spring Boot 2 / javax; the starter overrides these. -->
         <spring-boot.version>2.7.18</spring-boot.version>
         <!-- This is the last version to support the javax namespace -->
         <spring.version>5.3.39</spring.version>
         <sqlite.version>3.49.1.0</sqlite.version>
-        <!-- This was the last version to support Java 8 -->
         <swagger.version>1.6.14</swagger.version>
         <thrift.exec-cmd.executable>chmod</thrift.exec-cmd.executable>
         <thrift.exec.absolute.path/>
-        <!--
-      Thrift 0.17.0 was the last version that could be used in Java 8 applications,
-      However Thrift 0.17.0 has an invalid entry in the META-INF/MANIFEST.mf file.
-      All versions between 0.17.0 and 0.14.1 have know vulnerabilities, so for now
-      we'll stay at 0.14.1.
-    -->
-        <thrift.version>0.14.1</thrift.version>
-        <!-- This was the last version to support Java 8 -->
+        <!-- Match the runtime to the generated IoTDB 2.0.11 Thrift classes. -->
+        <thrift.version>0.23.0</thrift.version>
         <tomcat.version>9.0.86</tomcat.version>
-        <tsfile.version>2.1.1</tsfile.version>
+        <tsfile.version>2.4.0</tsfile.version>
         <xz.version>1.9</xz.version>
         <zeppelin.version>0.11.1</zeppelin.version>
-        <zstd-jni.version>1.5.5-5</zstd-jni.version>
+        <zstd-jni.version>1.5.6-3</zstd-jni.version>
     </properties>
     <!--
     if we claim dependencies in dependencyManagement, then we do not claim
@@ -196,6 +178,46 @@
   -->
     <dependencyManagement>
         <dependencies>
+            <!-- Match the released IoTDB v2.0.11 dependency baseline. -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>${lz4-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>${snappy-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.iotdb</groupId>
+                <artifactId>iotdb-jdbc</artifactId>
+                <version>${iotdb.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.iotdb</groupId>
+                <artifactId>iotdb-subscription</artifactId>
+                <version>${iotdb.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.iotdb</groupId>
+                <artifactId>isession</artifactId>
+                <version>${iotdb.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot</artifactId>
@@ -251,15 +273,38 @@
                 <artifactId>libthrift</artifactId>
                 <version>${thrift.version}</version>
                 <exclusions>
-                    <!-- Seemed suspicious to have this dependency in -->
+                    <!-- We don't use thrift HTTP client or servlet transports. -->
                     <exclusion>
-                        <groupId>org.apache.tomcat.embed</groupId>
-                        <artifactId>tomcat-embed-core</artifactId>
+                        <groupId>org.apache.httpcomponents.client5</groupId>
+                        <artifactId>httpclient5</artifactId>
                     </exclusion>
-                    <!-- We don't want the old javax packages -->
                     <exclusion>
-                        <groupId>javax.annotation</groupId>
-                        <artifactId>javax.annotation-api</artifactId>
+                        <groupId>org.apache.httpcomponents.core5</groupId>
+                        <artifactId>httpcore5</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.httpcomponents.core5</groupId>
+                        <artifactId>httpcore5-h2</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>jakarta.servlet</groupId>
+                        <artifactId>jakarta.servlet-api</artifactId>
+                    </exclusion>
+                    <!--
+                      Thrift generated Java sources suppress @Generated annotations.
+                      IoTDB does not use libthrift APIs that require Jakarta annotations.
+                    -->
+                    <exclusion>
+                        <groupId>jakarta.annotation</groupId>
+                        <artifactId>jakarta.annotation-api</artifactId>
+                    </exclusion>
+                    <!--
+                      commons-lang3 is only used by Thrift's partial deserialization runtime.
+                      IoTDB does not use org.apache.thrift.partial APIs.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-lang3</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>
@@ -1100,7 +1145,7 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.module</groupId>
                 <artifactId>jackson-module-jaxb-annotations</artifactId>
-                <version>2.15.2</version>
+                <version>${jackson.version}</version>
             </dependency>
             <!- - Conflict:
         hadoop-common (pulls in 1.9 and 1.10.0)
@@ -1669,7 +1714,7 @@
             </plugin>
             <!--
         Strange things usually happen if you run with a too low Java version.
-        This plugin not only checks the minimum java version of 1.8, but also
+        This plugin not only checks the minimum Java version of 17, but also
         checks all dependencies (and transitive dependencies) for reported CVEs.
       -->
             <plugin>
@@ -1693,6 +1738,23 @@
                     </dependency>
                 </dependencies>
                 <executions>
+                    <!-- Check Java independently of the optional dependency audit. -->
+                    <execution>
+                        <id>enforce-java-baseline</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <skip>false</skip>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                    <message>IoTDB Extras with IoTDB 2.0.11 requires JDK 17 or newer.</message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
                     <!-- Ensure we're not mixing dependency versions -->
                     <execution>
                         <id>enforce-version-convergence</id>
@@ -1741,7 +1803,7 @@
                             <fail>true</fail>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>1.8.0</version>
+                                    <version>[17,)</version>
                                 </requireJavaVersion>
                                 <banVulnerable implementation="org.sonatype.ossindex.maven.enforcer.BanVulnerableDependencies">
                                     <excludeCoordinates>
@@ -2025,43 +2087,8 @@
         </repository>
     </repositories-->
     <profiles>
-        <profile>
-            <id>.java-9-and-above</id>
-            <activation>
-                <jdk>[9,)</jdk>
-            </activation>
-            <properties>
-                <maven.compiler.release>8</maven.compiler.release>
-            </properties>
-        </profile>
-        <!-- Current version of spotless cannot support JDK11 below -->
-        <profile>
-            <id>.java-11-below</id>
-            <activation>
-                <jdk>(,11]</jdk>
-            </activation>
-            <properties>
-                <!-- This was the last version to support Java 8, Just for run -->
-                <spotless.version>2.27.1</spotless.version>
-                <!-- To avoid format conflicts -->
-                <spotless.skip>true</spotless.skip>
-            </properties>
-        </profile>
         <!--
-      Add argLine for Java 16 and above, due to [JEP 396: Strongly Encapsulate JDK Internals by Default]
-      (https://openjdk.java.net/jeps/396)
-    -->
-        <profile>
-            <id>.java-16</id>
-            <activation>
-                <jdk>16</jdk>
-            </activation>
-            <properties>
-                <argLine>--illegal-access=permit --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</argLine>
-            </properties>
-        </profile>
-        <!--
-      Add argLine for Java 16 and above, due to [JEP 396: Strongly Encapsulate JDK Internals by Default]
+      Add argLine for Java 17 and above, due to [JEP 396: Strongly Encapsulate JDK Internals by Default]
       (https://openjdk.java.net/jeps/396)
     -->
         <profile>
@@ -2079,8 +2106,7 @@
       opt-in convention (cf. the with-springboot profile / iotdb-spring-boot-starter), it is wired
       as an explicit, named profile rather than JDK-auto-activated, so a plain `mvn clean verify`
       never pulls it into the reactor implicitly. CI builds and tests it on the JDK 17+ jobs by
-      passing `-P with-thingsboard` (see .github/workflows/compile-check.yml); the JDK 8/11 jobs
-      omit the flag and skip it.
+      passing `-P with-thingsboard` (see .github/workflows/compile-check.yml).
     -->
         <profile>
             <id>with-thingsboard</id>

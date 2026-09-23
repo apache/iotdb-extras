@@ -1,4 +1,4 @@
-#  This workflow will compile IoTDB under jdk8 to check for compatibility issues
+# Build Java integrations on the minimum supported JDK and the next LTS.
 
 name: Compile Check
 
@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [8, 11, 17, 21]
+        java: [17, 21]
         os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -47,9 +47,56 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Compiler Test
         shell: bash
+        run: mvn clean verify -Pwith-springboot,with-all-connectors,with-examples,with-thingsboard,with-grafana-connector -ntp
+      - name: Spring Boot 4 Starter Test
+        shell: bash
+        run: mvn clean test -Pwith-springboot,spring-boot4 -pl iotdb-spring-boot-starter -am -ntp
+      - name: Spring Boot 4 MyBatis-Plus Test
+        shell: bash
+        run: mvn clean test -Pwith-examples,with-springboot,spring-boot4 -pl examples/mybatisplus-generator -am -ntp
+
+  mybatis-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        profiles: [iotdb-mybatis-it, 'iotdb-mybatis-it,spring-boot4']
+    services:
+      iotdb:
+        image: apache/iotdb:2.0.11-standalone
+        env:
+          MEMORY_SIZE: 1G
+          # The image binds the client RPC service to 127.0.0.1 by default, which the
+          # published port cannot reach; bind to all interfaces like the Testcontainers ITs do.
+          dn_rpc_address: 0.0.0.0
+        ports:
+          - 6667:6667
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: liberica
+          java-version: 17
+          cache: maven
+      - name: Wait for IoTDB to accept client sessions
+        # A TCP probe passes as soon as the port is published, several seconds before the
+        # DataNode can open a session, so wait for a real client round trip instead.
         run: |
-          if [ "${{ matrix.java }}" -ge 17 ]; then
-            mvn clean verify -P with-springboot -P with-all-connectors -P with-examples -P with-thingsboard -ntp
-          else
-            mvn clean verify -P with-all-connectors -P with-examples -ntp
-          fi
+          for attempt in $(seq 1 120); do
+            if docker exec "${{ job.services.iotdb.id }}" timeout 15 /iotdb/sbin/start-cli.sh \
+                -h 127.0.0.1 -p 6667 -u root -pw root -e 'SHOW VERSION' >/dev/null 2>&1; then
+              echo "IoTDB accepted a client session after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'IoTDB did not accept a client session within 4 minutes' >&2
+          docker logs "${{ job.services.iotdb.id }}" 2>&1 | tail -n 100
+          exit 1
+      - name: Generate, compile and execute MyBatis mappers
+        run: >-
+          mvn verify -Pwith-examples,with-springboot,${{ matrix.profiles }}
+          -pl examples/mybatis-generator,examples/mybatisplus-generator -am
+          '-Diotdb.it.url=jdbc:iotdb://127.0.0.1:6667/?sql_dialect=table'
+          -Diotdb.it.precision=ms

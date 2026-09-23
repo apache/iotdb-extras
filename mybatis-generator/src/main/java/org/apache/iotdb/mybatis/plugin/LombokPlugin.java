@@ -43,6 +43,18 @@ public class LombokPlugin extends PluginAdapter {
   }
 
   @Override
+  public boolean modelPrimaryKeyClassGenerated(
+      TopLevelClass topLevelClass, IntrospectedTable introspectedTable) {
+    return modelBaseRecordClassGenerated(topLevelClass, introspectedTable);
+  }
+
+  @Override
+  public boolean modelRecordWithBLOBsClassGenerated(
+      TopLevelClass topLevelClass, IntrospectedTable introspectedTable) {
+    return modelBaseRecordClassGenerated(topLevelClass, introspectedTable);
+  }
+
+  @Override
   public boolean modelSetterMethodGenerated(
       Method method,
       TopLevelClass topLevelClass,
