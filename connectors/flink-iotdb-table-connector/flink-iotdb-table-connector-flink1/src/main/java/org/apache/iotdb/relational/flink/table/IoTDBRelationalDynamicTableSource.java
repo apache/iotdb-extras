@@ -104,7 +104,7 @@ public class IoTDBRelationalDynamicTableSource
     if (options.isCdc()) {
       return SourceProvider.of(
           new IoTDBCDCSource<RowData>(
-              options, new RowDataDeserializationSchema(physicalRowDataType)));
+              options, physicalRowDataType, new RowDataDeserializationSchema(physicalRowDataType)));
     }
     return SourceProvider.of(
         new IoTDBSource<>(
@@ -172,6 +172,11 @@ public class IoTDBRelationalDynamicTableSource
       return Result.of(Collections.emptyList(), Collections.emptyList());
     }
 
+    // The CDC source reads the subscription stream and cannot apply row-level filters.
+    if (options.isCdc()) {
+      return Result.of(Collections.emptyList(), filters);
+    }
+
     List<ResolvedExpression> acceptedFilters = new ArrayList<>();
     List<ResolvedExpression> remainingFilters = new ArrayList<>();
     IoTDBExpressionVisitor expressionVisitor = new IoTDBExpressionVisitor();
@@ -192,6 +197,10 @@ public class IoTDBRelationalDynamicTableSource
       List<int[]> groupingSets,
       List<AggregateExpression> aggregateExpressions,
       DataType producedDataType) {
+    // The CDC source cannot aggregate an unbounded subscription stream.
+    if (options.isCdc()) {
+      return false;
+    }
     // Grouping and argument indices refer to the scan's current row type, which is the row type
     // after any projection that has already been pushed into this source.
     AggregateSpec spec =
@@ -207,6 +216,11 @@ public class IoTDBRelationalDynamicTableSource
 
   @Override
   public void applyLimit(long limit) {
+    // Limit pushdown is only an optimization hint; the CDC source ignores it and Flink still
+    // enforces the limit itself.
+    if (options.isCdc()) {
+      return;
+    }
     if (aggregateSpec == null) {
       this.limit = limit;
     }

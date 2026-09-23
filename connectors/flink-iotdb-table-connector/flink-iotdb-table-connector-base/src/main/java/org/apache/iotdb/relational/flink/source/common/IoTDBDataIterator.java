@@ -29,6 +29,11 @@ import java.util.List;
  *
  * <p>The caller advances with {@link #next()} and then reads the current row by column index. The
  * index is always 0-based, regardless of the underlying IoTDB API.
+ *
+ * <p>The exposed columns are the final output columns of the source: projection has already been
+ * applied. Implementations are responsible for hiding the projection (e.g. the CDC iterator maps
+ * the projected positions onto the full subscription record), so a {@link
+ * IoTDBDeserializationSchema} can simply read the columns by their output position.
  */
 public interface IoTDBDataIterator {
 

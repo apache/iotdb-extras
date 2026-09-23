@@ -34,6 +34,7 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.table.types.DataType;
 
 /**
  * Unbounded CDC source backed by the IoTDB subscription API.
@@ -48,10 +49,15 @@ public class IoTDBCDCSource<OUT>
   private static final long serialVersionUID = 1L;
 
   private final IoTDBOptions options;
+  private final DataType projectedRowType;
   private final IoTDBDeserializationSchema<OUT> deserializer;
 
-  public IoTDBCDCSource(IoTDBOptions options, IoTDBDeserializationSchema<OUT> deserializer) {
+  public IoTDBCDCSource(
+      IoTDBOptions options,
+      DataType projectedRowType,
+      IoTDBDeserializationSchema<OUT> deserializer) {
     this.options = options;
+    this.projectedRowType = projectedRowType;
     this.deserializer = deserializer;
   }
 
@@ -62,7 +68,8 @@ public class IoTDBCDCSource<OUT>
 
   @Override
   public SourceReader<OUT, IoTDBSubscriptionSplit> createReader(SourceReaderContext readerContext) {
-    return new IoTDBSubscriptionSourceReader<>(readerContext, options, deserializer);
+    return new IoTDBSubscriptionSourceReader<>(
+        readerContext, options, projectedRowType, deserializer);
   }
 
   @Override

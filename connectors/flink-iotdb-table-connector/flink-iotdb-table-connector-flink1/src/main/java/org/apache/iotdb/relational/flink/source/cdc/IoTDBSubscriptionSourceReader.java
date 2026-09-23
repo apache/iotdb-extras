@@ -32,6 +32,7 @@ import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceReader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.core.io.InputStatus;
+import org.apache.flink.table.types.DataType;
 import org.apache.tsfile.read.query.dataset.ResultSet;
 
 import java.time.Duration;
@@ -52,6 +53,7 @@ public class IoTDBSubscriptionSourceReader<OUT>
 
   private final SourceReaderContext context;
   private final IoTDBOptions options;
+  private final List<String> projectedColumns;
   private final IoTDBDeserializationSchema<OUT> deserializer;
   private final Deque<IoTDBSubscriptionSplit> pendingSplits = new ArrayDeque<>();
   private final Deque<OUT> buffer = new ArrayDeque<>();
@@ -65,9 +67,11 @@ public class IoTDBSubscriptionSourceReader<OUT>
   public IoTDBSubscriptionSourceReader(
       SourceReaderContext context,
       IoTDBOptions options,
+      DataType projectedRowType,
       IoTDBDeserializationSchema<OUT> deserializer) {
     this.context = context;
     this.options = options;
+    this.projectedColumns = DataType.getFieldNames(projectedRowType);
     this.deserializer = deserializer;
   }
 
@@ -172,7 +176,7 @@ public class IoTDBSubscriptionSourceReader<OUT>
       }
       for (ResultSet resultSet : message.getResultSets()) {
         SubscriptionDataIterator iterator =
-            new SubscriptionDataIterator((SubscriptionResultSet) resultSet);
+            new SubscriptionDataIterator((SubscriptionResultSet) resultSet, projectedColumns);
         while (iterator.next()) {
           OUT record = deserializer.deserialize(iterator);
           if (record != null) {
