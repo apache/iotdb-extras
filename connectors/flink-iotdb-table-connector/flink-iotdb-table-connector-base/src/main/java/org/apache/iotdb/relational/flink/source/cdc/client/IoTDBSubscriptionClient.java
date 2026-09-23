@@ -38,7 +38,7 @@ public final class IoTDBSubscriptionClient {
   public static void createTopicIfNotExists(IoTDBOptions options) throws Exception {
     List<String> nodeUrls = options.getNodeUrls();
     if (nodeUrls == null || nodeUrls.isEmpty()) {
-      throw new IllegalArgumentException("IoTDB nodeUrls must not be empty for CDC.");
+      throw new IllegalArgumentException("IoTDB 'iotdb.node-urls' must not be empty for CDC.");
     }
     String[] hostPort = splitNodeUrl(nodeUrls.get(0));
 

@@ -140,25 +140,25 @@ public class IoTDBRelationalLocalQueryManual {
             .append("  `temperature` DOUBLE\n")
             .append(") WITH (\n")
             .append("  'connector' = 'iotdb-relational',\n")
-            .append("  'nodeUrls' = '")
+            .append("  'iotdb.node-urls' = '")
             .append(nodeUrls)
             .append("',\n")
-            .append("  'user' = '")
+            .append("  'iotdb.user' = '")
             .append(user)
             .append("',\n")
-            .append("  'password' = '")
+            .append("  'iotdb.password' = '")
             .append(password)
             .append("',\n")
-            .append("  'database' = '")
+            .append("  'iotdb.database' = '")
             .append(database)
             .append("',\n")
-            .append("  'table' = '")
+            .append("  'iotdb.table' = '")
             .append(table)
             .append("',\n")
-            .append("  'time-column' = 'time',\n")
-            .append("  'tag-columns' = 'device_id'");
+            .append("  'iotdb.time-column' = 'time',\n")
+            .append("  'iotdb.tag-columns' = 'device_id'");
     if (async != null) {
-      ddl.append(",\n  'lookup.async' = '").append(async).append("'");
+      ddl.append(",\n  'iotdb.lookup.async' = '").append(async).append("'");
     }
     ddl.append("\n)");
     return ddl.toString();

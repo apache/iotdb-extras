@@ -114,7 +114,7 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
 
   @Override
   public String visit(ValueLiteralExpression valueLiteral) {
-    return IoTDBLiteralUtils.render(valueLiteral);
+    return IoTDBUtils.renderLiteral(valueLiteral);
   }
 
   @Override

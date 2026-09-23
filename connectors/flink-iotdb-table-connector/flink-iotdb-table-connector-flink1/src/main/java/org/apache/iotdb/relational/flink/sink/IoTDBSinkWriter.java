@@ -159,13 +159,13 @@ public class IoTDBSinkWriter<IN> implements SinkWriter<IN> {
   private void initializeTablet() throws IOException {
     String tableName = options.getTable();
     if (tableName == null || tableName.trim().isEmpty()) {
-      throw new IOException("Table option 'table' must specify the IoTDB table name.");
+      throw new IOException("Table option 'iotdb.table' must specify the IoTDB table name.");
     }
 
     String rawTimeColumn = options.getTimeColumn();
     if (rawTimeColumn == null || rawTimeColumn.trim().isEmpty()) {
       throw new IOException(
-          "Table option 'time-column' is required to write into an IoTDB table model table.");
+          "Table option 'iotdb.time-column' is required to write into an IoTDB table model table.");
     }
 
     try {

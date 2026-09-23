@@ -50,13 +50,13 @@ public class IoTDBRelationalSourcePushDownPlannerTest {
           + "  `humidity` DOUBLE\n"
           + ") WITH (\n"
           + "  'connector' = 'iotdb-relational',\n"
-          + "  'nodeUrls' = '127.0.0.1:6667',\n"
-          + "  'user' = 'root',\n"
-          + "  'password' = 'root',\n"
-          + "  'database' = 'test',\n"
-          + "  'table' = 'sensor',\n"
-          + "  'time-column' = 'time',\n"
-          + "  'tag-columns' = 'device_id'\n"
+          + "  'iotdb.node-urls' = '127.0.0.1:6667',\n"
+          + "  'iotdb.user' = 'root',\n"
+          + "  'iotdb.password' = 'root',\n"
+          + "  'iotdb.database' = 'test',\n"
+          + "  'iotdb.table' = 'sensor',\n"
+          + "  'iotdb.time-column' = 'time',\n"
+          + "  'iotdb.tag-columns' = 'device_id'\n"
           + ")";
 
   @Test

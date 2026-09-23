@@ -19,12 +19,25 @@
 
 package org.apache.iotdb.relational.flink.utils;
 
+import org.apache.iotdb.relational.flink.source.scan.pushdown.AggregateSpec;
+import org.apache.iotdb.relational.flink.source.scan.pushdown.IoTDBExpressionVisitor;
+
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.expressions.AggregateExpression;
+import org.apache.flink.table.expressions.FieldReferenceExpression;
+import org.apache.flink.table.expressions.ValueLiteralExpression;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.tsfile.enums.ColumnCategory;
 import org.apache.tsfile.enums.TSDataType;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -32,13 +45,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
  * Shared utilities for the IoTDB relational (table model) Flink connector.
  *
- * <p>This class centralizes identifier quoting, Flink/IoTDB data type conversion and the column
- * name/category resolution used by both the Flink catalog (DDL) and the sink serializer.
+ * <p>This class centralizes identifier quoting, Flink/IoTDB data type conversion, the column
+ * name/category resolution used by both the Flink catalog (DDL) and the sink serializer, the
+ * rendering of Flink planner/runtime values as IoTDB SQL literals, and the aggregate pushdown
+ * translation.
  */
 public final class IoTDBUtils {
 
@@ -140,8 +156,8 @@ public final class IoTDBUtils {
   }
 
   /**
-   * Validates the {@code time-column}, {@code tag-columns} and {@code attribute-columns} options
-   * against an existing table schema.
+   * Validates the {@code iotdb.time-column}, {@code iotdb.tag-columns} and {@code
+   * iotdb.attribute-columns} options against an existing table schema.
    *
    * @param timeColumn normalized TIME column name
    * @param tagColumns normalized TAG column names
@@ -154,7 +170,8 @@ public final class IoTDBUtils {
       Collection<String> attributeColumns,
       Map<String, TSDataType> dataTypesByColumn) {
     if (timeColumn == null || timeColumn.isEmpty()) {
-      throw new CatalogException("Table option 'time-column' must specify the IoTDB TIME column.");
+      throw new CatalogException(
+          "Table option 'iotdb.time-column' must specify the IoTDB TIME column.");
     }
     if (tagColumns.contains(timeColumn) || attributeColumns.contains(timeColumn)) {
       throw new CatalogException("The TIME column cannot also be a TAG or ATTRIBUTE column.");
@@ -165,12 +182,12 @@ public final class IoTDBUtils {
       throw new CatalogException(
           "TAG and ATTRIBUTE columns must not overlap: " + overlappingColumns.iterator().next());
     }
-    validateColumnExists(timeColumn, "time-column", dataTypesByColumn);
+    validateColumnExists(timeColumn, "iotdb.time-column", dataTypesByColumn);
     for (String columnName : tagColumns) {
-      validateColumnExists(columnName, "tag-columns", dataTypesByColumn);
+      validateColumnExists(columnName, "iotdb.tag-columns", dataTypesByColumn);
     }
     for (String columnName : attributeColumns) {
-      validateColumnExists(columnName, "attribute-columns", dataTypesByColumn);
+      validateColumnExists(columnName, "iotdb.attribute-columns", dataTypesByColumn);
     }
     if (dataTypesByColumn.get(timeColumn) != TSDataType.TIMESTAMP) {
       throw new CatalogException("The IoTDB TIME column must use the TIMESTAMP data type.");
@@ -276,6 +293,303 @@ public final class IoTDBUtils {
       sql.append(" GROUP BY ").append(String.join(", ", groupByExpressions));
     }
     return sql.toString();
+  }
+
+  /**
+   * Renders a Flink planner literal as an IoTDB SQL literal. Returns {@code null} if the literal
+   * type or value cannot be represented in IoTDB SQL.
+   */
+  public static String renderLiteral(ValueLiteralExpression literal) {
+    if (literal == null || literal.isNull()) {
+      return null;
+    }
+
+    try {
+      LogicalTypeRoot typeRoot = literal.getOutputDataType().getLogicalType().getTypeRoot();
+      switch (typeRoot) {
+        case BOOLEAN:
+          return literal.getValueAs(Boolean.class).map(String::valueOf).orElse(null);
+        case TINYINT:
+          return value(literal.getValueAs(Byte.class));
+        case SMALLINT:
+          return value(literal.getValueAs(Short.class));
+        case INTEGER:
+          return value(literal.getValueAs(Integer.class));
+        case BIGINT:
+          return value(literal.getValueAs(Long.class));
+        case FLOAT:
+          return literal
+              .getValueAs(Float.class)
+              .filter(value -> !value.isNaN() && !value.isInfinite())
+              .map(String::valueOf)
+              .orElse(null);
+        case DOUBLE:
+          return literal
+              .getValueAs(Double.class)
+              .filter(value -> !value.isNaN() && !value.isInfinite())
+              .map(String::valueOf)
+              .orElse(null);
+        case CHAR:
+        case VARCHAR:
+          return literal.getValueAs(String.class).map(IoTDBUtils::quoteString).orElse(null);
+        case BINARY:
+        case VARBINARY:
+          return literal.getValueAs(byte[].class).map(IoTDBUtils::formatBinary).orElse(null);
+        case DATE:
+          return literal
+              .getValueAs(LocalDate.class)
+              .map(value -> "CAST('" + value + "' AS DATE)")
+              .orElse(null);
+        case TIMESTAMP_WITHOUT_TIME_ZONE:
+          return literal
+              .getValueAs(LocalDateTime.class)
+              .map(value -> "CAST('" + value + "' AS TIMESTAMP)")
+              .orElse(null);
+        case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+          return literal
+              .getValueAs(Instant.class)
+              .map(value -> "CAST('" + value + "' AS TIMESTAMP)")
+              .orElse(null);
+        default:
+          return null;
+      }
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  /**
+   * Renders a runtime {@link RowData} field as an IoTDB SQL literal. Returns {@code null} when the
+   * value is {@code null} or cannot be represented in IoTDB SQL.
+   */
+  public static String renderLiteral(RowData row, int position, DataType dataType) {
+    if (row == null || row.isNullAt(position) || dataType == null) {
+      return null;
+    }
+
+    LogicalTypeRoot typeRoot = dataType.getLogicalType().getTypeRoot();
+    switch (typeRoot) {
+      case BOOLEAN:
+        return Boolean.toString(row.getBoolean(position));
+      case TINYINT:
+        return Byte.toString(row.getByte(position));
+      case SMALLINT:
+        return Short.toString(row.getShort(position));
+      case INTEGER:
+        return Integer.toString(row.getInt(position));
+      case BIGINT:
+        return Long.toString(row.getLong(position));
+      case FLOAT:
+        float floatValue = row.getFloat(position);
+        return isFinite(floatValue) ? Float.toString(floatValue) : null;
+      case DOUBLE:
+        double doubleValue = row.getDouble(position);
+        return isFinite(doubleValue) ? Double.toString(doubleValue) : null;
+      case CHAR:
+      case VARCHAR:
+        return quoteString(row.getString(position).toString());
+      case BINARY:
+      case VARBINARY:
+        byte[] bytes = row.getBinary(position);
+        return bytes == null ? null : formatBinary(bytes);
+      case DATE:
+        return "CAST('" + LocalDate.ofEpochDay(row.getInt(position)) + "' AS DATE)";
+      case TIMESTAMP_WITHOUT_TIME_ZONE:
+        return "CAST('"
+            + getTimestamp(row, position, dataType).toLocalDateTime()
+            + "' AS TIMESTAMP)";
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+        return "CAST('" + getTimestamp(row, position, dataType).toInstant() + "' AS TIMESTAMP)";
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Translates Flink aggregate pushdown information into a serializable {@link AggregateSpec}.
+   *
+   * <p>The pushdown is all-or-nothing: any unsupported aggregate, argument or grouping makes this
+   * return {@code null} so the whole aggregation stays in Flink. Each aggregate is classified and
+   * translated in a single pass from its function class name; grouping columns and aggregate
+   * arguments are rendered through {@link IoTDBExpressionVisitor}.
+   */
+  public static AggregateSpec translateAggregate(
+      List<int[]> groupingSets,
+      List<AggregateExpression> aggregateExpressions,
+      DataType sourceRowDataType,
+      DataType producedDataType) {
+    if (groupingSets == null
+        || groupingSets.size() != 1
+        || aggregateExpressions == null
+        || aggregateExpressions.isEmpty()) {
+      return null;
+    }
+
+    final List<String> sourceFieldNames;
+    final List<DataType> producedFieldTypes;
+    try {
+      sourceFieldNames = DataType.getFieldNames(sourceRowDataType);
+      producedFieldTypes = DataType.getFieldDataTypes(producedDataType);
+    } catch (RuntimeException e) {
+      return null;
+    }
+
+    int[] grouping = groupingSets.get(0);
+    if (grouping == null) {
+      return null;
+    }
+
+    List<String> groupByExpressions = new ArrayList<>(grouping.length);
+    List<String> selectExpressions = new ArrayList<>(grouping.length + aggregateExpressions.size());
+    for (int index : grouping) {
+      if (index < 0 || index >= sourceFieldNames.size()) {
+        return null;
+      }
+      String column = quoteIdentifier(sourceFieldNames.get(index));
+      groupByExpressions.add(column);
+      selectExpressions.add(column);
+    }
+
+    IoTDBExpressionVisitor visitor = new IoTDBExpressionVisitor();
+    for (int i = 0; i < aggregateExpressions.size(); i++) {
+      int producedIndex = grouping.length + i;
+      if (producedIndex >= producedFieldTypes.size()) {
+        return null;
+      }
+      String sql =
+          translateAggregateFunction(
+              aggregateExpressions.get(i), producedFieldTypes.get(producedIndex), visitor);
+      if (sql == null) {
+        return null;
+      }
+      selectExpressions.add(sql);
+    }
+
+    return new AggregateSpec(selectExpressions, groupByExpressions);
+  }
+
+  private static String translateAggregateFunction(
+      AggregateExpression aggregate, DataType producedType, IoTDBExpressionVisitor visitor) {
+    if (!isSupportedAggregate(aggregate)) {
+      return null;
+    }
+
+    Class<?> functionClass = aggregate.getFunctionDefinition().getClass();
+    String simpleName = functionClass == null ? null : functionClass.getSimpleName();
+    TSDataType outType = toTsDataType(producedType);
+    if (simpleName == null || outType == null) {
+      return null;
+    }
+
+    List<FieldReferenceExpression> args = aggregate.getArgs();
+    int argCount = args == null ? 0 : args.size();
+
+    String expression;
+    if (simpleName.endsWith("Count1AggFunction")) {
+      if (argCount != 0 || !isCountType(outType)) {
+        return null;
+      }
+      expression = "COUNT(*)";
+    } else if (simpleName.endsWith("CountAggFunction")) {
+      if (argCount != 1 || !isCountType(outType)) {
+        return null;
+      }
+      String argSql = args.get(0).accept(visitor);
+      if (argSql == null || toTsDataType(args.get(0).getOutputDataType()) == null) {
+        return null;
+      }
+      expression = "COUNT(" + argSql + ")";
+    } else if (simpleName.endsWith("Sum0AggFunction") || simpleName.endsWith("SumAggFunction")) {
+      if (argCount != 1 || !isNumeric(outType)) {
+        return null;
+      }
+      String argSql = args.get(0).accept(visitor);
+      TSDataType argType = argSql == null ? null : toTsDataType(args.get(0).getOutputDataType());
+      if (argType == null || !isNumeric(argType)) {
+        return null;
+      }
+      expression = "SUM(" + argSql + ")";
+    } else if (simpleName.endsWith("MaxAggFunction") || simpleName.endsWith("MinAggFunction")) {
+      if (argCount != 1) {
+        return null;
+      }
+      String argSql = args.get(0).accept(visitor);
+      if (argSql == null || toTsDataType(args.get(0).getOutputDataType()) == null) {
+        return null;
+      }
+      String functionName = simpleName.endsWith("MaxAggFunction") ? "MAX" : "MIN";
+      expression = functionName + "(" + argSql + ")";
+    } else {
+      return null;
+    }
+
+    return "CAST(" + expression + " AS " + outType.name() + ")";
+  }
+
+  private static boolean isSupportedAggregate(AggregateExpression aggregate) {
+    return aggregate != null
+        && !aggregate.isDistinct()
+        && !aggregate.isApproximate()
+        && !aggregate.isIgnoreNulls()
+        && !aggregate.getFilterExpression().isPresent();
+  }
+
+  private static boolean isNumeric(TSDataType dataType) {
+    switch (dataType) {
+      case INT32:
+      case INT64:
+      case FLOAT:
+      case DOUBLE:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private static boolean isCountType(TSDataType dataType) {
+    return dataType == TSDataType.INT32 || dataType == TSDataType.INT64;
+  }
+
+  private static TSDataType toTsDataType(DataType dataType) {
+    if (dataType == null) {
+      return null;
+    }
+    try {
+      return toIoTDBDataType(dataType);
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  private static TimestampData getTimestamp(RowData row, int position, DataType dataType) {
+    int precision = ((TimestampType) dataType.getLogicalType()).getPrecision();
+    return row.getTimestamp(position, precision);
+  }
+
+  private static boolean isFinite(float value) {
+    return !Float.isNaN(value) && !Float.isInfinite(value);
+  }
+
+  private static boolean isFinite(double value) {
+    return !Double.isNaN(value) && !Double.isInfinite(value);
+  }
+
+  private static String value(Optional<?> value) {
+    return value.map(Object::toString).orElse(null);
+  }
+
+  private static String quoteString(String value) {
+    return "'" + value.replace("'", "''") + "'";
+  }
+
+  private static String formatBinary(byte[] value) {
+    StringBuilder builder = new StringBuilder(value.length * 2 + 3);
+    builder.append("X'");
+    for (byte b : value) {
+      builder.append(String.format("%02X", b));
+    }
+    builder.append("'");
+    return builder.toString();
   }
 
   private static void validateColumnExists(

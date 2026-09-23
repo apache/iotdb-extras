@@ -342,10 +342,10 @@ public class IoTDBCatalog extends AbstractCatalog {
     Map<String, String> tableOptions = table.getOptions();
     String timeColumn = getRequiredTimeColumn(tableOptions);
     Set<String> tagColumns =
-        parseColumnNames(tableOptions.get(IoTDBOptions.TAG_COLUMNS.key()), "tag-columns");
+        parseColumnNames(tableOptions.get(IoTDBOptions.TAG_COLUMNS.key()), "iotdb.tag-columns");
     Set<String> attributeColumns =
         parseColumnNames(
-            tableOptions.get(IoTDBOptions.ATTRIBUTE_COLUMNS.key()), "attribute-columns");
+            tableOptions.get(IoTDBOptions.ATTRIBUTE_COLUMNS.key()), "iotdb.attribute-columns");
 
     List<String> columnNames = new ArrayList<>();
     List<TSDataType> dataTypes = new ArrayList<>();
@@ -383,7 +383,7 @@ public class IoTDBCatalog extends AbstractCatalog {
     String timeColumn = tableOptions.get(IoTDBOptions.TIME_COLUMN.key());
     if (timeColumn == null || timeColumn.trim().isEmpty()) {
       throw new CatalogException(
-          "Table option 'time-column' must specify the IoTDB TIME column for CREATE TABLE.");
+          "Table option 'iotdb.time-column' must specify the IoTDB TIME column for CREATE TABLE.");
     }
     return IoTDBUtils.normalizeColumnName(timeColumn);
   }

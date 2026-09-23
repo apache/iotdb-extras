@@ -117,8 +117,7 @@ public class IoTDBLookupReader implements AutoCloseable {
     List<String> predicates = new ArrayList<>(keyIndices.length);
     for (int position = 0; position < keyIndices.length; position++) {
       int fieldIndex = keyIndices[position];
-      String literal =
-          IoTDBRuntimeLiteralUtils.render(keyRow, position, fieldTypes.get(fieldIndex));
+      String literal = IoTDBUtils.renderLiteral(keyRow, position, fieldTypes.get(fieldIndex));
       if (literal == null) {
         return null;
       }

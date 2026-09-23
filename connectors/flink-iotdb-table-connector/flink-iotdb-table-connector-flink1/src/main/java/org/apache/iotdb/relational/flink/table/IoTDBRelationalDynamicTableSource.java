@@ -26,7 +26,6 @@ import org.apache.iotdb.relational.flink.source.lookup.IoTDBAsyncLookupFunction;
 import org.apache.iotdb.relational.flink.source.lookup.IoTDBLookupFunction;
 import org.apache.iotdb.relational.flink.source.scan.IoTDBSource;
 import org.apache.iotdb.relational.flink.source.scan.pushdown.AggregateSpec;
-import org.apache.iotdb.relational.flink.source.scan.pushdown.IoTDBAggregatePushDownUtils;
 import org.apache.iotdb.relational.flink.source.scan.pushdown.IoTDBExpressionVisitor;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
@@ -63,10 +62,10 @@ import java.util.List;
  * <p>It supports three read paths:
  *
  * <ul>
- *   <li>bounded scan reads ({@code scan.mode=snapshot}, the default) with filter, projection, limit
- *       and aggregate pushdown;
- *   <li>lookup reads, either synchronous or asynchronous ({@code lookup.async});
- *   <li>unbounded CDC reads backed by the IoTDB subscription API ({@code scan.mode=cdc}).
+ *   <li>bounded scan reads ({@code iotdb.scan.mode=snapshot}, the default) with filter, projection,
+ *       limit and aggregate pushdown;
+ *   <li>lookup reads, either synchronous or asynchronous ({@code iotdb.lookup.async});
+ *   <li>unbounded CDC reads backed by the IoTDB subscription API ({@code iotdb.scan.mode=cdc}).
  * </ul>
  *
  * <p>All rows are emitted as inserts, so the changelog mode is insert-only.
@@ -196,7 +195,7 @@ public class IoTDBRelationalDynamicTableSource
     // Grouping and argument indices refer to the scan's current row type, which is the row type
     // after any projection that has already been pushed into this source.
     AggregateSpec spec =
-        IoTDBAggregatePushDownUtils.translate(
+        IoTDBUtils.translateAggregate(
             groupingSets, aggregateExpressions, physicalRowDataType, producedDataType);
     if (spec == null) {
       return false;

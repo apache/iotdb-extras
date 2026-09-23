@@ -39,58 +39,60 @@ public class IoTDBOptions implements Serializable {
   public static final String IDENTIFIER = "iotdb-relational";
 
   public static final ConfigOption<String> NODE_URLS =
-      ConfigOptions.key("nodeUrls").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.node-urls").stringType().noDefaultValue();
 
   public static final ConfigOption<String> USER =
-      ConfigOptions.key("user").stringType().defaultValue("root");
+      ConfigOptions.key("iotdb.user").stringType().defaultValue("root");
 
   public static final ConfigOption<String> PASSWORD =
-      ConfigOptions.key("password").stringType().defaultValue("root");
+      ConfigOptions.key("iotdb.password").stringType().defaultValue("root");
 
   public static final ConfigOption<String> DATABASE =
-      ConfigOptions.key("database").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.database").stringType().noDefaultValue();
 
   public static final ConfigOption<String> TABLE =
-      ConfigOptions.key("table").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.table").stringType().noDefaultValue();
 
   public static final ConfigOption<String> DEFAULT_DATABASE =
-      ConfigOptions.key("default-database").stringType().defaultValue("public");
+      ConfigOptions.key("iotdb.default-database").stringType().defaultValue("public");
 
   public static final ConfigOption<String> TIME_COLUMN =
-      ConfigOptions.key("time-column").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.time-column").stringType().noDefaultValue();
 
   public static final ConfigOption<String> TAG_COLUMNS =
-      ConfigOptions.key("tag-columns").stringType().defaultValue("");
+      ConfigOptions.key("iotdb.tag-columns").stringType().defaultValue("");
 
   public static final ConfigOption<String> ATTRIBUTE_COLUMNS =
-      ConfigOptions.key("attribute-columns").stringType().defaultValue("");
+      ConfigOptions.key("iotdb.attribute-columns").stringType().defaultValue("");
 
   public static final ConfigOption<Boolean> LOOKUP_ASYNC =
-      ConfigOptions.key("lookup.async").booleanType().defaultValue(false);
+      ConfigOptions.key("iotdb.lookup.async").booleanType().defaultValue(false);
 
   public static final ConfigOption<Integer> LOOKUP_THREAD_SIZE =
-      ConfigOptions.key("lookup.thread-size").intType().defaultValue(5);
+      ConfigOptions.key("iotdb.lookup.thread-size").intType().defaultValue(5);
 
   public static final ConfigOption<ScanMode> SCAN_MODE =
-      ConfigOptions.key("scan.mode").enumType(ScanMode.class).defaultValue(ScanMode.SNAPSHOT);
+      ConfigOptions.key("iotdb.scan.mode")
+          .enumType(ScanMode.class)
+          .defaultValue(ScanMode.SNAPSHOT);
 
   public static final ConfigOption<String> CDC_TOPIC =
-      ConfigOptions.key("cdc.topic").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.cdc.topic").stringType().noDefaultValue();
 
   public static final ConfigOption<String> CDC_CONSUMER_GROUP =
-      ConfigOptions.key("cdc.consumer-group").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.cdc.consumer-group").stringType().noDefaultValue();
 
   public static final ConfigOption<String> CDC_MODE =
-      ConfigOptions.key("cdc.mode").stringType().defaultValue("live");
+      ConfigOptions.key("iotdb.cdc.mode").stringType().defaultValue("live");
 
   public static final ConfigOption<String> CDC_START_TIME =
-      ConfigOptions.key("cdc.start-time").stringType().noDefaultValue();
+      ConfigOptions.key("iotdb.cdc.start-time").stringType().noDefaultValue();
 
   public static final ConfigOption<Long> CDC_POLL_TIMEOUT_MS =
-      ConfigOptions.key("cdc.poll-timeout-ms").longType().defaultValue(1000L);
+      ConfigOptions.key("iotdb.cdc.poll-timeout-ms").longType().defaultValue(1000L);
 
   public static final ConfigOption<Boolean> CDC_AUTO_COMMIT =
-      ConfigOptions.key("cdc.auto-commit").booleanType().defaultValue(true);
+      ConfigOptions.key("iotdb.cdc.auto-commit").booleanType().defaultValue(true);
 
   private static final String CDC_TOPIC_PREFIX = "flink_iotdb_table_";
 
@@ -183,7 +185,7 @@ public class IoTDBOptions implements Serializable {
   }
 
   /**
-   * @return the configured IoTDB time-column name, or {@code null} when unspecified.
+   * @return the configured IoTDB {@code iotdb.time-column} name, or {@code null} when unspecified.
    */
   public String getTimeColumn() {
     return timeColumn;
