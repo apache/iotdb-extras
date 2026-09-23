@@ -39,11 +39,12 @@ import org.mybatis.generator.internal.rules.HierarchicalModelRules;
 
 import javax.tools.ToolProvider;
 
-import java.io.StringReader;
+import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Types;
@@ -210,7 +211,10 @@ public class BatchInsertPluginTest {
     assertFalse(xml.contains("measurements m"));
     Configuration configuration = new Configuration();
     new XMLMapperBuilder(
-            new StringReader(xml), configuration, "mapper.xml", configuration.getSqlFragments())
+            new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)),
+            configuration,
+            "mapper.xml",
+            configuration.getSqlFragments())
         .parse();
     org.apache.ibatis.mapping.BoundSql sql =
         configuration

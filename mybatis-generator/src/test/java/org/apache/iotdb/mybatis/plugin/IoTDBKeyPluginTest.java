@@ -35,7 +35,8 @@ import org.mybatis.generator.config.ModelType;
 import org.mybatis.generator.config.TableConfiguration;
 import org.mybatis.generator.internal.rules.FlatModelRules;
 
-import java.io.StringReader;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -116,7 +117,10 @@ public class IoTDBKeyPluginTest {
     document.setRootElement(root);
     Configuration configuration = new Configuration();
     new XMLMapperBuilder(
-            new StringReader(new DefaultXmlFormatter().getFormattedContent(document)),
+            new ByteArrayInputStream(
+                new DefaultXmlFormatter()
+                    .getFormattedContent(document)
+                    .getBytes(StandardCharsets.UTF_8)),
             configuration,
             "mapper.xml",
             configuration.getSqlFragments())

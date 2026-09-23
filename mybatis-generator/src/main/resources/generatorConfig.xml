@@ -44,6 +44,7 @@
         <jdbcConnection driverClass="org.apache.iotdb.jdbc.IoTDBDriver" connectionURL="jdbc:iotdb://127.0.0.1:6667/test?sql_dialect=table" userId="root" password="root"/>
         <javaTypeResolver type="org.apache.iotdb.mybatis.plugin.generator.resolver.IoTDBJavaTypeResolver">
             <property name="forceBigDecimals" value="false"/>
+            <property name="jdbcType.FLOAT" value="java.lang.Float"/>
         </javaTypeResolver>
         <javaModelGenerator targetPackage="org.apache.iotdb.mybatis.plugin.model" targetProject="iotdb">
             <property name="enableSubPackages" value="true"/>
