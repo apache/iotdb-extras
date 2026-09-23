@@ -378,7 +378,14 @@ public class TaskCombinerTest {
     public void heartbeat() {}
 
     @Override
-    public void transfer(final TabletInsertionEvent tabletInsertionEvent) {}
+    public void transfer(final TabletInsertionEvent tabletInsertionEvent) {
+      try {
+        transfer((Event) tabletInsertionEvent);
+      } catch (final InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while transferring tablet insertion event", e);
+      }
+    }
 
     @Override
     public void transfer(final Event event) throws InterruptedException {
