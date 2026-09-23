@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source;
+package org.apache.iotdb.relational.flink.source.scan;
 
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
-import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
-import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
+import org.apache.iotdb.relational.flink.source.scan.enumerator.IoTDBSourceEnumeratorState;
+import org.apache.iotdb.relational.flink.source.scan.pushdown.AggregateSpec;
+import org.apache.iotdb.relational.flink.source.scan.split.IoTDBSourceSplit;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
 import org.apache.flink.api.connector.source.SplitEnumerator;

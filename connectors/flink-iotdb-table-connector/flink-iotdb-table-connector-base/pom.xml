@@ -60,6 +60,11 @@
             <version>${iotdb.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>iotdb-subscription</artifactId>
+            <version>${iotdb.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.tsfile</groupId>
             <artifactId>common</artifactId>
             <version>${tsfile.version}</version>

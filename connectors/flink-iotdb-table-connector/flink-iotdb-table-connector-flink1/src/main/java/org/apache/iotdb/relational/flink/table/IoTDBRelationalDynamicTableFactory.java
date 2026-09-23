@@ -25,6 +25,7 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
+import org.apache.flink.table.connector.source.lookup.LookupOptions;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
@@ -39,8 +40,8 @@ import java.util.Set;
 /**
  * SPI factory of the IoTDB relational (table model) Flink connector.
  *
- * <p>The factory only wires options and the dynamic table source/sink. Runtime read/write logic is
- * intentionally not implemented yet.
+ * <p>The factory resolves the table options and creates the dynamic table source/sink. The source
+ * supports bounded scan, lookup and CDC reads, and the sink writes insert rows into an IoTDB table.
  */
 public class IoTDBRelationalDynamicTableFactory
     implements DynamicTableSourceFactory, DynamicTableSinkFactory {
@@ -49,8 +50,9 @@ public class IoTDBRelationalDynamicTableFactory
   public DynamicTableSource createDynamicTableSource(Context context) {
     FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
     helper.validate();
+    ReadableConfig config = helper.getOptions();
     return new IoTDBRelationalDynamicTableSource(
-        toOptions(helper.getOptions()), context.getCatalogTable().getResolvedSchema());
+        toOptions(config), context.getCatalogTable().getResolvedSchema(), config);
   }
 
   @Override
@@ -82,7 +84,19 @@ public class IoTDBRelationalDynamicTableFactory
             IoTDBOptions.TAG_COLUMNS,
             IoTDBOptions.ATTRIBUTE_COLUMNS,
             IoTDBOptions.LOOKUP_ASYNC,
-            IoTDBOptions.LOOKUP_THREAD_SIZE));
+            IoTDBOptions.LOOKUP_THREAD_SIZE,
+            IoTDBOptions.SCAN_MODE,
+            IoTDBOptions.CDC_TOPIC,
+            IoTDBOptions.CDC_CONSUMER_GROUP,
+            IoTDBOptions.CDC_MODE,
+            IoTDBOptions.CDC_START_TIME,
+            IoTDBOptions.CDC_POLL_TIMEOUT_MS,
+            IoTDBOptions.CDC_AUTO_COMMIT,
+            LookupOptions.CACHE_TYPE,
+            LookupOptions.PARTIAL_CACHE_MAX_ROWS,
+            LookupOptions.PARTIAL_CACHE_EXPIRE_AFTER_WRITE,
+            LookupOptions.PARTIAL_CACHE_EXPIRE_AFTER_ACCESS,
+            LookupOptions.PARTIAL_CACHE_CACHE_MISSING_KEY));
   }
 
   private static IoTDBOptions toOptions(ReadableConfig config) {
@@ -97,6 +111,13 @@ public class IoTDBRelationalDynamicTableFactory
         .withAttributeColumns(parseColumnNames(config.get(IoTDBOptions.ATTRIBUTE_COLUMNS)))
         .withLookupAsync(config.get(IoTDBOptions.LOOKUP_ASYNC))
         .withLookupThreadSize(config.get(IoTDBOptions.LOOKUP_THREAD_SIZE))
+        .withScanMode(config.get(IoTDBOptions.SCAN_MODE))
+        .withCdcTopic(config.get(IoTDBOptions.CDC_TOPIC))
+        .withCdcConsumerGroup(config.get(IoTDBOptions.CDC_CONSUMER_GROUP))
+        .withCdcMode(config.get(IoTDBOptions.CDC_MODE))
+        .withCdcStartTime(config.get(IoTDBOptions.CDC_START_TIME))
+        .withCdcPollTimeoutMs(config.get(IoTDBOptions.CDC_POLL_TIMEOUT_MS))
+        .withCdcAutoCommit(config.get(IoTDBOptions.CDC_AUTO_COMMIT))
         .build();
   }
 

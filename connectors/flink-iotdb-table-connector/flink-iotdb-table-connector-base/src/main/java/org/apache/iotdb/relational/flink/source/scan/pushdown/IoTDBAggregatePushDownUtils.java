@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.pushdown;
+package org.apache.iotdb.relational.flink.source.scan.pushdown;
 
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 

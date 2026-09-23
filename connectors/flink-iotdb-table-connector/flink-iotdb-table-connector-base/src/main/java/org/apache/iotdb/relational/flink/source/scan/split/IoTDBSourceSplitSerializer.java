@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.split;
+package org.apache.iotdb.relational.flink.source.scan.split;
 
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 

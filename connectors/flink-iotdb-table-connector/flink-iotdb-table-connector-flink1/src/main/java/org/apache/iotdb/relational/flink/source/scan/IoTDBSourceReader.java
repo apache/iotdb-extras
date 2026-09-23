@@ -17,13 +17,14 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source;
+package org.apache.iotdb.relational.flink.source.scan;
 
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
-import org.apache.iotdb.relational.flink.source.deserializer.IoTDBDeserializationSchema;
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
+import org.apache.iotdb.relational.flink.source.common.IoTDBDataIterator;
+import org.apache.iotdb.relational.flink.source.common.IoTDBDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.scan.split.IoTDBSourceSplit;
 import org.apache.iotdb.session.TableSessionBuilder;
 
 import org.apache.flink.api.connector.source.ReaderOutput;
@@ -50,7 +51,7 @@ public class IoTDBSourceReader<OUT> implements SourceReader<OUT, IoTDBSourceSpli
   private IoTDBSourceSplit currentSplit;
   private ITableSession session;
   private SessionDataSet dataSet;
-  private SessionDataSet.DataIterator iterator;
+  private IoTDBDataIterator iterator;
   private boolean noMoreSplits;
   private boolean closed;
   private CompletableFuture<Void> availability = CompletableFuture.completedFuture(null);
@@ -161,7 +162,7 @@ public class IoTDBSourceReader<OUT> implements SourceReader<OUT, IoTDBSourceSpli
     try {
       session = builder.build();
       dataSet = session.executeQueryStatement(currentSplit.getSql());
-      iterator = dataSet.iterator();
+      iterator = new SessionScanDataIterator(dataSet.iterator());
       return true;
     } catch (Exception e) {
       try {

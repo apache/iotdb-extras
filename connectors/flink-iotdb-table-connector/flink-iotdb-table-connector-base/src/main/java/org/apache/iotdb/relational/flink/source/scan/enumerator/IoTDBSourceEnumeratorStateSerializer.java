@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.enumerator;
+package org.apache.iotdb.relational.flink.source.scan.enumerator;
 
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplitSerializer;
+import org.apache.iotdb.relational.flink.source.scan.split.IoTDBSourceSplit;
+import org.apache.iotdb.relational.flink.source.scan.split.IoTDBSourceSplitSerializer;
 
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 

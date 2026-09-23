@@ -17,45 +17,36 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.split;
+package org.apache.iotdb.relational.flink.source.cdc.split;
 
 import org.apache.flink.api.connector.source.SourceSplit;
 
-import java.io.Serializable;
 import java.util.Objects;
 
-/** Read split for the IoTDB relational table source. */
-public class IoTDBSourceSplit implements SourceSplit, Serializable {
+/** A CDC split identifying the IoTDB subscription topic and consumer group to consume. */
+public class IoTDBSubscriptionSplit implements SourceSplit {
 
   private static final long serialVersionUID = 1L;
 
-  private final String splitId;
-  private final String database;
-  private final String table;
-  private final String sql;
+  private final String topic;
+  private final String consumerGroup;
 
-  public IoTDBSourceSplit(String splitId, String database, String table, String sql) {
-    this.splitId = splitId;
-    this.database = database;
-    this.table = table;
-    this.sql = sql;
+  public IoTDBSubscriptionSplit(String topic, String consumerGroup) {
+    this.topic = topic;
+    this.consumerGroup = consumerGroup;
+  }
+
+  public String getTopic() {
+    return topic;
+  }
+
+  public String getConsumerGroup() {
+    return consumerGroup;
   }
 
   @Override
   public String splitId() {
-    return splitId;
-  }
-
-  public String getDatabase() {
-    return database;
-  }
-
-  public String getTable() {
-    return table;
-  }
-
-  public String getSql() {
-    return sql;
+    return topic + ":" + consumerGroup;
   }
 
   @Override
@@ -63,18 +54,20 @@ public class IoTDBSourceSplit implements SourceSplit, Serializable {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof IoTDBSourceSplit)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    IoTDBSourceSplit that = (IoTDBSourceSplit) o;
-    return Objects.equals(splitId, that.splitId)
-        && Objects.equals(database, that.database)
-        && Objects.equals(table, that.table)
-        && Objects.equals(sql, that.sql);
+    IoTDBSubscriptionSplit that = (IoTDBSubscriptionSplit) o;
+    return Objects.equals(topic, that.topic) && Objects.equals(consumerGroup, that.consumerGroup);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(splitId, database, table, sql);
+    return Objects.hash(topic, consumerGroup);
+  }
+
+  @Override
+  public String toString() {
+    return "IoTDBSubscriptionSplit{topic='" + topic + "', consumerGroup='" + consumerGroup + "'}";
   }
 }

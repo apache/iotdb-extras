@@ -20,15 +20,17 @@
 package org.apache.iotdb.relational.flink.table;
 
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
-import org.apache.iotdb.relational.flink.source.IoTDBSource;
-import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.cdc.IoTDBCDCSource;
+import org.apache.iotdb.relational.flink.source.common.RowDataDeserializationSchema;
 import org.apache.iotdb.relational.flink.source.lookup.IoTDBAsyncLookupFunction;
 import org.apache.iotdb.relational.flink.source.lookup.IoTDBLookupFunction;
-import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
-import org.apache.iotdb.relational.flink.source.pushdown.IoTDBAggregatePushDownUtils;
-import org.apache.iotdb.relational.flink.source.pushdown.IoTDBExpressionVisitor;
+import org.apache.iotdb.relational.flink.source.scan.IoTDBSource;
+import org.apache.iotdb.relational.flink.source.scan.pushdown.AggregateSpec;
+import org.apache.iotdb.relational.flink.source.scan.pushdown.IoTDBAggregatePushDownUtils;
+import org.apache.iotdb.relational.flink.source.scan.pushdown.IoTDBExpressionVisitor;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
@@ -42,6 +44,11 @@ import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
 import org.apache.flink.table.connector.source.lookup.AsyncLookupFunctionProvider;
 import org.apache.flink.table.connector.source.lookup.LookupFunctionProvider;
+import org.apache.flink.table.connector.source.lookup.LookupOptions;
+import org.apache.flink.table.connector.source.lookup.PartialCachingAsyncLookupProvider;
+import org.apache.flink.table.connector.source.lookup.PartialCachingLookupProvider;
+import org.apache.flink.table.connector.source.lookup.cache.DefaultLookupCache;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.expressions.AggregateExpression;
 import org.apache.flink.table.expressions.ResolvedExpression;
 import org.apache.flink.table.types.DataType;
@@ -53,8 +60,16 @@ import java.util.List;
 /**
  * Dynamic table source of the IoTDB relational (table model) Flink connector.
  *
- * <p>Scan reads are fully implemented. Lookup reads are declared through {@link LookupTableSource}
- * but their runtime behavior is still a stub.
+ * <p>It supports three read paths:
+ *
+ * <ul>
+ *   <li>bounded scan reads ({@code scan.mode=snapshot}, the default) with filter, projection, limit
+ *       and aggregate pushdown;
+ *   <li>lookup reads, either synchronous or asynchronous ({@code lookup.async});
+ *   <li>unbounded CDC reads backed by the IoTDB subscription API ({@code scan.mode=cdc}).
+ * </ul>
+ *
+ * <p>All rows are emitted as inserts, so the changelog mode is insert-only.
  */
 public class IoTDBRelationalDynamicTableSource
     implements ScanTableSource,
@@ -66,14 +81,17 @@ public class IoTDBRelationalDynamicTableSource
 
   private final IoTDBOptions options;
   private final ResolvedSchema schema;
+  private final ReadableConfig config;
   private DataType physicalRowDataType;
   private final List<String> resolvedFilterQueries = new ArrayList<>();
   private long limit = -1L;
   private AggregateSpec aggregateSpec;
 
-  public IoTDBRelationalDynamicTableSource(IoTDBOptions options, ResolvedSchema schema) {
+  public IoTDBRelationalDynamicTableSource(
+      IoTDBOptions options, ResolvedSchema schema, ReadableConfig config) {
     this.options = options;
     this.schema = schema;
+    this.config = config;
     this.physicalRowDataType = schema.toPhysicalRowDataType();
   }
 
@@ -84,6 +102,11 @@ public class IoTDBRelationalDynamicTableSource
 
   @Override
   public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
+    if (options.isCdc()) {
+      return SourceProvider.of(
+          new IoTDBCDCSource<RowData>(
+              options, new RowDataDeserializationSchema(physicalRowDataType)));
+    }
     return SourceProvider.of(
         new IoTDBSource<>(
             options,
@@ -112,13 +135,24 @@ public class IoTDBRelationalDynamicTableSource
       }
       keyIndices[i] = keyIndex;
     }
-    if (options.isLookupAsync()) {
-      return AsyncLookupFunctionProvider.of(
-          new IoTDBAsyncLookupFunction(
-              options, lookupRowDataType, keyIndices, options.getLookupThreadSize()));
+    LookupOptions.LookupCacheType cacheType = config.get(LookupOptions.CACHE_TYPE);
+    if (cacheType == LookupOptions.LookupCacheType.FULL) {
+      throw new TableException(
+          "The IoTDB connector does not support the lookup FULL cache; use 'partial' or 'none'.");
     }
-    return LookupFunctionProvider.of(
-        new IoTDBLookupFunction(options, lookupRowDataType, keyIndices));
+    boolean cacheEnabled = cacheType == LookupOptions.LookupCacheType.PARTIAL;
+    if (options.isLookupAsync()) {
+      IoTDBAsyncLookupFunction function =
+          new IoTDBAsyncLookupFunction(
+              options, lookupRowDataType, keyIndices, options.getLookupThreadSize());
+      return cacheEnabled
+          ? PartialCachingAsyncLookupProvider.of(function, DefaultLookupCache.fromConfig(config))
+          : AsyncLookupFunctionProvider.of(function);
+    }
+    IoTDBLookupFunction function = new IoTDBLookupFunction(options, lookupRowDataType, keyIndices);
+    return cacheEnabled
+        ? PartialCachingLookupProvider.of(function, DefaultLookupCache.fromConfig(config))
+        : LookupFunctionProvider.of(function);
   }
 
   @Override
@@ -181,7 +215,8 @@ public class IoTDBRelationalDynamicTableSource
 
   @Override
   public DynamicTableSource copy() {
-    IoTDBRelationalDynamicTableSource copy = new IoTDBRelationalDynamicTableSource(options, schema);
+    IoTDBRelationalDynamicTableSource copy =
+        new IoTDBRelationalDynamicTableSource(options, schema, config);
     copy.physicalRowDataType = physicalRowDataType;
     copy.resolvedFilterQueries.addAll(resolvedFilterQueries);
     copy.limit = limit;

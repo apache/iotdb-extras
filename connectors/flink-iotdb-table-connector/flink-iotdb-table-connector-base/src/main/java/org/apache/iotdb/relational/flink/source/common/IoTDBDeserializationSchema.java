@@ -17,24 +17,21 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.deserializer;
-
-import org.apache.iotdb.isession.SessionDataSet;
+package org.apache.iotdb.relational.flink.source.common;
 
 import java.io.IOException;
 import java.io.Serializable;
 
 /**
- * Converts the current row of an IoTDB {@link SessionDataSet.DataIterator} into the output type of
- * the Flink source.
+ * Converts the current row of an {@link IoTDBDataIterator} into the output type of the Flink
+ * source.
  *
- * <p>The caller owns iteration and must invoke {@link SessionDataSet.DataIterator#next()} before
- * calling this method. Implementations must only read the current row and must not advance the
- * iterator.
+ * <p>The caller owns iteration and must invoke {@link IoTDBDataIterator#next()} before calling this
+ * method. Implementations must only read the current row and must not advance the iterator.
  *
  * @param <OUT> output type
  */
 public interface IoTDBDeserializationSchema<OUT> extends Serializable {
 
-  OUT deserialize(SessionDataSet.DataIterator iterator) throws IOException;
+  OUT deserialize(IoTDBDataIterator iterator) throws IOException;
 }

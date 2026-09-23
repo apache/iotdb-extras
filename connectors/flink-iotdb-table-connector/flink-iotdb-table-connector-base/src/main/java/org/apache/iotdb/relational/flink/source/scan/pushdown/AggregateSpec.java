@@ -17,26 +17,36 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.enumerator;
-
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
+package org.apache.iotdb.relational.flink.source.scan.pushdown;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Checkpoint state of the IoTDB source enumerator. */
-public class IoTDBSourceEnumeratorState implements Serializable {
+/**
+ * Serializable description of a pushed-down aggregate query.
+ *
+ * <p>{@code selectExpressions} are the rendered grouping keys followed by the aggregate
+ * expressions; {@code groupByExpressions} are the rendered grouping keys.
+ */
+public class AggregateSpec implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private final List<IoTDBSourceSplit> remainingSplits;
+  private final List<String> selectExpressions;
+  private final List<String> groupByExpressions;
 
-  public IoTDBSourceEnumeratorState(List<IoTDBSourceSplit> remainingSplits) {
-    this.remainingSplits = remainingSplits;
+  public AggregateSpec(List<String> selectExpressions, List<String> groupByExpressions) {
+    this.selectExpressions = Collections.unmodifiableList(new ArrayList<>(selectExpressions));
+    this.groupByExpressions = Collections.unmodifiableList(new ArrayList<>(groupByExpressions));
   }
 
-  public List<IoTDBSourceSplit> getRemainingSplits() {
-    return remainingSplits == null ? Collections.emptyList() : remainingSplits;
+  public List<String> getSelectExpressions() {
+    return selectExpressions;
+  }
+
+  public List<String> getGroupByExpressions() {
+    return groupByExpressions;
   }
 }

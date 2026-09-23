@@ -23,7 +23,9 @@ import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.isession.SessionDataSet;
 import org.apache.iotdb.isession.pool.ITableSessionPool;
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
-import org.apache.iotdb.relational.flink.source.deserializer.RowDataDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.common.IoTDBDataIterator;
+import org.apache.iotdb.relational.flink.source.common.RowDataDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.scan.SessionScanDataIterator;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
 import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
@@ -98,7 +100,7 @@ public class IoTDBLookupReader implements AutoCloseable {
     try (ITableSession session = pool.getSession();
         SessionDataSet dataSet = session.executeQueryStatement(sql)) {
       List<RowData> rows = new ArrayList<>();
-      SessionDataSet.DataIterator iterator = dataSet.iterator();
+      IoTDBDataIterator iterator = new SessionScanDataIterator(dataSet.iterator());
       while (iterator.next()) {
         rows.add(deserializer.deserialize(iterator));
       }

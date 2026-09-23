@@ -71,6 +71,35 @@ public class IoTDBOptions implements Serializable {
   public static final ConfigOption<Integer> LOOKUP_THREAD_SIZE =
       ConfigOptions.key("lookup.thread-size").intType().defaultValue(5);
 
+  public static final ConfigOption<ScanMode> SCAN_MODE =
+      ConfigOptions.key("scan.mode").enumType(ScanMode.class).defaultValue(ScanMode.SNAPSHOT);
+
+  public static final ConfigOption<String> CDC_TOPIC =
+      ConfigOptions.key("cdc.topic").stringType().noDefaultValue();
+
+  public static final ConfigOption<String> CDC_CONSUMER_GROUP =
+      ConfigOptions.key("cdc.consumer-group").stringType().noDefaultValue();
+
+  public static final ConfigOption<String> CDC_MODE =
+      ConfigOptions.key("cdc.mode").stringType().defaultValue("live");
+
+  public static final ConfigOption<String> CDC_START_TIME =
+      ConfigOptions.key("cdc.start-time").stringType().noDefaultValue();
+
+  public static final ConfigOption<Long> CDC_POLL_TIMEOUT_MS =
+      ConfigOptions.key("cdc.poll-timeout-ms").longType().defaultValue(1000L);
+
+  public static final ConfigOption<Boolean> CDC_AUTO_COMMIT =
+      ConfigOptions.key("cdc.auto-commit").booleanType().defaultValue(true);
+
+  private static final String CDC_TOPIC_PREFIX = "flink_iotdb_table_";
+
+  /** Scan mode of the table source. */
+  public enum ScanMode {
+    SNAPSHOT,
+    CDC
+  }
+
   private final List<String> nodeUrls;
   private final String username;
   private final String password;
@@ -82,6 +111,13 @@ public class IoTDBOptions implements Serializable {
   private final List<String> attributeColumns;
   private final boolean lookupAsync;
   private final int lookupThreadSize;
+  private final ScanMode scanMode;
+  private final String cdcTopic;
+  private final String cdcConsumerGroup;
+  private final String cdcMode;
+  private final String cdcStartTime;
+  private final long cdcPollTimeoutMs;
+  private final boolean cdcAutoCommit;
 
   private IoTDBOptions(Builder builder) {
     this.nodeUrls = builder.nodeUrls;
@@ -95,6 +131,13 @@ public class IoTDBOptions implements Serializable {
     this.attributeColumns = builder.attributeColumns;
     this.lookupAsync = builder.lookupAsync;
     this.lookupThreadSize = builder.lookupThreadSize;
+    this.scanMode = builder.scanMode;
+    this.cdcTopic = builder.cdcTopic;
+    this.cdcConsumerGroup = builder.cdcConsumerGroup;
+    this.cdcMode = builder.cdcMode;
+    this.cdcStartTime = builder.cdcStartTime;
+    this.cdcPollTimeoutMs = builder.cdcPollTimeoutMs;
+    this.cdcAutoCommit = builder.cdcAutoCommit;
   }
 
   /**
@@ -175,6 +218,73 @@ public class IoTDBOptions implements Serializable {
   }
 
   /**
+   * @return the scan mode of the table source.
+   */
+  public ScanMode getScanMode() {
+    return scanMode;
+  }
+
+  /**
+   * @return whether the CDC (subscription) source is used instead of the bounded snapshot scan.
+   */
+  public boolean isCdc() {
+    return scanMode == ScanMode.CDC;
+  }
+
+  /**
+   * @return the effective CDC topic name. When unset, it is derived from the connector marker and
+   *     the database/table names so the topic origin is recognizable.
+   */
+  public String getCdcTopic() {
+    if (cdcTopic != null && !cdcTopic.isEmpty()) {
+      return cdcTopic;
+    }
+    return CDC_TOPIC_PREFIX + sanitize(database) + "_" + sanitize(table);
+  }
+
+  /**
+   * @return the effective CDC consumer group id. When unset, it is derived from the topic name.
+   */
+  public String getCdcConsumerGroup() {
+    if (cdcConsumerGroup != null && !cdcConsumerGroup.isEmpty()) {
+      return cdcConsumerGroup;
+    }
+    return getCdcTopic() + "_group";
+  }
+
+  /**
+   * @return the CDC topic mode, e.g. {@code live} or {@code snapshot}.
+   */
+  public String getCdcMode() {
+    return cdcMode;
+  }
+
+  /**
+   * @return the CDC history start time, or {@code null} when unset.
+   */
+  public String getCdcStartTime() {
+    return cdcStartTime;
+  }
+
+  /**
+   * @return the CDC poll timeout in milliseconds.
+   */
+  public long getCdcPollTimeoutMs() {
+    return cdcPollTimeoutMs;
+  }
+
+  /**
+   * @return whether the CDC consumer commits offsets automatically.
+   */
+  public boolean isCdcAutoCommit() {
+    return cdcAutoCommit;
+  }
+
+  private static String sanitize(String value) {
+    return value == null ? "" : value.replaceAll("[^A-Za-z0-9_]", "_");
+  }
+
+  /**
    * @return a new builder
    */
   public static Builder builder() {
@@ -195,6 +305,13 @@ public class IoTDBOptions implements Serializable {
     private List<String> attributeColumns = Collections.emptyList();
     private boolean lookupAsync = false;
     private int lookupThreadSize = 5;
+    private ScanMode scanMode = ScanMode.SNAPSHOT;
+    private String cdcTopic;
+    private String cdcConsumerGroup;
+    private String cdcMode = "live";
+    private String cdcStartTime;
+    private long cdcPollTimeoutMs = 1000L;
+    private boolean cdcAutoCommit = true;
 
     public Builder withNodeUrls(List<String> nodeUrls) {
       this.nodeUrls = nodeUrls;
@@ -248,6 +365,41 @@ public class IoTDBOptions implements Serializable {
 
     public Builder withLookupThreadSize(int lookupThreadSize) {
       this.lookupThreadSize = lookupThreadSize;
+      return this;
+    }
+
+    public Builder withScanMode(ScanMode scanMode) {
+      this.scanMode = scanMode;
+      return this;
+    }
+
+    public Builder withCdcTopic(String cdcTopic) {
+      this.cdcTopic = cdcTopic;
+      return this;
+    }
+
+    public Builder withCdcConsumerGroup(String cdcConsumerGroup) {
+      this.cdcConsumerGroup = cdcConsumerGroup;
+      return this;
+    }
+
+    public Builder withCdcMode(String cdcMode) {
+      this.cdcMode = cdcMode;
+      return this;
+    }
+
+    public Builder withCdcStartTime(String cdcStartTime) {
+      this.cdcStartTime = cdcStartTime;
+      return this;
+    }
+
+    public Builder withCdcPollTimeoutMs(long cdcPollTimeoutMs) {
+      this.cdcPollTimeoutMs = cdcPollTimeoutMs;
+      return this;
+    }
+
+    public Builder withCdcAutoCommit(boolean cdcAutoCommit) {
+      this.cdcAutoCommit = cdcAutoCommit;
       return this;
     }
 

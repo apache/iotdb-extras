@@ -17,36 +17,35 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source.pushdown;
+package org.apache.iotdb.relational.flink.source.cdc.enumerator;
+
+import org.apache.iotdb.relational.flink.source.cdc.split.IoTDBSubscriptionSplit;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Serializable description of a pushed-down aggregate query.
- *
- * <p>{@code selectExpressions} are the rendered grouping keys followed by the aggregate
- * expressions; {@code groupByExpressions} are the rendered grouping keys.
- */
-public class AggregateSpec implements Serializable {
+/** Checkpoint state of the CDC enumerator. */
+public class IoTDBSubscriptionEnumeratorState implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private final List<String> selectExpressions;
-  private final List<String> groupByExpressions;
+  private final boolean allSplitsCreated;
+  private final List<IoTDBSubscriptionSplit> remainingSplits;
 
-  public AggregateSpec(List<String> selectExpressions, List<String> groupByExpressions) {
-    this.selectExpressions = Collections.unmodifiableList(new ArrayList<>(selectExpressions));
-    this.groupByExpressions = Collections.unmodifiableList(new ArrayList<>(groupByExpressions));
+  public IoTDBSubscriptionEnumeratorState(
+      boolean allSplitsCreated, List<IoTDBSubscriptionSplit> remainingSplits) {
+    this.allSplitsCreated = allSplitsCreated;
+    this.remainingSplits =
+        remainingSplits == null ? Collections.emptyList() : new ArrayList<>(remainingSplits);
   }
 
-  public List<String> getSelectExpressions() {
-    return selectExpressions;
+  public boolean isAllSplitsCreated() {
+    return allSplitsCreated;
   }
 
-  public List<String> getGroupByExpressions() {
-    return groupByExpressions;
+  public List<IoTDBSubscriptionSplit> getRemainingSplits() {
+    return remainingSplits;
   }
 }

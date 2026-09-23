@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package org.apache.iotdb.relational.flink.source;
+package org.apache.iotdb.relational.flink.source.scan;
 
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
-import org.apache.iotdb.relational.flink.source.deserializer.IoTDBDeserializationSchema;
-import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorState;
-import org.apache.iotdb.relational.flink.source.enumerator.IoTDBSourceEnumeratorStateSerializer;
-import org.apache.iotdb.relational.flink.source.pushdown.AggregateSpec;
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplit;
-import org.apache.iotdb.relational.flink.source.split.IoTDBSourceSplitSerializer;
+import org.apache.iotdb.relational.flink.source.common.IoTDBDeserializationSchema;
+import org.apache.iotdb.relational.flink.source.scan.enumerator.IoTDBSourceEnumeratorState;
+import org.apache.iotdb.relational.flink.source.scan.enumerator.IoTDBSourceEnumeratorStateSerializer;
+import org.apache.iotdb.relational.flink.source.scan.pushdown.AggregateSpec;
+import org.apache.iotdb.relational.flink.source.scan.split.IoTDBSourceSplit;
+import org.apache.iotdb.relational.flink.source.scan.split.IoTDBSourceSplitSerializer;
 
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
