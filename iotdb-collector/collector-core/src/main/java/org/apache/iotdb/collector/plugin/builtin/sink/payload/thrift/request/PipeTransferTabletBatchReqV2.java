@@ -85,44 +85,6 @@ public class PipeTransferTabletBatchReqV2 extends TPipeTransferReq {
     return batchReq;
   }
 
-  // public static PipeTransferTabletBatchReqV2 fromTPipeTransferReq(
-  //     final TPipeTransferReq transferReq) {
-  //   final PipeTransferTabletBatchReqV2 batchReq = new PipeTransferTabletBatchReqV2();
-  //
-  //   int size = ReadWriteIOUtils.readInt(transferReq.body);
-  //   for (int i = 0; i < size; ++i) {
-  //     final int length = ReadWriteIOUtils.readInt(transferReq.body);
-  //     final byte[] body = new byte[length];
-  //     transferReq.body.get(body);
-  //     batchReq.binaryReqs.add(
-  //         PipeTransferTabletBinaryReqV2.toTPipeTransferBinaryReq(
-  //             ByteBuffer.wrap(body), ReadWriteIOUtils.readString(transferReq.body)));
-  //   }
-  //
-  //   size = ReadWriteIOUtils.readInt(transferReq.body);
-  //   for (int i = 0; i < size; ++i) {
-  //     batchReq.insertNodeReqs.add(
-  //         PipeTransferTabletInsertNodeReqV2.toTabletInsertNodeReq(
-  //             (InsertNode) PlanFragment.deserializeHelper(transferReq.body, null),
-  //             ReadWriteIOUtils.readString(transferReq.body)));
-  //   }
-  //
-  //   size = ReadWriteIOUtils.readInt(transferReq.body);
-  //   for (int i = 0; i < size; ++i) {
-  //     batchReq.tabletReqs.add(
-  //         PipeTransferTabletRawReqV2.toTPipeTransferRawReq(
-  //             Tablet.deserialize(transferReq.body),
-  //             ReadWriteIOUtils.readBool(transferReq.body),
-  //             ReadWriteIOUtils.readString(transferReq.body)));
-  //   }
-  //
-  //   batchReq.version = transferReq.version;
-  //   batchReq.type = transferReq.type;
-  //   batchReq.body = transferReq.body;
-  //
-  //   return batchReq;
-  // }
-
   /////////////////////////////// Object ///////////////////////////////
 
   @Override

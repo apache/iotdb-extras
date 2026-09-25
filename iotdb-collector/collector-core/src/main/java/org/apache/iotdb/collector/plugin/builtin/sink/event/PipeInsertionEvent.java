@@ -19,14 +19,23 @@
 
 package org.apache.iotdb.collector.plugin.builtin.sink.event;
 
+import org.apache.iotdb.collector.utils.PathUtils;
+
 public abstract class PipeInsertionEvent {
 
   protected Boolean isTableModelEvent;
 
+  protected String sourceDatabaseNameFromDataRegion;
   protected String treeModelDatabaseName;
   protected String tableModelDatabaseName;
 
   public boolean isTableModelEvent() {
+    if (isTableModelEvent == null) {
+      if (sourceDatabaseNameFromDataRegion == null) {
+        throw new IllegalStateException("databaseNameFromDataRegion is null");
+      }
+      return isTableModelEvent = PathUtils.isTableModelDatabase(sourceDatabaseNameFromDataRegion);
+    }
     return isTableModelEvent;
   }
 
@@ -35,6 +44,8 @@ public abstract class PipeInsertionEvent {
   }
 
   public String getTableModelDatabaseName() {
-    return tableModelDatabaseName;
+    return tableModelDatabaseName == null
+        ? tableModelDatabaseName = PathUtils.unQualifyDatabaseName(sourceDatabaseNameFromDataRegion)
+        : tableModelDatabaseName;
   }
 }

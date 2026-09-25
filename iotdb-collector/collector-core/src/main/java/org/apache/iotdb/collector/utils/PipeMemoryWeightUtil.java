@@ -61,7 +61,7 @@ public class PipeMemoryWeightUtil {
     int totalSizeInBytes = 0;
 
     // timestamp
-    totalSizeInBytes += 8L;
+    totalSizeInBytes += 8;
 
     // values
     final List<Field> fields = row.getFields();
@@ -101,7 +101,7 @@ public class PipeMemoryWeightUtil {
     int schemaCount = 0;
 
     // timestamp
-    totalSizeInBytes += 8L;
+    totalSizeInBytes += 8;
 
     // values
     final TSDataType type = batchData.getDataType();

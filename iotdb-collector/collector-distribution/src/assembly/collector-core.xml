@@ -60,6 +60,12 @@
             </excludes>
         </fileSet>
         <fileSet>
+            <outputDirectory>system/pipe/temp</outputDirectory>
+            <excludes>
+                <exclude>**/*</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet>
             <outputDirectory>licenses</outputDirectory>
             <directory>${project.basedir}/../../licenses</directory>
         </fileSet>

@@ -40,6 +40,12 @@ public class PipeRowCollector implements RowCollector {
   private final List<TabletInsertionEvent> tabletInsertionEventList = new ArrayList<>();
   private Tablet tablet = null;
 
+  private final String tableModelDatabaseName;
+
+  public PipeRowCollector(final String tableModelDatabaseName) {
+    this.tableModelDatabaseName = tableModelDatabaseName;
+  }
+
   @Override
   public void collectRow(Row row) {
     if (!(row instanceof PipeRow)) {
@@ -59,7 +65,7 @@ public class PipeRowCollector implements RowCollector {
       final List<IMeasurementSchema> measurementSchemaList =
           new ArrayList<>(Arrays.asList(measurementSchemaArray));
       // Calculate row count and memory size of the tablet based on the first row
-      Pair<Integer, Integer> rowCountAndMemorySize =
+      final Pair<Integer, Integer> rowCountAndMemorySize =
           PipeMemoryWeightUtil.calculateTabletRowCountAndMemory(pipeRow);
       tablet = new Tablet(deviceId, measurementSchemaList, rowCountAndMemorySize.getLeft());
       tablet.initBitMaps();
@@ -90,12 +96,16 @@ public class PipeRowCollector implements RowCollector {
   private void collectTabletInsertionEvent() {
     if (tablet != null) {
       // TODO: non-PipeInsertionEvent sourceEvent is not supported?
-      tabletInsertionEventList.add(new PipeRawTabletInsertionEvent(tablet, tablet.getDeviceId()));
+      tabletInsertionEventList.add(
+          new PipeRawTabletInsertionEvent(
+              tablet,
+              false,
+              tableModelDatabaseName != null ? tableModelDatabaseName : tablet.getDeviceId()));
     }
     this.tablet = null;
   }
 
-  public List<TabletInsertionEvent> convertToTabletInsertionEvents(final boolean shouldReport) {
+  public List<TabletInsertionEvent> convertToTabletInsertionEvents() {
     collectTabletInsertionEvent();
 
     return tabletInsertionEventList;

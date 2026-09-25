@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 public class TrimProperties extends Properties {
+
   @Override
   public synchronized Object get(Object key) {
     Object value = super.get(key);

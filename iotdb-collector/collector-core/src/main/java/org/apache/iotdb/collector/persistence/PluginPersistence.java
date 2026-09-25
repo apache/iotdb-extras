@@ -37,7 +37,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PluginPersistence extends Persistence {
 
@@ -76,6 +77,8 @@ public class PluginPersistence extends Persistence {
     final String queryAllPluginSQL =
         "SELECT plugin_name, class_name, jar_name, jar_md5 FROM plugin";
 
+    final List<String> notExistPluginNames = new ArrayList<>();
+
     try (final Connection connection = getConnection()) {
       final PreparedStatement statement = connection.prepareStatement(queryAllPluginSQL);
       final ResultSet pluginResultSet = statement.executeQuery();
@@ -87,14 +90,24 @@ public class PluginPersistence extends Persistence {
         final String jarMd5 = pluginResultSet.getString("jar_md5");
 
         if (!isPluginJarFileWithMD5NameExists(pluginName, jarName, jarMd5)) {
-          tryDeletePlugin(pluginName);
+          notExistPluginNames.add(pluginName);
+          LOGGER.warn(
+              "Plugin {} has not existed, will try delete from database later.", pluginName);
           continue;
         }
 
-        tryRecoverPlugin(pluginName, className, jarName, jarMd5);
+        final Response response = tryRecoverPlugin(pluginName, className, jarName, jarMd5);
+        if (response.getStatus() != Response.Status.OK.getStatusCode()) {
+          LOGGER.warn(
+              "Failed to recover plugin message from plugin {}, because {}", pluginName, response);
+        }
       }
     } catch (final SQLException e) {
       LOGGER.warn("Failed to resume plugin persistence message, because {}", e.getMessage());
+    }
+
+    if (!notExistPluginNames.isEmpty()) {
+      tryDeleteNotExistPlugins(notExistPluginNames);
     }
   }
 
@@ -108,17 +121,27 @@ public class PluginPersistence extends Persistence {
     return Files.exists(pluginJarFileWithMD5Path);
   }
 
-  private void tryRecoverPlugin(
+  private Response tryRecoverPlugin(
       final String pluginName, final String className, final String jarName, final String jarMD5) {
-    final Response response =
-        RuntimeService.plugin().isPresent()
-            ? RuntimeService.plugin()
-                .get()
-                .createPlugin(pluginName, className, jarName, jarMD5, false)
-            : null;
+    return RuntimeService.plugin().isPresent()
+        ? RuntimeService.plugin().get().createPlugin(pluginName, className, jarName, jarMD5, false)
+        : Response.serverError().entity("[RuntimeService] the plugin runtime is null.").build();
+  }
 
-    if (Objects.isNull(response) || response.getStatus() != Response.Status.OK.getStatusCode()) {
-      LOGGER.warn("Failed to recover plugin message from plugin {}: {}", pluginName, response);
+  private void tryDeleteNotExistPlugins(final List<String> pluginNames) {
+    final String batchDeleteSQL = "DELETE FROM plugin WHERE plugin_name = ?";
+
+    try (final Connection connection = getConnection();
+        final PreparedStatement statement = connection.prepareStatement(batchDeleteSQL)) {
+      for (final String pluginName : pluginNames) {
+        statement.setString(1, pluginName);
+        statement.addBatch();
+      }
+      statement.executeBatch();
+
+      LOGGER.info("Successfully delete plugin names: {}", pluginNames);
+    } catch (final SQLException e) {
+      LOGGER.warn("Failed to delete plugin names: {}, because {}", pluginNames, e.getMessage());
     }
   }
 
