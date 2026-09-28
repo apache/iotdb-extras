@@ -16,7 +16,7 @@
  */
 import { DataSourceInstanceSettings, MetricFindValue, ScopedVars } from '@grafana/data';
 
-import { IoTDBOptions, IoTDBQuery } from './types';
+import { IoTDBOptions, IoTDBQuery, TableColumn } from './types';
 import { toMetricFindValue } from './functions';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 
@@ -179,6 +179,24 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
         }
       })
       .then((data) => data.map(toMetricFindValue));
+  }
+
+  // Metadata behind the table-model editor's pickers. Template variables are
+  // expanded first, so a dashboard whose database is `$database` still lists
+  // its tables.
+  getTableDatabases(): Promise<string[]> {
+    return this.getResource('tableDatabases');
+  }
+
+  getTableTables(database: string): Promise<string[]> {
+    return this.getResource('tableTables', { database: getTemplateSrv().replace(database) });
+  }
+
+  getTableColumns(database: string, table: string): Promise<TableColumn[]> {
+    return this.getResource('tableColumns', {
+      database: getTemplateSrv().replace(database),
+      table: getTemplateSrv().replace(table),
+    });
   }
 
   async getVariablesResult(sql: string) {

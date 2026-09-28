@@ -38,6 +38,9 @@ export interface IoTDBQuery extends DataQuery {
   // rendered either as time series (long results are pivoted into one series
   // per tag combination) or as a plain table.
   database?: string;
+  // The table picked in the editor. It only drives the column list and the
+  // starter query; the SQL is what runs.
+  table?: string;
   sql?: string;
   format?: string;
   legendFormat?: string;
@@ -45,6 +48,13 @@ export interface IoTDBQuery extends DataQuery {
   // Range queries; Instant + Range together means Both.
   instant?: boolean;
   range?: boolean;
+}
+
+// One column of a table-model table, as the backend reports it from DESC.
+export interface TableColumn {
+  name: string;
+  dataType: string;
+  category: string;
 }
 
 export interface GroupBy {

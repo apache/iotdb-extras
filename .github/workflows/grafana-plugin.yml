@@ -141,7 +141,7 @@ jobs:
         run: |
           cd connectors/grafana-plugin/
           npx playwright install --with-deps chromium
-          npm run e2e -- tests/minimumGrafanaVersion.spec.ts
+          npm run e2e -- tests/minimumGrafanaVersion.spec.ts tests/tableModelEditor.spec.ts
 
       - name: Dump service logs on failure
         if: failure()
