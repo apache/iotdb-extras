@@ -130,6 +130,11 @@ public class IoTDBLookupFunction extends TableFunction<RowData> {
         continue;
       }
       int index = columnNames.indexOf(field.f0);
+      // A series with no value at this timestamp comes back as a field with no data type.
+      if (fields.get(index).getDataType() == null) {
+        values.add(null);
+        continue;
+      }
       DataType flinkType = field.f1;
       TSDataType iotdbType = fields.get(index).getDataType();
       if (!Utils.isTypeEqual(iotdbType, flinkType)) {
