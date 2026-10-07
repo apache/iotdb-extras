@@ -110,6 +110,21 @@ public class IoTDBLookupFunctionTest {
   }
 
   @Test
+  public void missingTimestampReturnsNoRow() throws Exception {
+    // Nothing is stored at time 6, so the lookup must not emit a row; otherwise an inner join
+    // would report a match for a key that does not exist.
+    SessionDataSet dataSet = mock(SessionDataSet.class);
+    when(dataSet.getColumnNames())
+        .thenReturn(new ArrayList<>(Arrays.asList("Time", "root.sg.d1.s0", "root.sg.d1.s1")));
+    when(dataSet.next()).thenReturn(null);
+    when(session.executeQueryStatement(anyString())).thenReturn(dataSet);
+
+    function.eval(6L);
+
+    assertTrue(collected.isEmpty());
+  }
+
+  @Test
   public void fullyPopulatedRowIsReturnedUnchanged() throws Exception {
     serverReturns(4L, floatField(24.25f), floatField(34.75f));
 

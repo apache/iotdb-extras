@@ -111,13 +111,8 @@ public class IoTDBLookupFunction extends TableFunction<RowData> {
     columnNames.remove("Time");
     RowRecord rowRecord = dataSet.next();
     if (rowRecord == null) {
-      ArrayList<Object> values = new ArrayList<>();
-      values.add(timestamp);
-      for (int i = 0; i < schema.size(); i++) {
-        values.add(null);
-      }
-      GenericRowData rowData = GenericRowData.of(values.toArray());
-      collect(rowData);
+      // No row at this timestamp: emit nothing, so that an inner join drops the key and a left
+      // join pads it with nulls itself.
       return;
     }
     List<Field> fields = rowRecord.getFields();
