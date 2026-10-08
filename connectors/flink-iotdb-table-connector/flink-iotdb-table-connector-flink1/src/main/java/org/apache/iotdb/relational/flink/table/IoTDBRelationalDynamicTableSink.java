@@ -53,7 +53,8 @@ public class IoTDBRelationalDynamicTableSink implements DynamicTableSink {
 
   @Override
   public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
-    SinkDataConverter<RowData> converter = new RowDataSinkDataConverter();
+    SinkDataConverter<RowData> converter =
+        new RowDataSinkDataConverter(schema.toPhysicalRowDataType());
     return SinkV2Provider.of(
         new IoTDBSink<>(options, schema.toPhysicalRowDataType(), converter));
   }

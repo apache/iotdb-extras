@@ -22,6 +22,7 @@ package org.apache.iotdb.relational.flink.sink;
 import org.apache.iotdb.isession.ITableSession;
 import org.apache.iotdb.relational.flink.cfg.IoTDBOptions;
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
+import org.apache.iotdb.relational.flink.utils.TimestampPrecision;
 import org.apache.iotdb.session.TableSessionBuilder;
 
 import org.apache.flink.api.connector.sink2.SinkWriter;
@@ -32,6 +33,7 @@ import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.write.record.Tablet;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -241,7 +243,7 @@ public class IoTDBSinkWriter<IN> implements SinkWriter<IN> {
     }
 
     int row = buffer.getRowSize();
-    buffer.addTimestamp(row, iterator.getTimestamp(timeColumnIndex));
+    buffer.addTimestamp(row, toUnits(iterator.getTimestamp(timeColumnIndex)));
     for (int i = 0; i < columnNames.size(); i++) {
       buffer.addValue(
           columnNames.get(i), row, readValue(iterator, columnIndexes[i], columnTsTypes.get(i)));
@@ -273,10 +275,15 @@ public class IoTDBSinkWriter<IN> implements SinkWriter<IN> {
       case DATE:
         return iterator.getDate(columnIndex);
       case TIMESTAMP:
-        return iterator.getTimestamp(columnIndex);
+        return toUnits(iterator.getTimestamp(columnIndex));
       default:
         throw new IOException("Unsupported IoTDB data type for sink: " + dataType);
     }
+  }
+
+  private long toUnits(Timestamp timestamp) {
+    TimestampPrecision precision = options.getTimestampPrecision();
+    return precision.toUnits(timestamp.getTime(), timestamp.getNanos() % 1_000_000);
   }
 
   private static Set<String> normalizeColumns(List<String> columns) {

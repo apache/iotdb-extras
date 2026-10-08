@@ -19,6 +19,8 @@
 
 package org.apache.iotdb.relational.flink.cfg;
 
+import org.apache.iotdb.relational.flink.utils.TimestampPrecision;
+
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -76,23 +78,25 @@ public class IoTDBOptions implements Serializable {
           .enumType(ScanMode.class)
           .defaultValue(ScanMode.SNAPSHOT);
 
-  public static final ConfigOption<String> CDC_TOPIC =
-      ConfigOptions.key("iotdb.cdc.topic").stringType().noDefaultValue();
-
-  public static final ConfigOption<String> CDC_CONSUMER_GROUP =
-      ConfigOptions.key("iotdb.cdc.consumer-group").stringType().noDefaultValue();
-
   public static final ConfigOption<String> CDC_MODE =
       ConfigOptions.key("iotdb.cdc.mode").stringType().defaultValue("live");
 
   public static final ConfigOption<String> CDC_START_TIME =
       ConfigOptions.key("iotdb.cdc.start-time").stringType().noDefaultValue();
 
+  public static final ConfigOption<String> CDC_END_TIME =
+      ConfigOptions.key("iotdb.cdc.end-time").stringType().noDefaultValue();
+
   public static final ConfigOption<Long> CDC_POLL_TIMEOUT_MS =
       ConfigOptions.key("iotdb.cdc.poll-timeout-ms").longType().defaultValue(1000L);
 
   public static final ConfigOption<Boolean> CDC_AUTO_COMMIT =
       ConfigOptions.key("iotdb.cdc.auto-commit").booleanType().defaultValue(true);
+
+  public static final ConfigOption<TimestampPrecision> TIMESTAMP_PRECISION =
+      ConfigOptions.key("iotdb.timestamp-precision")
+          .enumType(TimestampPrecision.class)
+          .defaultValue(TimestampPrecision.MS);
 
   private static final String CDC_TOPIC_PREFIX = "flink_iotdb_table_";
 
@@ -114,12 +118,12 @@ public class IoTDBOptions implements Serializable {
   private final boolean lookupAsync;
   private final int lookupThreadSize;
   private final ScanMode scanMode;
-  private final String cdcTopic;
-  private final String cdcConsumerGroup;
   private final String cdcMode;
   private final String cdcStartTime;
+  private final String cdcEndTime;
   private final long cdcPollTimeoutMs;
   private final boolean cdcAutoCommit;
+  private final TimestampPrecision timestampPrecision;
 
   private IoTDBOptions(Builder builder) {
     this.nodeUrls = builder.nodeUrls;
@@ -134,12 +138,12 @@ public class IoTDBOptions implements Serializable {
     this.lookupAsync = builder.lookupAsync;
     this.lookupThreadSize = builder.lookupThreadSize;
     this.scanMode = builder.scanMode;
-    this.cdcTopic = builder.cdcTopic;
-    this.cdcConsumerGroup = builder.cdcConsumerGroup;
     this.cdcMode = builder.cdcMode;
     this.cdcStartTime = builder.cdcStartTime;
+    this.cdcEndTime = builder.cdcEndTime;
     this.cdcPollTimeoutMs = builder.cdcPollTimeoutMs;
     this.cdcAutoCommit = builder.cdcAutoCommit;
+    this.timestampPrecision = builder.timestampPrecision;
   }
 
   /**
@@ -206,6 +210,13 @@ public class IoTDBOptions implements Serializable {
   }
 
   /**
+   * @return the timestamp precision of the target IoTDB server.
+   */
+  public TimestampPrecision getTimestampPrecision() {
+    return timestampPrecision;
+  }
+
+  /**
    * @return whether an asynchronous lookup function is used for lookup joins.
    */
   public boolean isLookupAsync() {
@@ -234,23 +245,17 @@ public class IoTDBOptions implements Serializable {
   }
 
   /**
-   * @return the effective CDC topic name. When unset, it is derived from the connector marker and
-   *     the database/table names so the topic origin is recognizable.
+   * @return the CDC topic name, derived from the connector marker and the database/table names so
+   *     the topic origin is recognizable.
    */
   public String getCdcTopic() {
-    if (cdcTopic != null && !cdcTopic.isEmpty()) {
-      return cdcTopic;
-    }
     return CDC_TOPIC_PREFIX + sanitize(database) + "_" + sanitize(table);
   }
 
   /**
-   * @return the effective CDC consumer group id. When unset, it is derived from the topic name.
+   * @return the CDC consumer group id, derived from the topic name.
    */
   public String getCdcConsumerGroup() {
-    if (cdcConsumerGroup != null && !cdcConsumerGroup.isEmpty()) {
-      return cdcConsumerGroup;
-    }
     return getCdcTopic() + "_group";
   }
 
@@ -266,6 +271,13 @@ public class IoTDBOptions implements Serializable {
    */
   public String getCdcStartTime() {
     return cdcStartTime;
+  }
+
+  /**
+   * @return the CDC history end time, or {@code null} when unset.
+   */
+  public String getCdcEndTime() {
+    return cdcEndTime;
   }
 
   /**
@@ -308,12 +320,12 @@ public class IoTDBOptions implements Serializable {
     private boolean lookupAsync = false;
     private int lookupThreadSize = 5;
     private ScanMode scanMode = ScanMode.SNAPSHOT;
-    private String cdcTopic;
-    private String cdcConsumerGroup;
     private String cdcMode = "live";
     private String cdcStartTime;
+    private String cdcEndTime;
     private long cdcPollTimeoutMs = 1000L;
     private boolean cdcAutoCommit = true;
+    private TimestampPrecision timestampPrecision = TimestampPrecision.MS;
 
     public Builder withNodeUrls(List<String> nodeUrls) {
       this.nodeUrls = nodeUrls;
@@ -375,16 +387,6 @@ public class IoTDBOptions implements Serializable {
       return this;
     }
 
-    public Builder withCdcTopic(String cdcTopic) {
-      this.cdcTopic = cdcTopic;
-      return this;
-    }
-
-    public Builder withCdcConsumerGroup(String cdcConsumerGroup) {
-      this.cdcConsumerGroup = cdcConsumerGroup;
-      return this;
-    }
-
     public Builder withCdcMode(String cdcMode) {
       this.cdcMode = cdcMode;
       return this;
@@ -395,6 +397,11 @@ public class IoTDBOptions implements Serializable {
       return this;
     }
 
+    public Builder withCdcEndTime(String cdcEndTime) {
+      this.cdcEndTime = cdcEndTime;
+      return this;
+    }
+
     public Builder withCdcPollTimeoutMs(long cdcPollTimeoutMs) {
       this.cdcPollTimeoutMs = cdcPollTimeoutMs;
       return this;
@@ -402,6 +409,11 @@ public class IoTDBOptions implements Serializable {
 
     public Builder withCdcAutoCommit(boolean cdcAutoCommit) {
       this.cdcAutoCommit = cdcAutoCommit;
+      return this;
+    }
+
+    public Builder withTimestampPrecision(TimestampPrecision timestampPrecision) {
+      this.timestampPrecision = timestampPrecision;
       return this;
     }
 

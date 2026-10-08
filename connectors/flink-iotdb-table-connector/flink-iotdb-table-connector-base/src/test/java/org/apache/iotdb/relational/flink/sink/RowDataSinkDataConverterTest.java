@@ -19,9 +19,11 @@
 
 package org.apache.iotdb.relational.flink.sink;
 
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
 import org.apache.tsfile.utils.Binary;
 import org.junit.Test;
@@ -38,7 +40,16 @@ import static org.junit.Assert.fail;
 
 public class RowDataSinkDataConverterTest {
 
-  private final RowDataSinkDataConverter converter = new RowDataSinkDataConverter();
+  private static final DataType ROW_TYPE =
+      DataTypes.ROW(
+          DataTypes.FIELD("time", DataTypes.TIMESTAMP(3)),
+          DataTypes.FIELD("s", DataTypes.STRING()),
+          DataTypes.FIELD("i", DataTypes.INT()),
+          DataTypes.FIELD("d", DataTypes.DOUBLE()),
+          DataTypes.FIELD("date", DataTypes.DATE()),
+          DataTypes.FIELD("b", DataTypes.BYTES()));
+
+  private final RowDataSinkDataConverter converter = new RowDataSinkDataConverter(ROW_TYPE);
 
   @Test
   public void testYieldsOneRowPerInput() throws IOException {
@@ -57,7 +68,7 @@ public class RowDataSinkDataConverterTest {
     try (SinkDataConverter.Iterator iterator = converter.getIterator(rowData())) {
       assertTrue(iterator.next());
 
-      assertEquals(1000L, iterator.getTimestamp(0));
+      assertEquals(1000L, iterator.getTimestamp(0).getTime());
       assertEquals("t", iterator.getString(1));
       assertEquals(7, iterator.getInt(2));
       assertEquals(2.5d, iterator.getDouble(3), 0.0d);

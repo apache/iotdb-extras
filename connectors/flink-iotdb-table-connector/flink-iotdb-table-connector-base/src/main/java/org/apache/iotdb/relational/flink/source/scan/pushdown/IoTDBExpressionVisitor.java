@@ -20,6 +20,7 @@
 package org.apache.iotdb.relational.flink.source.scan.pushdown;
 
 import org.apache.iotdb.relational.flink.utils.IoTDBUtils;
+import org.apache.iotdb.relational.flink.utils.TimestampPrecision;
 
 import org.apache.flink.table.expressions.CallExpression;
 import org.apache.flink.table.expressions.Expression;
@@ -99,6 +100,12 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
     FLINK_TO_IOTDB_FUNCTION_NAMES = Collections.unmodifiableMap(functionNames);
   }
 
+  private final TimestampPrecision timestampPrecision;
+
+  public IoTDBExpressionVisitor(TimestampPrecision timestampPrecision) {
+    this.timestampPrecision = timestampPrecision;
+  }
+
   @Override
   public String visit(CallExpression call) {
     if (call == null || call.getFunctionDefinition().getKind() != FunctionKind.SCALAR) {
@@ -114,7 +121,7 @@ public class IoTDBExpressionVisitor implements ExpressionVisitor<String> {
 
   @Override
   public String visit(ValueLiteralExpression valueLiteral) {
-    return IoTDBUtils.renderLiteral(valueLiteral);
+    return IoTDBUtils.renderLiteral(valueLiteral, timestampPrecision);
   }
 
   @Override

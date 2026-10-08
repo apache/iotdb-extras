@@ -23,6 +23,7 @@ import org.apache.tsfile.utils.Binary;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 
 /**
@@ -72,8 +73,11 @@ public interface SinkDataConverter<IN> extends Serializable {
 
     LocalDate getDate(int columnIndex) throws IOException;
 
-    /** Returns the TIME value of the current row as epoch milliseconds. */
-    long getTimestamp(int columnIndex) throws IOException;
+    /**
+     * Returns the timestamp value of the current row, keeping the sub-millisecond part. The sink
+     * converts it to the target IoTDB timestamp precision.
+     */
+    Timestamp getTimestamp(int columnIndex) throws IOException;
 
     @Override
     default void close() throws IOException {}

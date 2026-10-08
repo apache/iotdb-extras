@@ -176,7 +176,10 @@ public class IoTDBSubscriptionSourceReader<OUT>
       }
       for (ResultSet resultSet : message.getResultSets()) {
         SubscriptionDataIterator iterator =
-            new SubscriptionDataIterator((SubscriptionResultSet) resultSet, projectedColumns);
+            new SubscriptionDataIterator(
+                (SubscriptionResultSet) resultSet,
+                projectedColumns,
+                options.getTimestampPrecision());
         while (iterator.next()) {
           OUT record = deserializer.deserialize(iterator);
           if (record != null) {

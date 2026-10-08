@@ -20,6 +20,7 @@
 package org.apache.iotdb.relational.flink.source.cdc;
 
 import org.apache.iotdb.relational.flink.source.common.IoTDBDataIterator;
+import org.apache.iotdb.relational.flink.utils.TimestampPrecision;
 import org.apache.iotdb.session.subscription.payload.SubscriptionRecordHandler.SubscriptionResultSet;
 
 import java.io.IOException;
@@ -44,12 +45,16 @@ public class SubscriptionDataIterator implements IoTDBDataIterator {
   private final SubscriptionResultSet resultSet;
   private final List<String> columnNames;
   private final int[] sourceIndexes;
+  private final TimestampPrecision timestampPrecision;
 
   public SubscriptionDataIterator(
-      SubscriptionResultSet resultSet, List<String> projectedColumns) {
+      SubscriptionResultSet resultSet,
+      List<String> projectedColumns,
+      TimestampPrecision timestampPrecision) {
     this.resultSet = resultSet;
     this.columnNames = Collections.unmodifiableList(new ArrayList<>(projectedColumns));
     this.sourceIndexes = resolveSourceIndexes(resultSet.getColumnNames(), projectedColumns);
+    this.timestampPrecision = timestampPrecision;
   }
 
   private static int[] resolveSourceIndexes(
@@ -133,6 +138,6 @@ public class SubscriptionDataIterator implements IoTDBDataIterator {
 
   @Override
   public Timestamp getTimestamp(int columnIndex) {
-    return new Timestamp(resultSet.getLong(sourceIndexes[columnIndex]));
+    return timestampPrecision.toTimestamp(resultSet.getLong(sourceIndexes[columnIndex]));
   }
 }

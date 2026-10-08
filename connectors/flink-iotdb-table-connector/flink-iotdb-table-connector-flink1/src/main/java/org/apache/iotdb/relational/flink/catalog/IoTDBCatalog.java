@@ -418,7 +418,8 @@ public class IoTDBCatalog extends AbstractCatalog {
     for (int i = 0; i < columns.size(); i++) {
       IMeasurementSchema column = columns.get(i);
       schemaBuilder.column(
-          column.getMeasurementName(), IoTDBUtils.toFlinkDataType(column.getType()));
+          column.getMeasurementName(),
+          IoTDBUtils.toFlinkDataType(column.getType(), options.getTimestampPrecision()));
       switch (categories.get(i)) {
         case TIME:
           timeColumn = column.getMeasurementName();

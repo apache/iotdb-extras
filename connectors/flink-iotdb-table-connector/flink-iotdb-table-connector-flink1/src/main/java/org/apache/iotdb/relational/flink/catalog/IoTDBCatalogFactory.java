@@ -50,7 +50,8 @@ public class IoTDBCatalogFactory implements CatalogFactory {
         Arrays.asList(
             IoTDBOptions.USER,
             IoTDBOptions.PASSWORD,
-            IoTDBOptions.DEFAULT_DATABASE));
+            IoTDBOptions.DEFAULT_DATABASE,
+            IoTDBOptions.TIMESTAMP_PRECISION));
   }
 
   @Override
@@ -68,6 +69,7 @@ public class IoTDBCatalogFactory implements CatalogFactory {
         .withUsername(config.get(IoTDBOptions.USER))
         .withPassword(config.get(IoTDBOptions.PASSWORD))
         .withDefaultDatabase(config.get(IoTDBOptions.DEFAULT_DATABASE))
+        .withTimestampPrecision(config.get(IoTDBOptions.TIMESTAMP_PRECISION))
         .build();
   }
 }

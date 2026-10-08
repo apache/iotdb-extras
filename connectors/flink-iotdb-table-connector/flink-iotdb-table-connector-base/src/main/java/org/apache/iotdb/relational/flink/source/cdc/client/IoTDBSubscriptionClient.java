@@ -26,6 +26,8 @@ import org.apache.iotdb.session.subscription.SubscriptionTableSessionBuilder;
 import org.apache.iotdb.session.subscription.consumer.ISubscriptionTablePullConsumer;
 import org.apache.iotdb.session.subscription.consumer.table.SubscriptionTablePullConsumerBuilder;
 
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Properties;
 
@@ -47,9 +49,13 @@ public final class IoTDBSubscriptionClient {
     properties.setProperty(TopicConstant.TABLE_KEY, options.getTable());
     properties.setProperty(TopicConstant.MODE_KEY, options.getCdcMode());
     properties.setProperty(TopicConstant.FORMAT_KEY, TopicConstant.FORMAT_RECORD_HANDLER_VALUE);
-    if (options.getCdcStartTime() != null && !options.getCdcStartTime().isEmpty()) {
-      properties.setProperty(TopicConstant.START_TIME_KEY, options.getCdcStartTime());
-    }
+    setTimeProperty(
+        properties,
+        TopicConstant.START_TIME_KEY,
+        "iotdb.cdc.start-time",
+        options.getCdcStartTime());
+    setTimeProperty(
+        properties, TopicConstant.END_TIME_KEY, "iotdb.cdc.end-time", options.getCdcEndTime());
 
     try (ISubscriptionTableSession session =
         new SubscriptionTableSessionBuilder()
@@ -72,6 +78,52 @@ public final class IoTDBSubscriptionClient {
         .consumerGroupId(options.getCdcConsumerGroup())
         .autoCommit(options.isCdcAutoCommit())
         .build();
+  }
+
+  private static void setTimeProperty(
+      Properties properties, String key, String optionName, String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return;
+    }
+    properties.setProperty(key, validateTimeValue(value.trim(), optionName));
+  }
+
+  private static String validateTimeValue(String value, String optionName) {
+    if ("now".equalsIgnoreCase(value)) {
+      return value;
+    }
+    try {
+      Long.parseLong(value);
+      return value;
+    } catch (NumberFormatException ignored) {
+      // Not a raw long timestamp; fall through to the datetime formats.
+    }
+    if (isIsoDateTime(value)) {
+      return value;
+    }
+    throw new IllegalArgumentException(
+        "Invalid value for '"
+            + optionName
+            + "': "
+            + value
+            + ". Expected 'now', an ISO datetime (e.g. 2011-12-03T10:15:30), or a raw long"
+            + " timestamp in the IoTDB timestamp precision.");
+  }
+
+  private static boolean isIsoDateTime(String value) {
+    return parseable(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        || parseable(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        || parseable(value, DateTimeFormatter.ISO_LOCAL_DATE)
+        || parseable(value.replace(' ', 'T'), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+  }
+
+  private static boolean parseable(String value, DateTimeFormatter formatter) {
+    try {
+      formatter.parse(value);
+      return true;
+    } catch (DateTimeParseException e) {
+      return false;
+    }
   }
 
   private static String[] splitNodeUrl(String nodeUrl) {

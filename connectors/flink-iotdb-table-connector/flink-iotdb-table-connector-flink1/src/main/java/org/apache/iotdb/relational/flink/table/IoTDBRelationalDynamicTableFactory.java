@@ -86,12 +86,12 @@ public class IoTDBRelationalDynamicTableFactory
             IoTDBOptions.LOOKUP_ASYNC,
             IoTDBOptions.LOOKUP_THREAD_SIZE,
             IoTDBOptions.SCAN_MODE,
-            IoTDBOptions.CDC_TOPIC,
-            IoTDBOptions.CDC_CONSUMER_GROUP,
             IoTDBOptions.CDC_MODE,
             IoTDBOptions.CDC_START_TIME,
+            IoTDBOptions.CDC_END_TIME,
             IoTDBOptions.CDC_POLL_TIMEOUT_MS,
             IoTDBOptions.CDC_AUTO_COMMIT,
+            IoTDBOptions.TIMESTAMP_PRECISION,
             LookupOptions.CACHE_TYPE,
             LookupOptions.PARTIAL_CACHE_MAX_ROWS,
             LookupOptions.PARTIAL_CACHE_EXPIRE_AFTER_WRITE,
@@ -112,12 +112,12 @@ public class IoTDBRelationalDynamicTableFactory
         .withLookupAsync(config.get(IoTDBOptions.LOOKUP_ASYNC))
         .withLookupThreadSize(config.get(IoTDBOptions.LOOKUP_THREAD_SIZE))
         .withScanMode(config.get(IoTDBOptions.SCAN_MODE))
-        .withCdcTopic(config.get(IoTDBOptions.CDC_TOPIC))
-        .withCdcConsumerGroup(config.get(IoTDBOptions.CDC_CONSUMER_GROUP))
         .withCdcMode(config.get(IoTDBOptions.CDC_MODE))
         .withCdcStartTime(config.get(IoTDBOptions.CDC_START_TIME))
+        .withCdcEndTime(config.get(IoTDBOptions.CDC_END_TIME))
         .withCdcPollTimeoutMs(config.get(IoTDBOptions.CDC_POLL_TIMEOUT_MS))
         .withCdcAutoCommit(config.get(IoTDBOptions.CDC_AUTO_COMMIT))
+        .withTimestampPrecision(config.get(IoTDBOptions.TIMESTAMP_PRECISION))
         .build();
   }
 

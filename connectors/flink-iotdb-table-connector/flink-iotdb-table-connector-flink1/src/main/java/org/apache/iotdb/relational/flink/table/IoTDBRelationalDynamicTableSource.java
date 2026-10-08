@@ -179,7 +179,8 @@ public class IoTDBRelationalDynamicTableSource
 
     List<ResolvedExpression> acceptedFilters = new ArrayList<>();
     List<ResolvedExpression> remainingFilters = new ArrayList<>();
-    IoTDBExpressionVisitor expressionVisitor = new IoTDBExpressionVisitor();
+    IoTDBExpressionVisitor expressionVisitor =
+        new IoTDBExpressionVisitor(options.getTimestampPrecision());
     for (ResolvedExpression filter : filters) {
       String filterQuery = filter.accept(expressionVisitor);
       if (filterQuery == null || filterQuery.trim().isEmpty()) {
@@ -205,7 +206,11 @@ public class IoTDBRelationalDynamicTableSource
     // after any projection that has already been pushed into this source.
     AggregateSpec spec =
         IoTDBUtils.translateAggregate(
-            groupingSets, aggregateExpressions, physicalRowDataType, producedDataType);
+            groupingSets,
+            aggregateExpressions,
+            physicalRowDataType,
+            producedDataType,
+            options.getTimestampPrecision());
     if (spec == null) {
       return false;
     }

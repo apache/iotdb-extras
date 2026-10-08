@@ -103,7 +103,8 @@ public final class IoTDBUtils {
     }
   }
 
-  public static DataType toFlinkDataType(TSDataType dataType) {
+  public static DataType toFlinkDataType(
+      TSDataType dataType, TimestampPrecision timestampPrecision) {
     switch (dataType) {
       case BOOLEAN:
         return DataTypes.BOOLEAN();
@@ -123,7 +124,7 @@ public final class IoTDBUtils {
       case DATE:
         return DataTypes.DATE();
       case TIMESTAMP:
-        return DataTypes.TIMESTAMP(3);
+        return DataTypes.TIMESTAMP(timestampPrecision.getFlinkPrecision());
       default:
         throw new CatalogException("Unsupported IoTDB data type: " + dataType);
     }
@@ -299,7 +300,8 @@ public final class IoTDBUtils {
    * Renders a Flink planner literal as an IoTDB SQL literal. Returns {@code null} if the literal
    * type or value cannot be represented in IoTDB SQL.
    */
-  public static String renderLiteral(ValueLiteralExpression literal) {
+  public static String renderLiteral(
+      ValueLiteralExpression literal, TimestampPrecision timestampPrecision) {
     if (literal == null || literal.isNull()) {
       return null;
     }
@@ -340,16 +342,18 @@ public final class IoTDBUtils {
               .getValueAs(LocalDate.class)
               .map(value -> "CAST('" + value + "' AS DATE)")
               .orElse(null);
-        case TIMESTAMP_WITHOUT_TIME_ZONE:
-          return literal
-              .getValueAs(LocalDateTime.class)
-              .map(value -> "CAST('" + value + "' AS TIMESTAMP)")
-              .orElse(null);
-        case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-          return literal
-              .getValueAs(Instant.class)
-              .map(value -> "CAST('" + value + "' AS TIMESTAMP)")
-              .orElse(null);
+        case TIMESTAMP_WITHOUT_TIME_ZONE: {
+          LocalDateTime value = literal.getValueAs(LocalDateTime.class).orElse(null);
+          return value == null
+              ? null
+              : renderTimestampLiteral(TimestampData.fromLocalDateTime(value), timestampPrecision);
+        }
+        case TIMESTAMP_WITH_LOCAL_TIME_ZONE: {
+          Instant value = literal.getValueAs(Instant.class).orElse(null);
+          return value == null
+              ? null
+              : renderTimestampLiteral(TimestampData.fromInstant(value), timestampPrecision);
+        }
         default:
           return null;
       }
@@ -362,7 +366,8 @@ public final class IoTDBUtils {
    * Renders a runtime {@link RowData} field as an IoTDB SQL literal. Returns {@code null} when the
    * value is {@code null} or cannot be represented in IoTDB SQL.
    */
-  public static String renderLiteral(RowData row, int position, DataType dataType) {
+  public static String renderLiteral(
+      RowData row, int position, DataType dataType, TimestampPrecision timestampPrecision) {
     if (row == null || row.isNullAt(position) || dataType == null) {
       return null;
     }
@@ -395,11 +400,8 @@ public final class IoTDBUtils {
       case DATE:
         return "CAST('" + LocalDate.ofEpochDay(row.getInt(position)) + "' AS DATE)";
       case TIMESTAMP_WITHOUT_TIME_ZONE:
-        return "CAST('"
-            + getTimestamp(row, position, dataType).toLocalDateTime()
-            + "' AS TIMESTAMP)";
       case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-        return "CAST('" + getTimestamp(row, position, dataType).toInstant() + "' AS TIMESTAMP)";
+        return renderTimestampLiteral(getTimestamp(row, position, dataType), timestampPrecision);
       default:
         return null;
     }
@@ -417,7 +419,8 @@ public final class IoTDBUtils {
       List<int[]> groupingSets,
       List<AggregateExpression> aggregateExpressions,
       DataType sourceRowDataType,
-      DataType producedDataType) {
+      DataType producedDataType,
+      TimestampPrecision timestampPrecision) {
     if (groupingSets == null
         || groupingSets.size() != 1
         || aggregateExpressions == null
@@ -450,7 +453,7 @@ public final class IoTDBUtils {
       selectExpressions.add(column);
     }
 
-    IoTDBExpressionVisitor visitor = new IoTDBExpressionVisitor();
+    IoTDBExpressionVisitor visitor = new IoTDBExpressionVisitor(timestampPrecision);
     for (int i = 0; i < aggregateExpressions.size(); i++) {
       int producedIndex = grouping.length + i;
       if (producedIndex >= producedFieldTypes.size()) {
@@ -564,6 +567,13 @@ public final class IoTDBUtils {
   private static TimestampData getTimestamp(RowData row, int position, DataType dataType) {
     int precision = ((TimestampType) dataType.getLogicalType()).getPrecision();
     return row.getTimestamp(position, precision);
+  }
+
+  private static String renderTimestampLiteral(
+      TimestampData timestamp, TimestampPrecision timestampPrecision) {
+    long units =
+        timestampPrecision.toUnits(timestamp.getMillisecond(), timestamp.getNanoOfMillisecond());
+    return "CAST(" + units + " AS TIMESTAMP)";
   }
 
   private static boolean isFinite(float value) {
