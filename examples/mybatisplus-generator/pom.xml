@@ -22,30 +22,66 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.1</version>
-        <relativePath/>
-        <!-- lookup parent from repository -->
+        <groupId>org.apache.iotdb</groupId>
+        <artifactId>examples</artifactId>
+        <version>2.0.4-SNAPSHOT</version>
     </parent>
-    <groupId>org.apache.iotdb</groupId>
     <artifactId>mybatisplus-generator-example</artifactId>
     <name>IoTDB: Example: Mybatis Plus Generator</name>
     <version>2.0.4-SNAPSHOT</version>
     <properties>
-        <mybatisplus.version>3.5.10</mybatisplus.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <mybatisplus.version>3.5.15</mybatisplus.version>
+        <mybatisplus-starter>mybatis-plus-spring-boot3-starter</mybatisplus-starter>
+        <web-starter>spring-boot-starter-web</web-starter>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+          The reactor parent manages spring-boot, spring-boot-autoconfigure, the spring-* artifacts,
+          jackson-bom and mockito-core for the legacy Boot 2 / Spring 5 Grafana WAR. Inherited
+          management wins over the BOM imported below, so those lines are re-pointed at the
+          Spring Boot 3.5.1 values here and at the Spring Boot 4.1.1 values in the spring-boot4
+          profile. Logging (slf4j, logback) stays on the reactor's line.
+        -->
         <spring-boot.version>3.5.1</spring-boot.version>
-        <iotdb-jdbc.version>2.0.5</iotdb-jdbc.version>
-        <io-springfox.version>3.0.0</io-springfox.version>
+        <spring.version>6.2.8</spring.version>
+        <jackson.version>2.19.1</jackson.version>
+        <jackson-annotations.version>2.19.1</jackson-annotations.version>
+        <mockito.version>5.17.0</mockito.version>
     </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!--
+              Jackson 2.21 publishes jackson-annotations as 2.21 while the rest of the line is
+              2.21.x; the reactor pins jackson-annotations to ${jackson.version}, so re-pin it here.
+            -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson-annotations.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <dependencies>
         <dependency>
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>mybatis-support</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <artifactId>${mybatisplus-starter}</artifactId>
             <version>${mybatisplus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity-engine-core</artifactId>
+            <version>2.4.1</version>
         </dependency>
         <dependency>
             <groupId>com.baomidou</groupId>
@@ -55,7 +91,6 @@
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>iotdb-jdbc</artifactId>
-            <version>${iotdb-jdbc.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>commons-logging</groupId>
@@ -66,37 +101,20 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
-            <version>${spring-boot.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>${web-starter}</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <version>${spring-boot.version}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger2</artifactId>
-            <version>${io-springfox.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger-ui</artifactId>
-            <version>${io-springfox.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.36</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.jeffreyning</groupId>
-            <artifactId>mybatisplus-plus</artifactId>
-            <version>1.7.5-RELEASE</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
@@ -110,27 +128,63 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.mybatis.generator</groupId>
-                <artifactId>mybatis-generator-maven-plugin</artifactId>
-                <version>1.4.2</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.iotdb</groupId>
-                        <artifactId>mybatis-generator-plugin</artifactId>
-                        <version>2.0.4-SNAPSHOT</version>
-                    </dependency>
-                </dependencies>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <verbose>true</verbose>
-                    <overwrite>true</overwrite>
-                    <configurationFile>src/main/resources/generatorConfig.xml</configurationFile>
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>com.diffplug.spotless</groupId>
-                <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.43.0</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <!-- JUnit Platform 6 (Spring Boot 4) needs a newer provider than the reactor's 3.1.2. -->
+                <version>3.5.3</version>
+                <executions>
+                    <!-- *IT classes need a live server; they run through failsafe under iotdb-mybatis-it. -->
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.3</version>
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>spring-boot4</id>
+            <properties>
+                <spring-boot.version>4.1.1</spring-boot.version>
+                <spring.version>7.0.9</spring.version>
+                <jackson.version>2.21.5</jackson.version>
+                <jackson-annotations.version>2.21</jackson-annotations.version>
+                <mockito.version>5.23.0</mockito.version>
+                <mybatisplus-starter>mybatis-plus-spring-boot4-starter</mybatisplus-starter>
+                <web-starter>spring-boot-starter-webmvc</web-starter>
+            </properties>
+        </profile>
+        <profile>
+            <id>iotdb-mybatis-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

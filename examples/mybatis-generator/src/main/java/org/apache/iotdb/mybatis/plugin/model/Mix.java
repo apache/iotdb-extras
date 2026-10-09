@@ -23,7 +23,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDate;
 
 /**
  * table: test.mix of model class
@@ -37,7 +37,7 @@ public class Mix implements Serializable {
   /** class serial version id */
   private static final long serialVersionUID = 1L;
 
-  private Date time;
+  private Long time;
 
   private String deviceId;
 
@@ -49,11 +49,15 @@ public class Mix implements Serializable {
 
   private String maintenance;
 
-  private Double temperature;
+  private Float temperature;
 
-  private Double humidity;
+  private Float humidity;
 
   private Boolean status;
 
-  private Date arrivalTime;
+  private Long arrivalTime;
+
+  private LocalDate readingDate;
+
+  private byte[] payload;
 }

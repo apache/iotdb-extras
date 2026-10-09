@@ -19,7 +19,7 @@
 
 # TC-1 ingestion-throughput SMOKE-profile bench stack.
 #
-# This is the smoke profile: a single, clean-volume IoTDB 2.0.8 node for a fast,
+# This is the smoke profile: a single, clean-volume IoTDB 2.0.11 node for a fast,
 # reproducible local benchmark run. It mirrors docker-compose.test.yml but ships
 # only the IoTDB service on a dedicated fresh volume so each run starts from an
 # empty store. The benchmark IT (IoTDBTableIngestionBenchmarkIT) provisions its
@@ -34,7 +34,7 @@
 
 services:
   iotdb:
-    image: apache/iotdb:2.0.8-standalone
+    image: apache/iotdb:2.0.11-standalone
     container_name: iotdb-table-bench
     environment:
       IOTDB_USERNAME: ${IOTDB_USERNAME:?set IOTDB_USERNAME}

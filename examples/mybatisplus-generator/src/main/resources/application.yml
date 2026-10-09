@@ -21,3 +21,6 @@ spring:
     username: root
     password: root
     driver-class-name: org.apache.iotdb.jdbc.IoTDBDriver
+mybatis-plus:
+  mapper-locations: classpath*:mappers/*.xml
+  type-handlers-package: org.apache.iotdb.mybatis.type

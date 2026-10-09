@@ -25,6 +25,7 @@ import org.apache.iotdb.session.pool.TableSessionPoolBuilder;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
@@ -69,6 +70,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class IoTDBTableAttributesDaoIT {
+  private final List<String> createdDatabases = new ArrayList<>();
   // Cold testcontainer first writes/reads are slower than a warm production node, so the
   // per-future assertion timeout is generous.
   private static final int FUTURE_TIMEOUT_SECONDS = 30;
@@ -78,7 +80,9 @@ class IoTDBTableAttributesDaoIT {
 
   @Container
   static final GenericContainer<?> IOTDB =
-      new GenericContainer<>(DockerImageName.parse("apache/iotdb:2.0.8-standalone"))
+      new GenericContainer<>(
+              DockerImageName.parse(
+                  System.getProperty("iotdb.test.image", "apache/iotdb:2.0.11-standalone")))
           .withExposedPorts(6667)
           // IoTDB binds its client RPC service to dn_rpc_address (default 127.0.0.1); bind to all
           // interfaces so the Testcontainers port-mapped session handshake succeeds.
@@ -636,12 +640,28 @@ class IoTDBTableAttributesDaoIT {
         new TestEntityId(UUID.fromString(entityId), EntityType.DEVICE));
   }
 
+  @AfterEach
+  void dropCreatedDatabases() throws Exception {
+    // Every test provisions its own database. Drop them once the test is done: the shared
+    // container has a fixed region memory budget, and leaving dozens of databases behind makes
+    // later tests in the class fail schema-region creation ("Total allocated memory for direct
+    // buffer ... is greater than limit mem cost") and time out on their first write.
+    try (ITableSessionPool pool = newPool(null);
+        ITableSession session = pool.getSession()) {
+      for (String database : createdDatabases) {
+        session.executeNonQueryStatement("DROP DATABASE IF EXISTS " + database);
+      }
+    }
+  }
+
   private String uniqueDatabase(String prefix) {
     // IoTDB caps database names at 64 chars; keep the per-test prefix short and append a trimmed
     // UUID so the total length stays well within the limit.
     String shortPrefix = prefix.length() > 12 ? prefix.substring(0, 12) : prefix;
     String shortUuid = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    return "tb_at_" + shortPrefix + "_" + shortUuid;
+    String database = "tb_at_" + shortPrefix + "_" + shortUuid;
+    createdDatabases.add(database);
+    return database;
   }
 
   private TestAttributeKvEntry attr(long lastUpdateTs, String key, KvEntry value) {

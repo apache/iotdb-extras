@@ -99,7 +99,8 @@ public class TSFileConfigUtilCompletenessTest {
       "setDoubleCompression",
       "setInt32Compression",
       "setFloatCompression",
-      "setEncryptKeyFromToken"
+      "setEncryptKeyFromToken",
+      "setEncryptSalt"
     };
     Set<String> addedSetters = new HashSet<>();
     Collections.addAll(addedSetters, setters);

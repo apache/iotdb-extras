@@ -34,6 +34,14 @@
                 <include>mybatis-generator-plugin-*.jar</include>
             </includes>
         </fileSet>
+        <!-- The generated mappers need the runtime adapters (query interceptor, DATE/BLOB handlers). -->
+        <fileSet>
+            <directory>${maven.multiModuleProjectDirectory}/mybatis-support/target/</directory>
+            <outputDirectory>${file.separator}</outputDirectory>
+            <includes>
+                <include>mybatis-support-*.jar</include>
+            </includes>
+        </fileSet>
     </fileSets>
     <componentDescriptors>
         <componentDescriptor>common-files.xml</componentDescriptor>
