@@ -66,6 +66,25 @@ describe('starterTableQuery', () => {
     expect(starterTableQuery('t', [column('status', 'ATTRIBUTE')])).toBe('SELECT * FROM "t"');
   });
 
+  it('leaves string and boolean fields out when the table has numeric ones', () => {
+    const mixed = [
+      column('time', 'TIME', 'TIMESTAMP'),
+      column('device_id', 'TAG'),
+      column('temperature', 'FIELD', 'FLOAT'),
+      column('status', 'FIELD', 'STRING'),
+      column('online', 'FIELD', 'BOOLEAN'),
+      column('count', 'FIELD', 'INT64'),
+    ];
+    expect(starterTableQuery('weather', mixed)).toBe(
+      'SELECT "time", "device_id", "temperature", "count" FROM "weather" WHERE $__timeFilter("time")'
+    );
+  });
+
+  it('keeps every field when none of them is numeric', () => {
+    const text = [column('time', 'TIME', 'TIMESTAMP'), column('message', 'FIELD', 'TEXT')];
+    expect(starterTableQuery('log', text)).toBe('SELECT "time", "message" FROM "log" WHERE $__timeFilter("time")');
+  });
+
   it('uses the time column the table declares', () => {
     const renamed = [column('ts', 'TIME', 'TIMESTAMP'), column('v', 'FIELD', 'DOUBLE')];
     expect(starterTableQuery('t', renamed)).toBe('SELECT "ts", "v" FROM "t" WHERE $__timeFilter("ts")');

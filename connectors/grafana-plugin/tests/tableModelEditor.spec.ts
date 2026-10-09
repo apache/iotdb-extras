@@ -29,10 +29,10 @@ test('the table-model editor lists databases, tables and columns from the server
   await page.getByText('SQL: Full Customized', { exact: true }).first().click();
   await page.getByText('SQL: Table Model', { exact: true }).last().click();
 
-  await page.locator('#iotdb-table-database').click();
+  await page.locator('#iotdb-table-database-A').click();
   await page.getByRole('option', { name: 'information_schema' }).click();
 
-  await page.locator('#iotdb-table-table').click();
+  await page.locator('#iotdb-table-table-A').click();
   await page.getByRole('option', { name: 'tables', exact: true }).click();
 
   // The COLUMNS row is built from DESC, grouped by category.
@@ -87,3 +87,56 @@ test('the table-model editor lists databases, tables and columns from the server
   expect(frame.error, `query error: ${frame.error}`).toBeUndefined();
   expect(frame.frames[0].data.values[0].length).toBeGreaterThan(0);
 });
+
+test('the table-model pickers keep their value on Tab, commit typed names on blur and report failures inline', async ({
+  page,
+}) => {
+  await page.goto('/explore');
+  await page.getByText('SQL: Full Customized', { exact: true }).first().click();
+  await page.getByText('SQL: Table Model', { exact: true }).last().click();
+
+  const table = page.locator('#iotdb-table-table-A');
+  await page.locator('#iotdb-table-database-A').click();
+  await page.getByRole('option', { name: 'information_schema' }).click();
+  await table.click();
+  await page.getByRole('option', { name: 'tables', exact: true }).click();
+  await expect(page.getByText('table_name', { exact: false })).toBeVisible({ timeout: 30_000 });
+
+  // Opening a picker and pressing Tab must keep its value. "tables" is not the
+  // first table of information_schema, so a picker that focused the first
+  // option on open would switch to "columns" here.
+  await table.click();
+  await expect(page.getByRole('option', { name: 'tables', exact: true })).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.getByText('table_name', { exact: false })).toBeVisible();
+  await expect(page.getByText('column_name', { exact: false })).toHaveCount(0);
+
+  // A table name typed and left by clicking elsewhere is kept.
+  await table.click();
+  await page.keyboard.type('columns');
+  // Leave the picker the way a click elsewhere does (the open menu covers the labels).
+  await table.blur();
+  await expect(page.getByText('column_name', { exact: false })).toBeVisible({ timeout: 30_000 });
+
+  // Running the query from the editor sends the picked database and table.
+  const request = page.waitForRequest(
+    (r) => r.url().includes('/api/ds/query') && r.method() === 'POST' && (r.postData() ?? '').includes('Table Model')
+  );
+  await page.getByRole('button', { name: 'Use starter query' }).click();
+  await page.getByRole('button', { name: /run query/i }).first().click();
+  const sent = (await request).postDataJSON().queries[0];
+  expect(sent.database).toBe('information_schema');
+  expect(sent.table).toBe('columns');
+
+  // A failed lookup is reported next to the pickers and raises no global alert.
+  await table.click();
+  await page.keyboard.type('no_such_table');
+  // Leave the picker the way a click elsewhere does (the open menu covers the labels).
+  await table.blur();
+  await expect(page.getByText('Could not read metadata', { exact: false })).toBeVisible({ timeout: 30_000 });
+  // Explore's own default query can leave an unrelated alert when the page
+  // opens, so look for an alert about this lookup specifically.
+  await page.waitForTimeout(1_000);
+  await expect(page.getByTestId('data-testid Alert error').filter({ hasText: 'no_such_table' })).toHaveCount(0);
+});
+

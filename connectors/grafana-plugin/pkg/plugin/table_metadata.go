@@ -59,8 +59,10 @@ func (d *IoTDBDataSource) getTableDatabases() http.Handler {
 // query parameter.
 func (d *IoTDBDataSource) getTableTables() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		database := strings.TrimSpace(r.URL.Query().Get("database"))
-		if database == "" {
+		// The editor trims names when they are entered; here a blank name is only
+		// rejected, and the name is used as given.
+		database := r.URL.Query().Get("database")
+		if strings.TrimSpace(database) == "" {
 			writeJSONError(w, http.StatusBadRequest, "the database parameter is required")
 			return
 		}
@@ -82,9 +84,9 @@ func (d *IoTDBDataSource) getTableTables() http.Handler {
 // query parameters, in the server's column order.
 func (d *IoTDBDataSource) getTableColumns() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		database := strings.TrimSpace(r.URL.Query().Get("database"))
-		table := strings.TrimSpace(r.URL.Query().Get("table"))
-		if database == "" || table == "" {
+		database := r.URL.Query().Get("database")
+		table := r.URL.Query().Get("table")
+		if strings.TrimSpace(database) == "" || strings.TrimSpace(table) == "" {
 			writeJSONError(w, http.StatusBadRequest, "the database and table parameters are required")
 			return
 		}

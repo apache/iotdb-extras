@@ -148,8 +148,9 @@ export class QueryEditor extends PureComponent<Props, State> {
   onDatabaseChange = (database: string) => {
     const { onChange, query } = this.props;
     this.setState({ database });
-    // A table belongs to one database, so switching database clears it.
-    onChange({ ...query, database, table: undefined });
+    // A table belongs to one database, so switching database clears it. Picking
+    // the current database again is not a switch.
+    onChange({ ...query, database, table: database === query.database ? query.table : undefined });
   };
 
   onTableChange = (table: string) => {
@@ -422,6 +423,8 @@ export class QueryEditor extends PureComponent<Props, State> {
                 </div>
                 <TablePicker
                   datasource={this.props.datasource}
+                  refId={query.refId}
+                  scopedVars={this.props.data?.request?.scopedVars}
                   database={query.database ?? this.state.database}
                   table={query.table ?? ''}
                   onDatabaseChange={this.onDatabaseChange}

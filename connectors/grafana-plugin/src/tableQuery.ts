@@ -26,18 +26,25 @@ export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+// Numeric FIELD types. The Time series format plots these; string and boolean
+// fields are treated as factors and split each device into extra series.
+const numericTypes = ['INT32', 'INT64', 'FLOAT', 'DOUBLE'];
+
 // starterTableQuery builds a first query for a table: the time column, every
-// TAG column and every FIELD column, limited to the dashboard's time range.
-// ATTRIBUTE columns are left out because they do not change over time. The
-// TAG columns are what the Time series format uses to split the result into
-// one series per device. A table without a time column, such as the views in
-// information_schema, gets no time filter.
+// TAG column and the numeric FIELD columns, limited to the dashboard's time
+// range. ATTRIBUTE columns are left out because they do not change over time.
+// The TAG columns are what the Time series format uses to split the result into
+// one series per device. A table with no numeric field, such as the views in
+// information_schema, gets all of its fields instead, and a table without a
+// time column gets no time filter.
 export function starterTableQuery(table: string, columns: TableColumn[]): string {
   const time = columns.find((c) => c.category === 'TIME')?.name;
+  const fields = columns.filter((c) => c.category === 'FIELD');
+  const numericFields = fields.filter((c) => numericTypes.includes(c.dataType.toUpperCase()));
   const selected = [
     ...(time ? [time] : []),
     ...columns.filter((c) => c.category === 'TAG').map((c) => c.name),
-    ...columns.filter((c) => c.category === 'FIELD').map((c) => c.name),
+    ...(numericFields.length > 0 ? numericFields : fields).map((c) => c.name),
   ].map(quoteIdentifier);
   const projection = selected.length > 0 ? selected.join(', ') : '*';
   const from = `SELECT ${projection} FROM ${quoteIdentifier(table)}`;

@@ -181,22 +181,25 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
       .then((data) => data.map(toMetricFindValue));
   }
 
-  // Metadata behind the table-model editor's pickers. Template variables are
-  // expanded first, so a dashboard whose database is `$database` still lists
-  // its tables.
+  // resolveTemplate expands dashboard variables in a database or table name the
+  // same way applyTemplateVariables does when the query runs.
+  resolveTemplate(value: string, scopedVars?: ScopedVars): string {
+    return getTemplateSrv().replace(value, scopedVars);
+  }
+
+  // Metadata behind the table-model editor's pickers. Callers pass names that
+  // resolveTemplate has already expanded. The editor shows a failed lookup
+  // inline, so it is not also raised as a global error alert.
   getTableDatabases(): Promise<string[]> {
-    return this.getResource('tableDatabases');
+    return this.getResource('tableDatabases', undefined, { showErrorAlert: false });
   }
 
   getTableTables(database: string): Promise<string[]> {
-    return this.getResource('tableTables', { database: getTemplateSrv().replace(database) });
+    return this.getResource('tableTables', { database }, { showErrorAlert: false });
   }
 
   getTableColumns(database: string, table: string): Promise<TableColumn[]> {
-    return this.getResource('tableColumns', {
-      database: getTemplateSrv().replace(database),
-      table: getTemplateSrv().replace(table),
-    });
+    return this.getResource('tableColumns', { database, table }, { showErrorAlert: false });
   }
 
   async getVariablesResult(sql: string) {

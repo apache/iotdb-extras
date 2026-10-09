@@ -301,3 +301,19 @@ describe('query type model', () => {
     expect(getQueryType({ ...query, instant: true })).toBe('Instant');
   });
 });
+
+describe('table-model metadata lookups', () => {
+  it('do not raise a global error alert, since the editor shows failures inline', async () => {
+    const ds = new DataSource({ jsonData: { url: 'http://localhost:6667', username: 'root' } } as any);
+    const getResource = jest.fn().mockResolvedValue([]);
+    (ds as unknown as { getResource: jest.Mock }).getResource = getResource;
+    await ds.getTableDatabases();
+    await ds.getTableTables('db');
+    await ds.getTableColumns('db', 't');
+    expect(getResource.mock.calls).toEqual([
+      ['tableDatabases', undefined, { showErrorAlert: false }],
+      ['tableTables', { database: 'db' }, { showErrorAlert: false }],
+      ['tableColumns', { database: 'db', table: 't' }, { showErrorAlert: false }],
+    ]);
+  });
+});

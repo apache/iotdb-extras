@@ -140,6 +140,25 @@ func TestTableColumnsQuotesTheTableName(t *testing.T) {
 	}
 }
 
+func TestTableColumnsUsesTheNamesAsGiven(t *testing.T) {
+	var calls []recordedStatement
+	d := metadataDataSource(&tableQueryDataSet{
+		ColumnNames: []string{"ColumnName", "DataType", "Category"},
+		Values:      [][]interface{}{{"time", "TIMESTAMP", "TIME"}},
+	}, nil, &calls)
+
+	recorder := serveMetadata(t, d.getTableColumns(), `/tableColumns?database=grafana_demo&table=weather%20`)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	// The editor trims names when they are entered, so the handler does not trim
+	// again: the columns it lists are those of the table the starter query names.
+	if want := []recordedStatement{{database: "grafana_demo", sql: `DESC "weather "`}}; !reflect.DeepEqual(calls, want) {
+		t.Fatalf("statements = %v, want %v", calls, want)
+	}
+}
+
 func TestTableMetadataRequiresItsParameters(t *testing.T) {
 	var calls []recordedStatement
 	d := metadataDataSource(&tableQueryDataSet{}, nil, &calls)
