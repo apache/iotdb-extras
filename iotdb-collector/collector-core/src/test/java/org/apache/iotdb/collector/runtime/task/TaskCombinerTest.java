@@ -35,12 +35,14 @@ import org.apache.iotdb.collector.service.ScheduleService;
 import org.apache.iotdb.pipe.api.PipeProcessor;
 import org.apache.iotdb.pipe.api.PipeSink;
 import org.apache.iotdb.pipe.api.PipeSource;
+import org.apache.iotdb.pipe.api.customizer.configuration.PipeConnectorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSinkRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 
 import com.lmax.disruptor.WorkProcessor;
 import org.junit.After;
@@ -367,9 +369,17 @@ public class TaskCombinerTest {
     @Override
     public void validate(final PipeParameterValidator validator) {}
 
+    // Both customize overloads are abstract in the pipe API. Every overload below forwards to a
+    // single implementation, so which one the argument's static type selects does not matter.
     @Override
     public void customize(
-        final PipeParameters parameters, final PipeSinkRuntimeConfiguration configuration) {}
+        final PipeParameters parameters, final PipeConnectorRuntimeConfiguration configuration) {}
+
+    @Override
+    public void customize(
+        final PipeParameters parameters, final PipeSinkRuntimeConfiguration configuration) {
+      customize(parameters, (PipeConnectorRuntimeConfiguration) configuration);
+    }
 
     @Override
     public void handshake() {}
@@ -378,13 +388,15 @@ public class TaskCombinerTest {
     public void heartbeat() {}
 
     @Override
-    public void transfer(final TabletInsertionEvent tabletInsertionEvent) {
-      try {
-        transfer((Event) tabletInsertionEvent);
-      } catch (final InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted while transferring tablet insertion event", e);
-      }
+    public void transfer(final TabletInsertionEvent tabletInsertionEvent)
+        throws InterruptedException {
+      transfer((Event) tabletInsertionEvent);
+    }
+
+    @Override
+    public void transfer(final TsFileInsertionEvent tsFileInsertionEvent)
+        throws InterruptedException {
+      transfer((Event) tsFileInsertionEvent);
     }
 
     @Override
