@@ -102,7 +102,8 @@ public class IoTDBSubscriptionSourceReader<OUT>
       }
       fetchBatch();
       if (buffer.isEmpty()) {
-        markUnavailable();
+        // Stay available: the next pollNext call blocks in consumer.poll(pollTimeout) and keeps the
+        // reader polling the subscription. Marking unavailable here would never be resumed.
         return InputStatus.NOTHING_AVAILABLE;
       }
     }

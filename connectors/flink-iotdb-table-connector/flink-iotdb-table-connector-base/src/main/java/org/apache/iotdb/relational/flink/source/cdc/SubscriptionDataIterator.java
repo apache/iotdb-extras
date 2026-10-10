@@ -59,9 +59,11 @@ public class SubscriptionDataIterator implements IoTDBDataIterator {
 
   private static int[] resolveSourceIndexes(
       List<String> availableColumns, List<String> projectedColumns) {
+    // The underlying SubscriptionResultSet is 1-based (see AbstractResultSet.getField), so store
+    // one-based source column indexes while the projected position stays 0-based.
     Map<String, Integer> indexByName = new HashMap<>(availableColumns.size());
     for (int i = 0; i < availableColumns.size(); i++) {
-      indexByName.put(normalize(availableColumns.get(i)), i);
+      indexByName.put(normalize(availableColumns.get(i)), i + 1);
     }
     int[] indexes = new int[projectedColumns.size()];
     for (int i = 0; i < projectedColumns.size(); i++) {

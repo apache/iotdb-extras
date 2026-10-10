@@ -19,6 +19,12 @@
 
 package org.apache.iotdb.relational.flink;
 
+import org.apache.iotdb.isession.ITableSession;
+import org.apache.iotdb.session.TableSessionBuilder;
+import org.apache.iotdb.session.subscription.ISubscriptionTableSession;
+import org.apache.iotdb.session.subscription.SubscriptionTableSessionBuilder;
+import org.apache.iotdb.session.subscription.model.Subscription;
+
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -27,12 +33,16 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import java.util.Arrays;
+import java.util.Set;
+
 /**
  * Temporary manual verification class. This is intentionally kept in test sources and should not be
  * committed as a production test.
  *
  * <p>The flow is write first and then query: rows are inserted through the connector and read back
- * with a SELECT, followed by a lookup join (both sync and async) executed as Flink SQL.
+ * with a SELECT, followed by a lookup join (both sync and async) and a subscription-backed CDC
+ * read, all executed as Flink SQL.
  *
  * <p>Run with system properties such as:
  *
@@ -86,6 +96,104 @@ public class IoTDBRelationalLocalQueryManual {
     // 3) Lookup: run a temporal join through SQL for both sync and async lookup.
     verifyLookupJoin(nodeUrls, user, password, database, table, false);
     verifyLookupJoin(nodeUrls, user, password, database, table, true);
+
+    // 4) CDC: read the table through the subscription-backed CDC source.
+    verifyCdc(nodeUrls, user, password, database, table);
+  }
+
+  /**
+   * Flushes the database so the written rows are sealed into TsFiles and thus visible to the
+   * subscription snapshot phase (mirrors the official subscription example, which flushes before
+   * subscribing).
+   */
+  private static void flushDatabase(
+      String nodeUrls, String user, String password, String database) throws Exception {
+    System.out.println("\n=== FLUSH database '" + database + "' ===");
+    try (ITableSession session =
+        new TableSessionBuilder()
+            .nodeUrls(Arrays.asList(nodeUrls.split(",")))
+            .username(user)
+            .password(password)
+            .database(database)
+            .build()) {
+      session.executeNonQueryStatement("flush");
+    }
+    long waitMs = Long.getLong("iotdb.cdc.flush.wait.ms", 3000L);
+    if (waitMs > 0) {
+      System.out.println("Waiting " + waitMs + " ms for the flush to seal data...");
+      Thread.sleep(waitMs);
+    }
+    System.out.println("Flush finished.");
+  }
+
+  /**
+   * Drops any existing subscription and topic for this (database, table) so each run starts from a
+   * clean subscription state. The names mirror the ones derived by {@code IoTDBOptions}.
+   */
+  private static void resetCdcSubscription(
+      String nodeUrls, String user, String password, String database, String table) {
+    String topic = "flink_iotdb_table_" + sanitize(database) + "_" + sanitize(table);
+    String[] hostPort = nodeUrls.split(",")[0].split(":");
+    System.out.println("\n=== CDC RESET: drop subscriptions and topic '" + topic + "' ===");
+
+    try (ISubscriptionTableSession session =
+        new SubscriptionTableSessionBuilder()
+            .host(hostPort[0])
+            .port(Integer.parseInt(hostPort[1]))
+            .username(user)
+            .password(password)
+            .build()) {
+      session.open();
+      try {
+        for (Subscription subscription : session.getSubscriptions(topic)) {
+          System.out.println("  drop subscription " + subscription.getSubscriptionId());
+          session.dropSubscriptionIfExists(subscription.getSubscriptionId());
+        }
+      } catch (Exception e) {
+        System.out.println("  list/drop subscriptions failed: " + e.getMessage());
+      }
+      session.dropTopicIfExists(topic);
+      System.out.println("  reset done.");
+    } catch (Exception e) {
+      System.out.println("  CDC reset skipped/failed: " + e.getMessage());
+    }
+  }
+
+  private static String sanitize(String value) {
+    return value == null ? "" : value.replaceAll("[^A-Za-z0-9_]", "_");
+  }
+
+  /**
+   * Reads the table through the CDC source. The database is flushed first so the written rows are
+   * visible to the subscription snapshot phase, then the topic/subscription is reset and recreated
+   * in {@code initial} mode (full + incremental); a LIMIT bounds the otherwise unbounded stream.
+   */
+  private static void verifyCdc(
+      String nodeUrls, String user, String password, String database, String table)
+      throws Exception {
+    flushDatabase(nodeUrls, user, password, database);
+    resetCdcSubscription(nodeUrls, user, password, database, table);
+
+    StreamExecutionEnvironment environment = StreamExecutionEnvironment.getExecutionEnvironment();
+    environment.setParallelism(1);
+    StreamTableEnvironment tableEnvironment = StreamTableEnvironment.create(environment);
+
+    String flinkTable = "iotdb_cdc";
+    tableEnvironment.executeSql("DROP TABLE IF EXISTS " + flinkTable);
+    String ddl = buildCdcDdl(flinkTable, nodeUrls, user, password, database, table);
+    System.out.println("\n=== CDC DDL ===\n" + ddl);
+    tableEnvironment.executeSql(ddl);
+
+    System.out.println("\n=== CDC (snapshot mode) ===");
+    String sql = "SELECT * FROM " + flinkTable + "";
+    System.out.println(sql);
+    TableResult result = tableEnvironment.executeSql(sql);
+    try (CloseableIterator<Row> iterator = result.collect()) {
+      while (iterator.hasNext()) {
+        System.out.println(iterator.next());
+      }
+    }
+    System.out.println("CDC read finished.");
   }
 
   private static void verifyLookupJoin(
@@ -162,6 +270,43 @@ public class IoTDBRelationalLocalQueryManual {
     }
     ddl.append("\n)");
     return ddl.toString();
+  }
+
+  private static String buildCdcDdl(
+      String flinkTable,
+      String nodeUrls,
+      String user,
+      String password,
+      String database,
+      String table) {
+    return "CREATE TABLE "
+        + flinkTable
+        + " (\n"
+        + "  `time` TIMESTAMP(3),\n"
+        + "  `device_id` STRING,\n"
+        + "  `temperature` DOUBLE\n"
+        + ") WITH (\n"
+        + "  'connector' = 'iotdb-relational',\n"
+        + "  'iotdb.node-urls' = '"
+        + nodeUrls
+        + "',\n"
+        + "  'iotdb.user' = '"
+        + user
+        + "',\n"
+        + "  'iotdb.password' = '"
+        + password
+        + "',\n"
+        + "  'iotdb.database' = '"
+        + database
+        + "',\n"
+        + "  'iotdb.table' = '"
+        + table
+        + "',\n"
+        + "  'iotdb.time-column' = 'time',\n"
+        + "  'iotdb.tag-columns' = 'device_id',\n"
+        + "  'iotdb.scan.mode' = 'cdc',\n"
+        + "  'iotdb.cdc.mode' = 'initial'\n"
+        + ")";
   }
 
   private static void execute(TableEnvironment tableEnvironment, String sql) throws Exception {
