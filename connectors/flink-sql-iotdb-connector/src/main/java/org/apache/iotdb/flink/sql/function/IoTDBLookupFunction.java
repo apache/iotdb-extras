@@ -111,13 +111,8 @@ public class IoTDBLookupFunction extends TableFunction<RowData> {
     columnNames.remove("Time");
     RowRecord rowRecord = dataSet.next();
     if (rowRecord == null) {
-      ArrayList<Object> values = new ArrayList<>();
-      values.add(timestamp);
-      for (int i = 0; i < schema.size(); i++) {
-        values.add(null);
-      }
-      GenericRowData rowData = GenericRowData.of(values.toArray());
-      collect(rowData);
+      // No row at this timestamp: emit nothing, so that an inner join drops the key and a left
+      // join pads it with nulls itself.
       return;
     }
     List<Field> fields = rowRecord.getFields();
@@ -130,6 +125,11 @@ public class IoTDBLookupFunction extends TableFunction<RowData> {
         continue;
       }
       int index = columnNames.indexOf(field.f0);
+      // A series with no value at this timestamp comes back as a field with no data type.
+      if (fields.get(index).getDataType() == null) {
+        values.add(null);
+        continue;
+      }
       DataType flinkType = field.f1;
       TSDataType iotdbType = fields.get(index).getDataType();
       if (!Utils.isTypeEqual(iotdbType, flinkType)) {
