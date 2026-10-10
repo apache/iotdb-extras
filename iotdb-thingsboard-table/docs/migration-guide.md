@@ -108,7 +108,7 @@ that route stays inert.
 | Route | Required properties | Default state |
 | --- | --- | --- |
 | Historical telemetry (raw read/write/delete) | `database.ts.type=iotdb-table` **and** `iotdb.ts.experimental-raw-only=true` | inert |
-| Latest value | `database.ts.type=iotdb-table` **and** `database.ts_latest.type=iotdb-table` **and** `iotdb.ts.experimental-raw-only=true` | inert |
+| Latest value | `database.ts.type=iotdb-table` **and** `database.ts_latest.type=iotdb-table` **and** `iotdb.ts.experimental-raw-only=true`; also requires `iotdb.ts_latest.cluster_mode` set to `sticky-routing` or `disabled` | inert |
 | Entity attributes (stretch) | `database.attributes.type=iotdb-table` (independent of the timeseries selectors); also requires `iotdb.attributes.cluster_mode` set to `sticky-routing` or `disabled` | inert |
 
 The latest route deliberately also requires the timeseries selector: the latest
@@ -163,11 +163,20 @@ example, to route both historical telemetry and latest values to IoTDB:
 database.ts.type=iotdb-table
 database.ts_latest.type=iotdb-table
 iotdb.ts.experimental-raw-only=true
+iotdb.ts_latest.cluster_mode=sticky-routing
 ```
 
-To additionally opt in to the stretch attributes route (only on a ThingsBoard
-build that exposes the attribute selector — no shipped release does yet, see
-*Limitations*):
+`iotdb.ts_latest.cluster_mode` is mandatory when the latest route is active.
+Choose `sticky-routing` when per-identity latest writes are pinned to one node,
+or `disabled` for single-node / acknowledged best-effort operation. Any other
+value, including the empty default, fails DAO construction because the latest
+overlay write path converges only within a single JVM. This property acknowledges
+your routing arrangement; it does not configure routing for you.
+
+To additionally opt in to the stretch attributes route, use the selector supplied
+by this module. On ThingsBoard 4.3.1.2, the module withdraws the host
+`JpaAttributeDao` at startup and logs a WARN; see *Coexistence and rollback* for
+the exact matching rule and conflict-guard boundary:
 
 ```properties
 database.attributes.type=iotdb-table
@@ -385,8 +394,9 @@ module `README.md` for the authoritative list):
 - **The attributes route is a stretch / Phase-2 opt-in.** `database.attributes.type`
   is a selector this module supplies rather than one ThingsBoard offers; leaving it
   unset is the default posture, and while unset attributes stay in the host entity
-  database. Setting it makes the module withdraw ThingsBoard's own attributes bean
-  — see the conflict-guard bullet above for the matching rule and its boundary.
+  database. On ThingsBoard 4.3.1.2, setting it makes the module withdraw the host
+  `JpaAttributeDao` and log a WARN; no host-provided attribute selector is needed.
+  See the conflict-guard bullet above for the matching rule and its boundary.
   When activated, `save` is a
   non-atomic tag-only delete-then-insert under a per-identity in-JVM lock that
   converges only within one JVM; `findNextBatch` is unsupported
