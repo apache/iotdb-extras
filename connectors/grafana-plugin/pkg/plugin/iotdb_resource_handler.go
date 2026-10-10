@@ -44,6 +44,9 @@ func (d *IoTDBDataSource) iotdbResourceHandler(authorization string, httpClient 
 
 	mux.Handle("/getVariables", d.getVariables(authorization, httpClient))
 	mux.Handle("/getNodes", d.getNodes(authorization, httpClient))
+	mux.Handle("/tableDatabases", d.getTableDatabases())
+	mux.Handle("/tableTables", d.getTableTables())
+	mux.Handle("/tableColumns", d.getTableColumns())
 
 	return httpadapter.New(mux)
 }

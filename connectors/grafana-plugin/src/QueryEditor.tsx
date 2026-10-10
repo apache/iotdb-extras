@@ -26,6 +26,7 @@ import { FromValue } from './componments/FromValue';
 import { WhereValue } from './componments/WhereValue';
 import { ControlValue } from './componments/ControlValue';
 import { FillValue } from './componments/FillValue';
+import { TablePicker } from './componments/TablePicker';
 import { Input, Segment, TextArea } from '@grafana/ui';
 import { toOption } from './functions';
 
@@ -144,18 +145,27 @@ export class QueryEditor extends PureComponent<Props, State> {
     onChange({ ...query, groupBy: g });
   };
 
-  onDatabaseChange = (event: ChangeEvent<HTMLInputElement>) => {
+  onDatabaseChange = (database: string) => {
     const { onChange, query } = this.props;
-    const database = event.target.value;
     this.setState({ database });
-    onChange({ ...query, database });
+    // A table belongs to one database, so switching database clears it. Picking
+    // the current database again is not a switch.
+    onChange({ ...query, database, table: database === query.database ? query.table : undefined });
+  };
+
+  onTableChange = (table: string) => {
+    const { onChange, query } = this.props;
+    onChange({ ...query, table: table || undefined });
+  };
+
+  onSqlValueChange = (sql: string) => {
+    const { onChange, query } = this.props;
+    this.setState({ sql });
+    onChange({ ...query, sql });
   };
 
   onSqlChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    const { onChange, query } = this.props;
-    const sql = event.target.value;
-    this.setState({ sql });
-    onChange({ ...query, sql });
+    this.onSqlValueChange(event.target.value);
   };
 
   onFormatChange = ({ value: value = tableFormats[0] }: SelectableValue<string>) => {
@@ -411,15 +421,16 @@ export class QueryEditor extends PureComponent<Props, State> {
                     />
                   </QueryInlineField>
                 </div>
-                <div className="gf-form">
-                  <QueryInlineField label={'DATABASE'}>
-                    <Input
-                      value={query.database ?? this.state.database}
-                      placeholder={'database name (required)'}
-                      onChange={this.onDatabaseChange}
-                    />
-                  </QueryInlineField>
-                </div>
+                <TablePicker
+                  datasource={this.props.datasource}
+                  refId={query.refId}
+                  scopedVars={this.props.data?.request?.scopedVars}
+                  database={query.database ?? this.state.database}
+                  table={query.table ?? ''}
+                  onDatabaseChange={this.onDatabaseChange}
+                  onTableChange={this.onTableChange}
+                  onSqlChange={this.onSqlValueChange}
+                />
                 <div className="gf-form">
                   <QueryInlineField label={'SQL'}>
                     <TextArea

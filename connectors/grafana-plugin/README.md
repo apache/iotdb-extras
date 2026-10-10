@@ -41,8 +41,9 @@ and loads the plugin there.
 
 CI does exactly that. The `minimum-grafana-version` job parses the floor out of
 `plugin.json`, boots that Grafana release together with IoTDB, and checks that the
-plugin's frontend loads and that a table-model query returns data through the
-native client. Raising or lowering the declared floor therefore changes what is
+plugin's frontend loads, that a table-model query returns data through the
+native client, and that the table-model editor lists databases, tables and
+columns from the server. Raising or lowering the declared floor therefore changes what is
 tested, with no separate file to keep in step.
 
 ### How to use Grafana-Plugin
@@ -146,7 +147,9 @@ SELECT time, device_id, temperature FROM table1 WHERE $__timeFilter(time)
 
 Unlike the tree-model modes, which go through the REST service, this mode connects to the IoTDB RPC port (6667 by default). The data source's `rpc address` option sets that endpoint explicitly; when it is left empty, the URL's host with port 6667 is used.
 
-DATABASE input box: the database to run the statement against. Required — every query first runs `USE <database>` on its pooled session, so results stay deterministic regardless of which session the pool hands out. Fully-qualified `database.table` references are still allowed and take precedence over the session database.
+DATABASE: the database to run the statement against, picked from the databases the server lists (a name can also be typed, for example a `$database` template variable). Required — every query first runs `USE <database>` on its pooled session, so results stay deterministic regardless of which session the pool hands out. Fully-qualified `database.table` references are still allowed and take precedence over the session database.
+
+TABLE (optional): picking a table lists its columns grouped by category (TAG, FIELD, ATTRIBUTE). **Use starter query** then replaces the SQL with a query that selects the table's time, TAG and numeric FIELD columns (every FIELD when none is numeric) within the dashboard time range, for example `SELECT "time", "region", "temperature" FROM "weather" WHERE $__timeFilter("time")`. Names are always double-quoted, so reserved words such as `order` and names with spaces stay valid. The table only drives this helper; the SQL is what runs.
 
 SQL input box: a single table-model SELECT statement. The following macros are expanded by the plugin before the statement is sent:
 
