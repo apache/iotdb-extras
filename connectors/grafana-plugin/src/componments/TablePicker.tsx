@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScopedVars, SelectableValue } from '@grafana/data';
 import { Button, Select } from '@grafana/ui';
 import { DataSource } from '../datasource';
@@ -48,11 +48,28 @@ const categories = ['TAG', 'FIELD', 'ATTRIBUTE'];
 // pickerOptions turns the listed names into options and appends the current
 // value when it is not among them (a typed or variable name), so that the
 // select can match its value to an option and open with that option focused.
-function pickerOptions(names: string[] | undefined, current: string): Array<SelectableValue<string>> {
-  const options = (names ?? []).map((name) => ({ label: name, value: name }));
-  return current && !options.some((o) => o.value === current)
-    ? [...options, { label: current, value: current }]
-    : options;
+function pickerOptions(
+  names: string[] | undefined,
+  current: string,
+  optionFor: (name: string) => SelectableValue<string>
+): Array<SelectableValue<string>> {
+  const options = (names ?? []).map(optionFor);
+  return current && !options.some((o) => o.value === current) ? [...options, optionFor(current)] : options;
+}
+
+// useOptionCache hands out one option object per name for the picker's
+// lifetime. react-select finds the focused option by identity, so a list
+// refreshed on open must still contain the same object for the current value.
+function useOptionCache(): (name: string) => SelectableValue<string> {
+  const cache = useRef(new Map<string, SelectableValue<string>>());
+  return useCallback((name: string) => {
+    let option = cache.current.get(name);
+    if (!option) {
+      option = { label: name, value: name };
+      cache.current.set(name, option);
+    }
+    return option;
+  }, []);
 }
 
 function errorMessage(err: unknown): string {
@@ -154,8 +171,16 @@ export function TablePicker({
   );
   const errors = Array.from(new Set([databases.error, tables.error, columns.error].filter(Boolean)));
 
-  const databaseOptions = useMemo(() => pickerOptions(databases.value, database), [databases.value, database]);
-  const tableOptions = useMemo(() => pickerOptions(tables.value, table), [tables.value, table]);
+  const databaseOption = useOptionCache();
+  const tableOption = useOptionCache();
+  const databaseOptions = useMemo(
+    () => pickerOptions(databases.value, database, databaseOption),
+    [databases.value, database, databaseOption]
+  );
+  const tableOptions = useMemo(
+    () => pickerOptions(tables.value, table, tableOption),
+    [tables.value, table, tableOption]
+  );
   const commitDatabase = (name: string) => onDatabaseChange(name.trim());
   const commitTable = (name: string) => onTableChange(name.trim());
   const typedDatabase = useTypedName(database, commitDatabase);

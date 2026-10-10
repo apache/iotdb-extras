@@ -91,6 +91,28 @@ describe('TablePicker', () => {
     expect(await screen.findByText(/cannot list databases; cannot list tables/)).toBeTruthy();
   });
 
+  it.each(['Tab', 'Enter'])('keeps the database on %s after the refresh-on-open settles', async (key) => {
+    const ds = fakeDatasource({});
+    // Like a real lookup, every response is a new array.
+    ds.getTableDatabases.mockImplementation(() => Promise.resolve(['information_schema', 'db1', 'db2']));
+    const { props } = renderPicker(ds, { database: 'db2' });
+    await waitFor(() => expect(ds.getTableDatabases).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    const databaseInput = document.getElementById('iotdb-table-database-A') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.focus(databaseInput);
+      fireEvent.keyDown(databaseInput, { key: 'ArrowDown' });
+    });
+    await waitFor(() => expect(ds.getTableDatabases).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.keyDown(databaseInput, { key });
+    });
+
+    expect(props.onDatabaseChange).not.toHaveBeenCalledWith('information_schema');
+  });
+
   it('gives each query its own element ids', () => {
     const ds = fakeDatasource({});
     renderPicker(ds, { refId: 'B' });
