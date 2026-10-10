@@ -21,6 +21,7 @@ package org.apache.iotdb.collector.plugin.builtin.sink.event;
 
 import org.apache.iotdb.pipe.api.access.Row;
 import org.apache.iotdb.pipe.api.collector.RowCollector;
+import org.apache.iotdb.pipe.api.collector.TabletCollector;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 
 import org.apache.tsfile.write.record.Tablet;
@@ -49,6 +50,13 @@ public class PipeRawTabletInsertionEvent extends PipeInsertionEvent
   @Override
   public Iterable<TabletInsertionEvent> processTablet(
       final BiConsumer<Tablet, RowCollector> consumer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Iterable<TabletInsertionEvent> processTabletWithCollect(
+      final BiConsumer<Tablet, TabletCollector> consumer) {
+    // Like the row-based callbacks above, processor-side collection is not implemented here.
     throw new UnsupportedOperationException();
   }
 

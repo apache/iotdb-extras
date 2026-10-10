@@ -29,7 +29,7 @@ services:
   # datasource in ./provisioning. The REST port serves the tree-model query
   # modes; 6667 is the native Thrift port the table-model mode uses.
   iotdb:
-    image: apache/iotdb:2.0.8-standalone
+    image: apache/iotdb:2.0.11-standalone
     container_name: iotdb
     environment:
       - dn_rpc_address=0.0.0.0

@@ -59,7 +59,7 @@ dao.save(tenant, entity, tsKvEntry, ttl)
   -> writer.enqueue(...)           bounded ArrayBlockingQueue (capacity 50,000)
   -> single flush worker           batches up to 500 rows, maxLingerMs 20
   -> Tablet insert                 multi-row table-session insert
-  -> real IoTDB 2.0.8              apache/iotdb:2.0.8-standalone Testcontainer
+  -> real IoTDB 2.0.11             apache/iotdb:2.0.11-standalone Testcontainer
 ```
 
 It runs `SAVER_THREADS = 50` concurrent threads, each writing
@@ -148,7 +148,7 @@ lack of Docker.
 
 ### Smoke stack
 
-The benchmark IT manages its own throwaway `apache/iotdb:2.0.8-standalone`
+The benchmark IT manages its own throwaway `apache/iotdb:2.0.11-standalone`
 Testcontainer, so no external stack is required to run it. For a manual run
 against a standalone node instead of the throwaway container, the module's
 [`../../docker-compose.test.yml`](../../docker-compose.test.yml) brings up an

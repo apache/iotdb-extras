@@ -18,7 +18,7 @@
 
 -->
 <generatorConfiguration>
-    <classPathEntry location="/path/to/iotdb-jdbc.jar"/>
+    <!-- The Maven generator plugin supplies iotdb-jdbc on its plugin classpath. -->
     <!-- mvn mybatis-generator:generate hierarchical/flat-->
     <context id="myBatis3Simple" targetRuntime="MyBatis3Simple" defaultModelType="flat">
         <!--        <property name="suppressAllComments" value="true"/>-->
@@ -27,6 +27,8 @@
         <!--        <property name="xmlFormatter" value="org.mybatis.generator.api.dom.DefaultXmlFormatter"/>-->
         <plugin type="org.apache.iotdb.mybatis.plugin.LombokPlugin"/>
         <plugin type="org.apache.iotdb.mybatis.plugin.BatchInsertPlugin"/>
+        <plugin type="org.apache.iotdb.mybatis.plugin.IoTDBKeyPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.UnmergeableXmlMappersPlugin"/>
         <!--        <plugin type="org.apache.iotdb.mybatis.plugin.SerializablePlugin"/>-->
         <plugin type="org.mybatis.generator.plugins.VirtualPrimaryKeyPlugin"/>
         <!--        <commentGenerator type="generator.org.apache.iotdb.mybatis.plugin.CNCommentGenerator">-->
@@ -40,6 +42,8 @@
         <jdbcConnection driverClass="org.apache.iotdb.jdbc.IoTDBDriver" connectionURL="jdbc:iotdb://127.0.0.1:6667/test?sql_dialect=table" userId="root" password="root"/>
         <javaTypeResolver type="org.apache.iotdb.mybatis.plugin.generator.resolver.IoTDBJavaTypeResolver">
             <property name="forceBigDecimals" value="false"/>
+            <property name="jdbcType.TIMESTAMP" value="java.lang.Long"/>
+            <property name="jdbcType.FLOAT" value="java.lang.Float"/>
         </javaTypeResolver>
         <javaModelGenerator targetPackage="org.apache.iotdb.mybatis.plugin.model" targetProject="src/main/java">
             <!--            <property name="enableSubPackages" value="true"/>-->
@@ -51,8 +55,11 @@
         <javaClientGenerator type="XMLMAPPER" targetPackage="org.apache.iotdb.mybatis.plugin.mapper" targetProject="src/main/java">
             <!--            <property name="enableSubPackages" value="true"/>-->
         </javaClientGenerator>
-        <table schema="test" tableName="mix" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true" enableUpdateByPrimaryKey="false">
-            <property name="virtualKeyColumns" value="time,device_id,device_name,device_tag"/>
+        <table schema="test" tableName="mix" domainObjectName="Mix" enableSelectByPrimaryKey="true" enableInsert="true" enableDeleteByPrimaryKey="true" enableUpdateByPrimaryKey="false" enableUpdateByExample="false">
+            <property name="ignoreQualifiersAtRuntime" value="true"/>
+            <property name="virtualKeyColumns" value="time,device_id"/>
+            <columnOverride column="reading_date" javaType="java.time.LocalDate" typeHandler="org.apache.iotdb.mybatis.type.IoTDBLocalDateTypeHandler"/>
+            <columnOverride column="payload" javaType="byte[]" typeHandler="org.apache.iotdb.mybatis.type.IoTDBBlobTypeHandler"/>
         </table>
     </context>
 </generatorConfiguration>

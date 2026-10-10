@@ -37,6 +37,12 @@
         <start-class>org.apache.iotdb.web.grafana.TsfileWebDemoApplication</start-class>
     </properties>
     <dependencies>
+        <!-- JDBC is loaded by class name, so it must be packaged explicitly. -->
+        <dependency>
+            <groupId>org.apache.iotdb</groupId>
+            <artifactId>iotdb-jdbc</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <dependency>
             <groupId>org.apache.tsfile</groupId>
             <artifactId>tsfile</artifactId>
@@ -209,6 +215,16 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <usedDependencies>
+                        <!-- The JDBC driver is loaded via the configured class name. -->
+                        <usedDependency>org.apache.iotdb:iotdb-jdbc</usedDependency>
+                    </usedDependencies>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

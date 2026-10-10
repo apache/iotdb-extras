@@ -19,7 +19,7 @@
 
 services:
   iotdb:
-    image: apache/iotdb:2.0.8-standalone
+    image: apache/iotdb:2.0.11-standalone
     container_name: iotdb-table-test
     environment:
       IOTDB_USERNAME: ${IOTDB_USERNAME:?set IOTDB_USERNAME}

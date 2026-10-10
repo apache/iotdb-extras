@@ -25,15 +25,21 @@ import org.apache.iotdb.pipe.api.customizer.configuration.PipeSourceRuntimeConfi
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.rpc.subscription.config.ConsumerConstant;
+import org.apache.iotdb.rpc.subscription.config.TopicConstant;
+import org.apache.iotdb.session.subscription.ISubscriptionTreeSession;
+import org.apache.iotdb.session.subscription.SubscriptionTreeSessionBuilder;
 import org.apache.iotdb.session.subscription.consumer.tree.SubscriptionTreePullConsumer;
+import org.apache.iotdb.session.subscription.model.Topic;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessage;
 import org.apache.iotdb.session.subscription.payload.SubscriptionMessageType;
-import org.apache.iotdb.session.subscription.payload.SubscriptionSessionDataSet;
 
+import org.apache.tsfile.write.record.Tablet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -48,6 +54,7 @@ public class IoTDBPushSource extends PushSource {
   private String deviceId;
 
   private volatile boolean isStarted = true;
+  private SubscriptionTreePullConsumer consumer;
   private Thread workerThread;
 
   @Override
@@ -76,42 +83,97 @@ public class IoTDBPushSource extends PushSource {
 
   @Override
   public void start() throws Exception {
-    if (workerThread == null || !workerThread.isAlive()) {
-      isStarted = true;
-      workerThread = new Thread(this::doWork);
-      workerThread.start();
+    if (workerThread != null && workerThread.isAlive()) {
+      return;
     }
-  }
 
-  private void doWork() {
+    // Validate the topic and subscribe on the calling thread so that a missing topic, a
+    // tsfile-format topic, an unreachable broker or a server without subscription support fails
+    // task creation with the cause, instead of leaving a task that looks alive but never delivers.
+    requireRecordFormatTopic();
+
     final Properties pullProperties = new Properties();
     pullProperties.put(IoTDBPushSourceConstant.HOST_KEY, host);
     pullProperties.put(IoTDBPushSourceConstant.PORT_KEY, port);
     pullProperties.put(ConsumerConstant.CONSUMER_ID_KEY, "r1");
     pullProperties.put(ConsumerConstant.CONSUMER_GROUP_ID_KEY, "rg1");
 
-    try (final SubscriptionTreePullConsumer consumer =
-        new SubscriptionTreePullConsumer(pullProperties)) {
-      consumer.open();
-      consumer.subscribe(topic);
+    final SubscriptionTreePullConsumer pullConsumer =
+        new SubscriptionTreePullConsumer(pullProperties);
+    try {
+      pullConsumer.open();
+      pullConsumer.subscribe(topic);
+    } catch (final Exception e) {
+      try {
+        pullConsumer.close();
+      } catch (final Exception closeException) {
+        e.addSuppressed(closeException);
+      }
+      throw e;
+    }
 
+    consumer = pullConsumer;
+    isStarted = true;
+    workerThread = new Thread(this::doWork, "iotdb-push-source-" + topic);
+    workerThread.start();
+  }
+
+  private void requireRecordFormatTopic() throws Exception {
+    try (final ISubscriptionTreeSession session =
+        new SubscriptionTreeSessionBuilder().host(host).port(port).build()) {
+      session.open();
+      final Optional<Topic> found = session.getTopic(topic);
+      if (!found.isPresent()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Topic %s does not exist on %s:%d; create it with format=%s before starting the"
+                    + " collector IoTDB source",
+                topic, host, port, TopicConstant.FORMAT_RECORD_HANDLER_VALUE));
+      }
+      final String attributes = String.valueOf(found.get().getTopicAttributes());
+      if (attributes.toLowerCase(Locale.ROOT).contains("tsfilehandler")) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Topic %s delivers tsfile messages (%s); the collector IoTDB source only consumes"
+                    + " record-format messages, create the topic with format=%s",
+                topic, attributes, TopicConstant.FORMAT_RECORD_HANDLER_VALUE));
+      }
+    }
+  }
+
+  private void doWork() {
+    try (final SubscriptionTreePullConsumer pullConsumer = consumer) {
       while (isStarted && !Thread.currentThread().isInterrupted()) {
         markPausePosition();
 
-        final List<SubscriptionMessage> messages = consumer.poll(timeout);
+        final List<SubscriptionMessage> messages = pullConsumer.poll(timeout);
         for (final SubscriptionMessage message : messages) {
           final short messageType = message.getMessageType();
-          if (SubscriptionMessageType.isValidatedMessageType(messageType)) {
-            for (final SubscriptionSessionDataSet dataSet : message.getSessionDataSetsHandler()) {
-              final SubDemoEvent event = new SubDemoEvent(dataSet.getTablet(), deviceId);
-              supply(event);
+          if (messageType == SubscriptionMessageType.RECORD_HANDLER.getType()) {
+            final Iterator<Tablet> tablets = message.getRecordTabletIterator();
+            while (tablets.hasNext()) {
+              supply(new SubDemoEvent(tablets.next(), deviceId));
             }
+          } else if (messageType != SubscriptionMessageType.WATERMARK.getType()) {
+            throw new UnsupportedOperationException(
+                String.format(
+                    "Topic %s delivered a message of type %d; the collector IoTDB source only"
+                        + " consumes record-format messages (format=%s)",
+                    topic, messageType, TopicConstant.FORMAT_RECORD_HANDLER_VALUE));
           }
         }
       }
     } catch (final Exception e) {
       Thread.currentThread().interrupt();
-      LOGGER.error("Error in push source", e);
+      if (isStarted) {
+        LOGGER.error(
+            "The collector IoTDB source for topic {} stopped consuming; drop and recreate the task"
+                + " after fixing the cause",
+            topic,
+            e);
+      } else {
+        LOGGER.info("The collector IoTDB source for topic {} stopped", topic);
+      }
     }
   }
 

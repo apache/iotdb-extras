@@ -60,9 +60,9 @@ Grafana displays data in a web page dashboard. Please open your browser and visi
 
 Click the `Settings` icon on the left, select the `Data Source` option, and then click `Add data source`.
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/datasource_1.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/datasource_1.png">
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/datasource_2.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/datasource_2.png">
 
 Select the `Apache IoTDB` data source.
 
@@ -73,22 +73,22 @@ Select the `Apache IoTDB` data source.
 
 Click `Save & Test`, and `Success` will appear.
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/datasource_3.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/datasource_3.png">
 
 
 #### Create a new Panel
 
 Click the `Dashboards` icon on the left, and select `Manage` option.
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/manage.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/manage.png">
 
 Click the `New Dashboard` icon on the top right, and select `Add an empty panel` option.
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/add%20empty%20panel.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/add-empty-panel.png">
 
 Grafana plugin supports SQL: Full Customized mode and SQL: Drop-down List mode for the tree model, and SQL: Table Model mode for the table model. The default mode is SQL: Full Customized mode.
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/grafana_input_style.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/grafana_input_style.png">
 
 ##### SQL: Full Customized input method
 
@@ -96,7 +96,7 @@ Enter content in the SELECT, FROM , WHERE and CONTROL input box, where the WHERE
 
 If a query involves multiple expressions, we can click `+` on the right side of the SELECT input box to add expressions in the SELECT clause, or click `+` on the right side of the FROM input box to add a path prefix:
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/grafana_input.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/grafana_input.png">
 
 SELECT input box: contents can be the time series suffix, function, udf, arithmetic expression, or nested expressions. You can also use the as clause to rename the result.
 
@@ -134,7 +134,7 @@ Tip: Statements like `select * from root.xx.**` are not recommended because thos
 
 Select a time series in the TIME-SERIES selection box, select a function in the FUNCTION option, and enter the contents in the SAMPLING INTERVAL、SLIDING STEP、LEVEL、FILL input boxes, where TIME-SERIES is a required item and the rest are non required items.
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/grafana_input2.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/grafana_input2.png">
 
 ##### SQL: Table Model
 
@@ -201,34 +201,34 @@ This works with any number of prefixPath entries. Literal paths (without variabl
 
 After creating a new Panel, click the Settings button in the upper right corner:
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/setconf.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/setconf.png">
 
 Select `Variables`, click `Add variable`:
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/addvaribles.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/addvaribles.png">
 
 Example 1：Enter `Name`, `Label`, and `Query`, and then click the `Update` button:
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/variblesinput.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/variblesinput.png">
 
 Apply Variables, enter the variable in the `grafana panel` and click the `save` button:
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/applyvariables.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/applyvariables.png">
 
 Example 2: Nested use of variables:
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/variblesinput2.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/variblesinput2.png">
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/variblesinput2-1.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/variblesinput2-1.png">
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/variblesinput2-2.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/variblesinput2-2.png">
 
 
 Example 3: using function variables
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/variablesinput3.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/variablesinput3.png">
 
-<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://github.com/apache/iotdb-bin-resources/blob/main/docs/UserGuide/Ecosystem%20Integration/Grafana-plugin/variablesinput3-1.png?raw=true">
+<img style="width:100%; max-width:800px; max-height:600px; margin-left:auto; margin-right:auto; display:block;" src="https://iotdb.apache.org/img/UserGuide/Ecosystem-Integration/Grafana-plugin/variablesinput3-1.png">
 
 The Name in the above figure is the variable name and the variable name we will use in the panel in the future. Label is the display name of the variable. If it is empty, the variable of Name will be displayed. Otherwise, the name of the Label will be displayed.
 There are Query, Custom, Text box, Constant, DataSource, Interval, Ad hoc filters, etc. in the Type drop-down, all of which can be used in IoTDB's Grafana Plugin

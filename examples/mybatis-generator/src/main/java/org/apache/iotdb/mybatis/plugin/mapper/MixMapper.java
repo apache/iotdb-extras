@@ -23,17 +23,30 @@ import org.apache.iotdb.mybatis.plugin.model.Mix;
 
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
 import java.util.List;
 
 public interface MixMapper {
-  int deleteByPrimaryKey(@Param("time") Date time, @Param("deviceId") String deviceId);
+  int deleteByPrimaryKey(@Param("time") Long time, @Param("deviceId") String deviceId);
 
   int insert(Mix row);
 
-  Mix selectByPrimaryKey(@Param("time") Date time, @Param("deviceId") String deviceId);
+  Mix selectByPrimaryKey(@Param("time") Long time, @Param("deviceId") String deviceId);
 
   List<Mix> selectAll();
 
-  int batchInsert(@Param("records") List<Mix> records);
+  default int batchInsert(List<Mix> records) {
+    if (records == null || records.stream().anyMatch(java.util.Objects::isNull)) {
+      throw new IllegalArgumentException("records and its elements must not be null");
+    }
+    int result = 0;
+    for (int start = 0; start < records.size(); ) {
+      int end = start + Math.min(500, records.size() - start);
+      int count = batchInsertRows(records.subList(start, end));
+      result = count < 0 || result < 0 ? -1 : result + count;
+      start = end;
+    }
+    return result;
+  }
+
+  int batchInsertRows(@Param("records") List<Mix> records);
 }

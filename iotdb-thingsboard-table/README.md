@@ -26,15 +26,17 @@
 `iotdb-thingsboard-table` is a ThingsBoard historical-telemetry DAO backend
 built on Apache IoTDB Table Mode. It lets a ThingsBoard deployment store
 and serve time-series telemetry through IoTDB's table-session API instead of the
-default Cassandra/SQL backends. It compiles against the reactor's IoTDB 2.0.5
-table-session client; its integration tests run the real write, read,
+default Cassandra/SQL backends. It compiles against the reactor's IoTDB 2.0.11
+table-session client; its integration tests are configured to run the real write, read,
 aggregation, latest-telemetry, attribute and retention paths against an
-`apache/iotdb:2.0.8-standalone` server. The module targets ThingsBoard v4.3.1.2. Because
+`apache/iotdb:2.0.11-standalone` server. The module targets ThingsBoard v4.3.1.2. Because
 it compiles with Java 17 language features (records and others), the
 `iotdb-extras` parent reactor builds and tests it only on JDK 17+ through the
 explicit, named `with-thingsboard` opt-in profile (it is not JDK-auto-activated):
-CI passes `-P with-thingsboard` on the JDK 17/21 jobs while the 8/11 jobs omit it
-and skip the module, and a plain reactor build never pulls it in.
+CI passes `-P with-thingsboard` on both JDK 17 and JDK 21 jobs.
+A plain reactor build never pulls it in.
+
+Container tests accept `-Diotdb.test.image=apache/iotdb:<version>-standalone` for additional compatibility checks.
 
 ## ThingsBoard SPI surface (Strategy F)
 
@@ -234,7 +236,7 @@ a retention window in **milliseconds**, and the accepted forms are narrow:
 | `TTL='INF'` | Never expire. The **quoted** string is the only accepted spelling; this is the form `entity_attributes` and `telemetry_latest` ship with. |
 | `TTL=DEFAULT` | Inherit the database default, which is `INF` on a fresh node. |
 
-Anything else is rejected by IoTDB 2.0.8: an unquoted `TTL=INF` is parsed as an
+Anything else is rejected by IoTDB 2.0.11 (and 2.0.8): an unquoted `TTL=INF` is parsed as an
 identifier (`ttl value must be a LongLiteral, but now is Identifier`), and any
 other quoted value — including a quoted number (`'604800000'`) or a duration
 (`'7d'`) — fails with `ttl value must be 'INF' or a long literal`.
@@ -265,7 +267,8 @@ SELECT table_name, "ttl(ms)" FROM information_schema.tables WHERE database='thin
 
 Either way a never-expiring table reads back as `INF` and a concrete retention as
 the millisecond number.
-`IoTDBTableTtlIT` pins both paths against a real IoTDB 2.0.8 container. It
+When the `iotdb-table-it` profile runs, `IoTDBTableTtlIT` exercises both paths against a real
+IoTDB 2.0.11 container. It
 verifies the TTL **property mechanism** only and deliberately does not assert
 physical row eviction, because eviction is asynchronous and compaction-driven and
 so is not deterministic inside a test.

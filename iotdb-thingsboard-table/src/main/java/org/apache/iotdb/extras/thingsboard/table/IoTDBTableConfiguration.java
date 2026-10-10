@@ -325,7 +325,7 @@ public class IoTDBTableConfiguration {
             .database(config.getDatabase())
             .maxSize(config.getSessionPoolSize())
             .connectionTimeoutInMs(config.getConnectionTimeoutMs())
-            .enableCompression(config.isEnableCompression())
+            .enableThriftCompression(config.isEnableCompression())
             .build();
     log.info(
         "IoTDB Table Mode session pool initialized: nodeUrl={}, database={}, poolSize={}, compression={}, defaultTtlMs(storageAccountingOnly)={}",
