@@ -38,5 +38,5 @@
   `@grafana/create-plugin`. Node 22 and npm replace Node 16 and Yarn, in both the CI
   workflow and the Maven `frontend-maven-plugin` execution.
 
-Older entries: this file previously pointed at `../RELEASE_NOTES.md`, which does not
-exist in this repository.
+Release notes for the whole repository, including older Grafana plugin changes, are in
+[`RELEASE_NOTES.md`](../../RELEASE_NOTES.md).
