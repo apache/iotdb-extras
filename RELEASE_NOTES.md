@@ -19,9 +19,9 @@
 
 -->
 
-# Apache IoTDB Extras 2.0.4
+# Apache IoTDB Extras 2.0.11
 
-Changes since v2.0.3. The dependency baseline is IoTDB 2.0.11 (TsFile 2.4.0, Thrift 0.23.0); Extras keeps its own artifact version.
+Changes since v2.0.3. Built against IoTDB 2.0.11 (TsFile 2.4.0, Thrift 0.23.0).
 
 Release date: to be set when the release vote passes.
 
