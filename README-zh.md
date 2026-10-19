@@ -65,7 +65,7 @@ IoTDB (物联网数据库) 是一个专为物联网 (IoT) 场景设计的时序�
 
 7. **示例**：展示 IoTDB 与各种技术结合使用的示例应用程序和代码示例
 
-IoTDB Java 依赖统一为 **2.0.11**，配套 **TsFile 2.4.0**、**Thrift 0.23.0**。Extras 自身版本仍为 `2.0.4-SNAPSHOT`，依赖基准为主仓库已发布的 `v2.0.11` 标签。
+IoTDB Java 依赖统一为 **2.0.11**，配套 **TsFile 2.4.0**、**Thrift 0.23.0**。Extras 自身同样以 **2.0.11** 发布，版本号即表示所对齐的 IoTDB 版本；依赖基准为主仓库已发布的 `v2.0.11` 标签。
 
 JDK 17 是最低要求，JDK 21 也纳入 CI。外部引擎需要单独确认对所选 JDK 的支持情况，尤其是 Spark 2.4/Scala 2.11 模块，部署到 JDK 17 前仍需完成运行时迁移。
 
@@ -283,7 +283,7 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 - **简介**：展示如何使用 iotdb-spring-boot-starter
 - **版本**：
   - IoTDB: 2.0.11
-  - iotdb-spring-boot-starter: 2.0.4-SNAPSHOT
+  - iotdb-spring-boot-starter: 2.0.11
   - Starter 构建线：默认 Spring Boot 3.5.1；CI 已验证 Spring Boot 4.1.1
 - **设置**：
   1. 安装 IoTDB
@@ -310,7 +310,7 @@ mvn clean package -Pwith-all-connectors,with-examples,with-springboot -DskipTest
 - **简介**：展示如何使用 IoTDB-Mybatis-Generator
 - **版本**：
   - IoTDB: 2.0.11
-  - mybatis-generator-plugin: 2.0.4-SNAPSHOT
+  - mybatis-generator-plugin: 2.0.11
 - **设置**：
   1. 安装并启动 IoTDB
   2. 创建必要的数据库和表

@@ -25,7 +25,7 @@ Generates MyBatis models, mapper interfaces and XML for the IoTDB **table model*
 
 ## Prerequisites
 
-Use JDK 17+, IoTDB/JDBC 2.0.11, and MyBatis Generator 1.4.2. The plugin artifact belongs to Extras (`2.0.4-SNAPSHOT` in this checkout); its version does not track the IoTDB driver version.
+Use JDK 17+, IoTDB/JDBC 2.0.11, and MyBatis Generator 1.4.2. The plugin artifact belongs to Extras and is released as `2.0.11` in this checkout, matching the IoTDB release it targets.
 
 From the repository root:
 
@@ -48,7 +48,7 @@ Both the plugin and JDBC driver must be in the generator's plugin classloader. N
         <dependency>
             <groupId>org.apache.iotdb</groupId>
             <artifactId>mybatis-generator-plugin</artifactId>
-            <version>2.0.4-SNAPSHOT</version>
+            <version>2.0.11</version>
         </dependency>
         <dependency>
             <groupId>org.apache.iotdb</groupId>

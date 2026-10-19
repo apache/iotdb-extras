@@ -74,7 +74,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The full multi-backend comparison (Cassandra / PostgreSQL / TimescaleDB) is later-scope and is
  * not built here.
  *
- * @since 2.0.4-SNAPSHOT
+ * @since 2.0.11
  */
 @Tag("benchmark")
 @Tag("integration")

@@ -21,7 +21,7 @@
 
 # IoTDB MyBatis Generator 插件
 
-为 IoTDB **表模型**生成 Model、Mapper 和 XML，提供批量插入、Lombok、序列化、Swagger 注释和 JDBC 类型映射。要求 **JDK 17+、IoTDB/JDBC 2.0.11、MBG 1.4.2**。插件版本属于 Extras，本仓库仍为 `2.0.4-SNAPSHOT`。
+为 IoTDB **表模型**生成 Model、Mapper 和 XML，提供批量插入、Lombok、序列化、Swagger 注释和 JDBC 类型映射。要求 **JDK 17+、IoTDB/JDBC 2.0.11、MBG 1.4.2**。插件由 Extras 发布，本仓库版本为 `2.0.11`，与所对齐的 IoTDB 版本一致。
 
 ## 安装与配置
 
@@ -37,10 +37,10 @@ mvn -pl mybatis-generator,mybatis-support -am clean install
 
 | 依赖 | 版本 |
 |---|---|
-| `org.apache.iotdb:mybatis-generator-plugin` | `2.0.4-SNAPSHOT` |
+| `org.apache.iotdb:mybatis-generator-plugin` | `2.0.11` |
 | `org.apache.iotdb:iotdb-jdbc` | `2.0.11` |
 
-无需配置机器相关的 `classPathEntry`。应用运行时还要依赖 `org.apache.iotdb:mybatis-support:2.0.4-SNAPSHOT` 并[注册查询拦截器](../mybatis-support/README.md)。2.0.11 表模型驱动的 prepared query 路径需要这一适配。
+无需配置机器相关的 `classPathEntry`。应用运行时还要依赖 `org.apache.iotdb:mybatis-support:2.0.11` 并[注册查询拦截器](../mybatis-support/README.md)。2.0.11 表模型驱动的 prepared query 路径需要这一适配。
 
 参考[完整生成配置](../examples/mybatis-generator/src/main/resources/generatorConfig.xml)，设置 JDBC URL、凭据、表名及输出路径。先创建表，再从应用项目目录执行：
 

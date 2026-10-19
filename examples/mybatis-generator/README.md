@@ -21,7 +21,7 @@
 
 # MyBatis Generator example
 
-Requires **JDK 17+, IoTDB/JDBC 2.0.11 and MyBatis 3.5.19**. The build-time generator and runtime support artifacts use Extras version `2.0.4-SNAPSHOT`.
+Requires **JDK 17+, IoTDB/JDBC 2.0.11 and MyBatis 3.5.19**. The build-time generator and runtime support artifacts use Extras version `2.0.11`.
 
 ## Prepare the schema
 

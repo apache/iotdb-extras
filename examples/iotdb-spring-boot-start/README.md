@@ -21,7 +21,7 @@
 
 # Spring Boot Session example
 
-This application uses Spring Boot 3.5.1, JDK 17+ and IoTDB client 2.0.11 through the locally built Extras starter (`2.0.4-SNAPSHOT`).
+This application uses Spring Boot 3.5.1, JDK 17+ and IoTDB client 2.0.11 through the locally built Extras starter (`2.0.11`).
 
 Build from the repository root:
 

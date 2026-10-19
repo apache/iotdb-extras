@@ -36,13 +36,13 @@ mvn -pl metric-scrape -am clean package -DskipTests
 The runnable jar is generated at:
 
 ```text
-metric-scrape/target/metric-scrape-2.0.4-SNAPSHOT.jar
+metric-scrape/target/metric-scrape-2.0.11.jar
 ```
 
 ## Run
 
 ```bash
-java -jar metric-scrape/target/metric-scrape-2.0.4-SNAPSHOT.jar \
+java -jar metric-scrape/target/metric-scrape-2.0.11.jar \
   -c metric-scrape/conf/metric-scrape.yml
 ```
 

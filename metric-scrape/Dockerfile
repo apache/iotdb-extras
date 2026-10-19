@@ -21,6 +21,6 @@ FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
-COPY target/metric-scrape-2.0.4-SNAPSHOT.jar /app/metric-scrape.jar
+COPY target/metric-scrape-2.0.11.jar /app/metric-scrape.jar
 
 ENTRYPOINT ["java", "-jar", "/app/metric-scrape.jar", "-c", "/app/conf/metric-scrape.yml"]
