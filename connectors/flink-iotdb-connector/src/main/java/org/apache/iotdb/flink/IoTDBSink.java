@@ -183,8 +183,9 @@ public class IoTDBSink<IN> extends RichSinkFunction<IN> {
       for (int i = 0; i < measurements.size(); i++) {
         String measurement = device + TsFileConstant.PATH_SEPARATOR + measurements.get(i);
         IoTDBSinkOptions.TimeseriesOption timeseriesOption = timeseriesOptionMap.get(measurement);
-        if (timeseriesOption != null && TSDataType.TEXT.equals(timeseriesOption.getDataType())) {
-          // The TEXT data type should be covered by " or '
+        if (timeseriesOption != null && (TSDataType.TEXT.equals(timeseriesOption.getDataType()) ||
+                TSDataType.STRING.equals(timeseriesOption.getDataType()))) {
+          // The TEXT/STRING data type should be covered by " or '
           values.set(i, "'" + values.get(i) + "'");
         }
       }

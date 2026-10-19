@@ -72,6 +72,7 @@ public class DefaultIoTSerializationSchema implements IoTSerializationSchema<Map
           values.add(Integer.parseInt(valuesStr[i]));
           break;
         case TEXT:
+        case STRING:
           values.add(valuesStr[i]);
           break;
         case FLOAT:
