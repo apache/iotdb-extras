@@ -110,6 +110,11 @@ type IoTDBDataSource struct {
 	// fake to exercise the variable-query path without a live server.
 	tableExecutor func(ctx context.Context, database, sql string) (*tableQueryDataSet, error)
 
+	// tableSessionSource hands out a table-model session for the real RPC
+	// executor. A nil value selects the session pool; tests substitute a fake to
+	// observe how a statement uses its session without a live server.
+	tableSessionSource func() (client.ITableSession, error)
+
 	// now returns the current instant used to compute the node-liveness window
 	// for table-model template-variable queries. A nil value selects time.Now;
 	// tests substitute a fixed clock so the window is deterministic.

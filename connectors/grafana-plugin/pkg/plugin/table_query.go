@@ -245,7 +245,8 @@ func formatIoTDBDuration(intervalMS int64) (string, error) {
 
 // quoteTableIdentifier wraps a table-model identifier in double quotes
 // (doubling any embedded quote), the relational grammar's quoted-identifier
-// form, so a database name survives the USE statement verbatim.
+// form, so a database or table name reaches the server verbatim. Each part of
+// a qualified name is quoted on its own ("db"."table").
 func quoteTableIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
@@ -521,19 +522,34 @@ func instantSeriesKey(dataSet *tableQueryDataSet, row []interface{}, timeCol int
 
 // executeTableStatement runs a table-model SQL statement against the given
 // database on a pooled native-client session and returns the fetched dataset.
-// The database is USEd on the session so a statement's table references resolve
-// against it regardless of any session state left by earlier queries. When
-// tableExecutor is non-nil it is used instead of the real RPC path.
+// A non-empty database is USEd on the session so a statement's table
+// references resolve against it regardless of any session state left by
+// earlier queries; a statement that names its database itself passes an empty
+// one and issues no USE. When tableExecutor is non-nil it is used instead of
+// the real RPC path.
+//
+// The native client's pool takes no context: GetSession can wait up to
+// tableWaitSessionTimeoutMs for a free session and cannot be interrupted. The
+// context is therefore checked before that wait and again after it, so a
+// request that has been cancelled, or whose deadline has passed, never runs a
+// statement whose result nobody will read.
 func (d *IoTDBDataSource) executeTableStatement(ctx context.Context, database, sql string) (*tableQueryDataSet, error) {
 	if d.tableExecutor != nil {
 		return d.tableExecutor(ctx, database, sql)
 	}
 
-	pool, err := d.getTablePool()
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	session, err := pool.GetSession()
+	getSession := d.tableSessionSource
+	if getSession == nil {
+		pool, err := d.getTablePool()
+		if err != nil {
+			return nil, err
+		}
+		getSession = pool.GetSession
+	}
+	session, err := getSession()
 	if err != nil {
 		log.DefaultLogger.Error("Cannot connect to the IoTDB RPC service", "err", err)
 		return nil, fmt.Errorf("cannot connect to the IoTDB RPC service: %w", err)
@@ -543,6 +559,11 @@ func (d *IoTDBDataSource) executeTableStatement(ctx context.Context, database, s
 			log.DefaultLogger.Error("Failed to return session to the pool", "err", closeErr)
 		}
 	}()
+	if err := ctx.Err(); err != nil {
+		// The caller gave up while this request waited for a session; hand the
+		// session straight back to the pool for the requests still waiting.
+		return nil, err
+	}
 
 	if db := strings.TrimSpace(database); db != "" {
 		if err := session.ExecuteNonQueryStatement("USE " + quoteTableIdentifier(db)); err != nil {

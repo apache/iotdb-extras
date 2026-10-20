@@ -28,6 +28,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/apache/iotdb-client-go/v2/client"
 )
 
 type recordedStatement struct {
@@ -80,7 +82,7 @@ func TestTableDatabasesReturnsTheDatabaseColumn(t *testing.T) {
 	}
 }
 
-func TestTableTablesRunsShowTablesInTheRequestedDatabase(t *testing.T) {
+func TestTableTablesNamesTheRequestedDatabaseInTheStatement(t *testing.T) {
 	var calls []recordedStatement
 	d := metadataDataSource(&tableQueryDataSet{
 		ColumnNames: []string{"TableName", "TTL(ms)"},
@@ -99,7 +101,8 @@ func TestTableTablesRunsShowTablesInTheRequestedDatabase(t *testing.T) {
 	if want := []string{"weather station", "cpu"}; !reflect.DeepEqual(names, want) {
 		t.Fatalf("names = %v, want %v", names, want)
 	}
-	if want := []recordedStatement{{database: "grafana_demo", sql: "SHOW TABLES"}}; !reflect.DeepEqual(calls, want) {
+	// SHOW TABLES FROM names the database, so no USE is needed on the session.
+	if want := []recordedStatement{{database: "", sql: `SHOW TABLES FROM "grafana_demo"`}}; !reflect.DeepEqual(calls, want) {
 		t.Fatalf("statements = %v, want %v", calls, want)
 	}
 }
@@ -134,9 +137,58 @@ func TestTableColumnsQuotesTheTableName(t *testing.T) {
 	if !reflect.DeepEqual(columns, want) {
 		t.Fatalf("columns = %v, want %v", columns, want)
 	}
-	// An embedded double quote is doubled, so the name stays one identifier.
-	if want := []recordedStatement{{database: "grafana_demo", sql: `DESC "weather""station"`}}; !reflect.DeepEqual(calls, want) {
+	// An embedded double quote is doubled, so the name stays one identifier, and
+	// the table is qualified with its database instead of a USE.
+	if want := []recordedStatement{{database: "", sql: `DESC "grafana_demo"."weather""station"`}}; !reflect.DeepEqual(calls, want) {
 		t.Fatalf("statements = %v, want %v", calls, want)
+	}
+}
+
+func TestTableMetadataQuotesEachPartOfTheName(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		handler func(d *IoTDBDataSource) http.Handler
+		target  string
+		want    string
+	}{
+		{
+			name:    "hyphen and upper case in the database",
+			handler: (*IoTDBDataSource).getTableTables,
+			target:  "/tableTables?database=grafana-Demo",
+			want:    `SHOW TABLES FROM "grafana-Demo"`,
+		},
+		{
+			name:    "double quote in the database",
+			handler: (*IoTDBDataSource).getTableTables,
+			target:  `/tableTables?database=we%22ird`,
+			want:    `SHOW TABLES FROM "we""ird"`,
+		},
+		{
+			name:    "hyphen and upper case in both parts",
+			handler: (*IoTDBDataSource).getTableColumns,
+			target:  "/tableColumns?database=grafana-Demo&table=Weather-Station",
+			want:    `DESC "grafana-Demo"."Weather-Station"`,
+		},
+		{
+			// A dot inside a name stays inside its quoted part, so it cannot
+			// redirect the lookup to another database.
+			name:    "dot and double quote inside the names",
+			handler: (*IoTDBDataSource).getTableColumns,
+			target:  `/tableColumns?database=a.b&table=c%22.%22d`,
+			want:    `DESC "a.b"."c"".""d"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []recordedStatement
+			d := metadataDataSource(&tableQueryDataSet{ColumnNames: []string{"TableName", "ColumnName", "DataType", "Category"}}, nil, &calls)
+
+			if recorder := serveMetadata(t, tc.handler(d), tc.target); recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+			}
+			if want := []recordedStatement{{database: "", sql: tc.want}}; !reflect.DeepEqual(calls, want) {
+				t.Fatalf("statements = %v, want %v", calls, want)
+			}
+		})
 	}
 }
 
@@ -147,14 +199,15 @@ func TestTableColumnsUsesTheNamesAsGiven(t *testing.T) {
 		Values:      [][]interface{}{{"time", "TIMESTAMP", "TIME"}},
 	}, nil, &calls)
 
-	recorder := serveMetadata(t, d.getTableColumns(), `/tableColumns?database=grafana_demo&table=weather%20`)
+	recorder := serveMetadata(t, d.getTableColumns(), `/tableColumns?database=%20grafana_demo%20&table=weather%20`)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
 	// The editor trims names when they are entered, so the handler does not trim
-	// again: the columns it lists are those of the table the starter query names.
-	if want := []recordedStatement{{database: "grafana_demo", sql: `DESC "weather "`}}; !reflect.DeepEqual(calls, want) {
+	// the table again: the columns it lists are those of the table the starter
+	// query names. The database is trimmed, as a panel query's USE trims it.
+	if want := []recordedStatement{{database: "", sql: `DESC "grafana_demo"."weather "`}}; !reflect.DeepEqual(calls, want) {
 		t.Fatalf("statements = %v, want %v", calls, want)
 	}
 }
@@ -178,6 +231,33 @@ func TestTableMetadataRequiresItsParameters(t *testing.T) {
 	}
 	if len(calls) != 0 {
 		t.Fatalf("a request missing its parameters reached the server: %v", calls)
+	}
+}
+
+func TestTableMetadataStopsWhenTheEditorCancelsTheRequest(t *testing.T) {
+	acquired := 0
+	d := sessionDataSource(&acquired, func() client.ITableSession { return &fakeTableSession{} })
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	for _, tc := range []struct {
+		handler http.Handler
+		target  string
+	}{
+		{d.getTableDatabases(), "/tableDatabases"},
+		{d.getTableTables(), "/tableTables?database=grafana_demo"},
+		{d.getTableColumns(), "/tableColumns?database=grafana_demo&table=cpu"},
+	} {
+		recorder := httptest.NewRecorder()
+		tc.handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tc.target, nil).WithContext(ctx))
+		if recorder.Code != http.StatusInternalServerError {
+			t.Errorf("%s: status = %d, want %d", tc.target, recorder.Code, http.StatusInternalServerError)
+		}
+	}
+	// The handlers pass the request's context on, so an aborted lookup never
+	// takes one of the pool's sessions from the panel queries.
+	if acquired != 0 {
+		t.Fatalf("cancelled lookups took %d session(s)", acquired)
 	}
 }
 

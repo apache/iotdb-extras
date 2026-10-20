@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { DataSource } from './datasource';
+import { DataSource, tableMetadataTtlMs } from './datasource';
 import { applyQueryType, getQueryType, IoTDBQuery } from './types';
 import { ScopedVars } from '@grafana/data';
 
@@ -303,10 +303,27 @@ describe('query type model', () => {
 });
 
 describe('table-model metadata lookups', () => {
-  it('do not raise a global error alert, since the editor shows failures inline', async () => {
+  let now: number;
+  let clock: jest.SpyInstance<number, []>;
+
+  beforeEach(() => {
+    now = 1_000_000;
+    clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
+  });
+
+  afterEach(() => {
+    clock.mockRestore();
+  });
+
+  function metadataDataSource() {
     const ds = new DataSource({ jsonData: { url: 'http://localhost:6667', username: 'root' } } as any);
     const getResource = jest.fn().mockResolvedValue([]);
     (ds as unknown as { getResource: jest.Mock }).getResource = getResource;
+    return { ds, getResource };
+  }
+
+  it('do not raise a global error alert, since the editor shows failures inline', async () => {
+    const { ds, getResource } = metadataDataSource();
     await ds.getTableDatabases();
     await ds.getTableTables('db');
     await ds.getTableColumns('db', 't');
@@ -315,5 +332,79 @@ describe('table-model metadata lookups', () => {
       ['tableTables', { database: 'db' }, { showErrorAlert: false }],
       ['tableColumns', { database: 'db', table: 't' }, { showErrorAlert: false }],
     ]);
+  });
+
+  it('reuse a recent result for the same database and table', async () => {
+    const { ds, getResource } = metadataDataSource();
+    getResource.mockImplementation((path: string, params?: Record<string, string>) =>
+      Promise.resolve([`${path} ${JSON.stringify(params ?? {})}`])
+    );
+
+    expect(await ds.getTableTables('db1')).toEqual(['tableTables {"database":"db1"}']);
+    expect(await ds.getTableTables('db1')).toEqual(['tableTables {"database":"db1"}']);
+    await ds.getTableTables('db2');
+    await ds.getTableColumns('db1', 't');
+    await ds.getTableColumns('db1', 't');
+    await ds.getTableColumns('db1', 'u');
+    await ds.getTableColumns('db2', 't');
+    await ds.getTableDatabases();
+    await ds.getTableDatabases();
+
+    expect(getResource.mock.calls.map(([path, params]) => [path, params])).toEqual([
+      ['tableTables', { database: 'db1' }],
+      ['tableTables', { database: 'db2' }],
+      ['tableColumns', { database: 'db1', table: 't' }],
+      ['tableColumns', { database: 'db1', table: 'u' }],
+      ['tableColumns', { database: 'db2', table: 't' }],
+      ['tableDatabases', undefined],
+    ]);
+  });
+
+  it('ask the server again once the cached result has expired', async () => {
+    const { ds, getResource } = metadataDataSource();
+    getResource.mockResolvedValueOnce(['cpu']).mockResolvedValueOnce(['cpu', 'mem']);
+
+    await ds.getTableTables('db1');
+    now += tableMetadataTtlMs - 1;
+    expect(await ds.getTableTables('db1')).toEqual(['cpu']);
+    expect(getResource).toHaveBeenCalledTimes(1);
+
+    now += 1;
+    expect(await ds.getTableTables('db1')).toEqual(['cpu', 'mem']);
+    expect(getResource).toHaveBeenCalledTimes(2);
+  });
+
+  it('do not keep a failed lookup', async () => {
+    const { ds, getResource } = metadataDataSource();
+    getResource.mockRejectedValueOnce(new Error('Unknown database db1')).mockResolvedValueOnce(['cpu']);
+
+    await expect(ds.getTableTables('db1')).rejects.toThrow('Unknown database db1');
+    expect(await ds.getTableTables('db1')).toEqual(['cpu']);
+    expect(getResource).toHaveBeenCalledTimes(2);
+  });
+
+  it('ask the server past the cache on refresh, and keep the fresh answer', async () => {
+    const { ds, getResource } = metadataDataSource();
+    getResource.mockResolvedValueOnce(['db1']).mockResolvedValueOnce(['db1', 'db2']);
+
+    await ds.getTableDatabases();
+    expect(await ds.getTableDatabases({ refresh: true })).toEqual(['db1', 'db2']);
+    expect(await ds.getTableDatabases()).toEqual(['db1', 'db2']);
+    expect(getResource).toHaveBeenCalledTimes(2);
+  });
+
+  it("pass the caller's abort signal to the request", async () => {
+    const { ds, getResource } = metadataDataSource();
+    const controller = new AbortController();
+
+    await ds.getTableColumns('db1', 't', { signal: controller.signal });
+
+    expect(getResource).toHaveBeenCalledWith(
+      'tableColumns',
+      { database: 'db1', table: 't' },
+      { showErrorAlert: false, abortSignal: controller.signal }
+    );
+    // Equality alone would accept any AbortSignal; it must be the caller's.
+    expect(getResource.mock.calls[0][2].abortSignal).toBe(controller.signal);
   });
 });

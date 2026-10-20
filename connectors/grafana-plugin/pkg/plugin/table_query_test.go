@@ -21,10 +21,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/apache/iotdb-client-go/v2/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
@@ -317,6 +319,126 @@ func TestFetchTableDataSetPropagatesError(t *testing.T) {
 	rs := &fakeResultSet{names: []string{"a"}, types: []string{"INT64"}, err: errors.New("broken pipe")}
 	if _, err := fetchTableDataSet(rs); err == nil {
 		t.Fatalf("expected the iteration error to propagate")
+	}
+}
+
+// errQueryNotServed ends a statement on fakeTableSession: a *client.SessionDataSet
+// cannot be built without a server, so the tests only look at which
+// statements reached the session.
+var errQueryNotServed = errors.New("fake session serves no results")
+
+// fakeTableSession stands in for a pooled native-client table session and
+// records the statements run on it.
+type fakeTableSession struct {
+	statements []string
+	closed     bool
+}
+
+func (s *fakeTableSession) Insert(*client.Tablet) error { return errors.New("not supported") }
+
+func (s *fakeTableSession) ExecuteNonQueryStatement(sql string) error {
+	s.statements = append(s.statements, sql)
+	return nil
+}
+
+func (s *fakeTableSession) ExecuteQueryStatement(sql string, _ *int64) (*client.SessionDataSet, error) {
+	s.statements = append(s.statements, sql)
+	return nil, errQueryNotServed
+}
+
+func (s *fakeTableSession) Close() error {
+	s.closed = true
+	return nil
+}
+
+// sessionDataSource returns a datasource whose real RPC executor takes its
+// sessions from source, counting each acquisition.
+func sessionDataSource(acquired *int, source func() client.ITableSession) *IoTDBDataSource {
+	return &IoTDBDataSource{
+		tableSessionSource: func() (client.ITableSession, error) {
+			*acquired++
+			return source(), nil
+		},
+	}
+}
+
+func TestTableStatementUsesTheDatabaseOnlyWhenOneIsGiven(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		database string
+		sql      string
+		want     []string
+	}{
+		// A panel or variable query keeps its USE, as before.
+		{name: "panel query", database: " grafana_demo ", sql: "SELECT 1", want: []string{`USE "grafana_demo"`, "SELECT 1"}},
+		// A metadata statement names its database itself and needs no USE.
+		{name: "metadata lookup", database: "", sql: `SHOW TABLES FROM "grafana_demo"`, want: []string{`SHOW TABLES FROM "grafana_demo"`}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			acquired := 0
+			session := &fakeTableSession{}
+			d := sessionDataSource(&acquired, func() client.ITableSession { return session })
+
+			if _, err := d.executeTableStatement(context.Background(), tc.database, tc.sql); !errors.Is(err, errQueryNotServed) {
+				t.Fatalf("error = %v, want %v", err, errQueryNotServed)
+			}
+			if !reflect.DeepEqual(session.statements, tc.want) {
+				t.Fatalf("statements = %q, want %q", session.statements, tc.want)
+			}
+			if !session.closed {
+				t.Fatalf("the session was not handed back to the pool")
+			}
+		})
+	}
+}
+
+func TestTableStatementTakesNoSessionOnceTheRequestIsOver(t *testing.T) {
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	expired, cancelExpired := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancelExpired()
+
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+		want error
+	}{
+		{name: "cancelled", ctx: cancelled, want: context.Canceled},
+		{name: "deadline passed", ctx: expired, want: context.DeadlineExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			acquired := 0
+			d := sessionDataSource(&acquired, func() client.ITableSession { return &fakeTableSession{} })
+
+			if _, err := d.executeTableStatement(tc.ctx, "", `SHOW TABLES FROM "grafana_demo"`); !errors.Is(err, tc.want) {
+				t.Fatalf("error = %v, want %v", err, tc.want)
+			}
+			if acquired != 0 {
+				t.Fatalf("a request that was already over waited for %d session(s)", acquired)
+			}
+		})
+	}
+}
+
+func TestTableStatementHandsBackASessionThatArrivesAfterTheRequestEnded(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	acquired := 0
+	session := &fakeTableSession{}
+	d := sessionDataSource(&acquired, func() client.ITableSession {
+		// GetSession cannot be interrupted, so the caller gives up while it waits.
+		cancel()
+		return session
+	})
+
+	if _, err := d.executeTableStatement(ctx, "grafana_demo", "SELECT 1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want %v", err, context.Canceled)
+	}
+	if len(session.statements) != 0 {
+		t.Fatalf("statements = %q, want none once the request has ended", session.statements)
+	}
+	if !session.closed {
+		t.Fatalf("the session was not handed back to the pool")
 	}
 }
 

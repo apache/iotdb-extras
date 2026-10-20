@@ -58,12 +58,64 @@ describe('TablePicker', () => {
     const variables: Record<string, string> = { $db: 'db1' };
     const ds = fakeDatasource(variables);
     const { rerender, props } = renderPicker(ds, { database: '$db' });
-    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledWith('db1'));
+    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledWith('db1', expect.anything()));
 
     variables.$db = 'db2';
     rerender(<TablePicker {...props} />);
 
-    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledWith('db2'));
+    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledWith('db2', expect.anything()));
+  });
+
+  it('cancels a lookup that is still running when the picker unmounts', async () => {
+    const ds = fakeDatasource({});
+    ds.getTableTables.mockReturnValue(new Promise(() => {}));
+    const { unmount } = renderPicker(ds, { database: 'db1' });
+    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledTimes(1));
+    const { signal } = ds.getTableTables.mock.calls[0][1];
+    expect(signal.aborted).toBe(false);
+
+    unmount();
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('cancels the lookup for a database that is no longer selected, without reporting it', async () => {
+    const variables: Record<string, string> = { $db: 'db1' };
+    const ds = fakeDatasource(variables);
+    // Like a real request, the db1 lookup fails once it is aborted.
+    ds.getTableTables.mockImplementation((database: string, { signal }: { signal: AbortSignal }) =>
+      database === 'db1'
+        ? new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('request aborted'))))
+        : Promise.resolve(['cpu'])
+    );
+    const { rerender, props } = renderPicker(ds, { database: '$db' });
+    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledWith('db1', expect.anything()));
+
+    variables.$db = 'db2';
+    rerender(<TablePicker {...props} />);
+    await waitFor(() => expect(ds.getTableTables).toHaveBeenCalledWith('db2', expect.anything()));
+    await act(async () => {});
+
+    const [first, second] = ds.getTableTables.mock.calls.map(([, options]) => options.signal);
+    expect(first.aborted).toBe(true);
+    expect(second.aborted).toBe(false);
+    expect(screen.queryByText(/request aborted/)).toBeNull();
+  });
+
+  it('asks past the datasource cache only when the database list is opened', async () => {
+    const ds = fakeDatasource({});
+    renderPicker(ds, {});
+    await waitFor(() => expect(ds.getTableDatabases).toHaveBeenCalledTimes(1));
+    expect(ds.getTableDatabases.mock.calls[0][0]).toMatchObject({ refresh: false });
+    const databaseInput = document.getElementById('iotdb-table-database-A') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.focus(databaseInput);
+      fireEvent.keyDown(databaseInput, { key: 'ArrowDown' });
+    });
+
+    await waitFor(() => expect(ds.getTableDatabases).toHaveBeenCalledTimes(2));
+    expect(ds.getTableDatabases.mock.calls[1][0]).toMatchObject({ refresh: true });
   });
 
   it('keeps a typed database name when the picker loses focus', async () => {

@@ -20,6 +20,8 @@
 package plugin
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -30,6 +32,10 @@ import (
 // Resource handlers behind the table-model query editor's database, table and
 // column pickers. Each one runs a fixed metadata statement on a pooled native
 // session; request parameters only reach the server as quoted identifiers.
+// The statements name their database themselves (SHOW TABLES FROM <db>,
+// DESC <db>.<table>), so a lookup issues no USE and changes no session state.
+// The request context is honoured as far as the native client allows; see
+// executeTableStatement.
 
 // tableColumn describes one column of a table-model table as DESC reports it.
 type tableColumn struct {
@@ -60,13 +66,13 @@ func (d *IoTDBDataSource) getTableDatabases() http.Handler {
 func (d *IoTDBDataSource) getTableTables() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The editor trims names when they are entered; here a blank name is only
-		// rejected, and the name is used as given.
+		// rejected. The database is trimmed as a panel query's USE trims it.
 		database := r.URL.Query().Get("database")
 		if strings.TrimSpace(database) == "" {
 			writeJSONError(w, http.StatusBadRequest, "the database parameter is required")
 			return
 		}
-		dataSet, err := d.executeTableStatement(r.Context(), database, "SHOW TABLES")
+		dataSet, err := d.executeTableStatement(r.Context(), "", showTablesStatement(database))
 		if err != nil {
 			writeMetadataError(w, "SHOW TABLES", err)
 			return
@@ -90,7 +96,7 @@ func (d *IoTDBDataSource) getTableColumns() http.Handler {
 			writeJSONError(w, http.StatusBadRequest, "the database and table parameters are required")
 			return
 		}
-		dataSet, err := d.executeTableStatement(r.Context(), database, "DESC "+quoteTableIdentifier(table))
+		dataSet, err := d.executeTableStatement(r.Context(), "", describeTableStatement(database, table))
 		if err != nil {
 			writeMetadataError(w, "DESC", err)
 			return
@@ -104,8 +110,25 @@ func (d *IoTDBDataSource) getTableColumns() http.Handler {
 	})
 }
 
+// showTablesStatement lists the tables of a database without a USE.
+func showTablesStatement(database string) string {
+	return "SHOW TABLES FROM " + quoteTableIdentifier(strings.TrimSpace(database))
+}
+
+// describeTableStatement describes a table by its qualified name, without a
+// USE. The table name is used as given: the editor trims it when it is
+// entered, and the starter query names the same table.
+func describeTableStatement(database, table string) string {
+	return "DESC " + quoteTableIdentifier(strings.TrimSpace(database)) + "." + quoteTableIdentifier(table)
+}
+
 func writeMetadataError(w http.ResponseWriter, statement string, err error) {
-	log.DefaultLogger.Error("table-model metadata query failed", "statement", statement, "err", err)
+	if errors.Is(err, context.Canceled) {
+		// The editor cancels a lookup it no longer needs; that is not a failure.
+		log.DefaultLogger.Debug("table-model metadata query cancelled", "statement", statement)
+	} else {
+		log.DefaultLogger.Error("table-model metadata query failed", "statement", statement, "err", err)
+	}
 	writeJSONError(w, http.StatusInternalServerError, err.Error())
 }
 
