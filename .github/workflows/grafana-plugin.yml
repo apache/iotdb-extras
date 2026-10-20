@@ -43,12 +43,19 @@ jobs:
         run: |
           cd connectors/grafana-plugin/
           npm ci
+          npm run test:ci
           npm run build
 
       - name: Install dependencies and Build backend
         run: |
           cd connectors/grafana-plugin/
           ./backend-compile.sh
+
+      # go.sum is not checked in; backend-compile.sh resolves it, so the tests run after it.
+      - name: Test backend
+        run: |
+          cd connectors/grafana-plugin/
+          go test ./pkg/...
 
   # The job above exercises the npm path directly. This one exercises the Maven
   # entrypoint (`mvn -Pwith-grafana-plugin`), which drives the same frontend build
