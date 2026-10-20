@@ -130,7 +130,8 @@ public class RowDataDeserializationSchema implements IoTDBDeserializationSchema<
         return (int) iterator.getDate(columnIndex).toEpochDay();
       case TIMESTAMP_WITHOUT_TIME_ZONE:
       case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-        return TimestampData.fromTimestamp(iterator.getTimestamp(columnIndex));
+        // fromTimestamp() would shift the value by the JVM default time zone.
+        return TimestampData.fromInstant(iterator.getTimestamp(columnIndex).toInstant());
       default:
         throw new IOException(
             "Unsupported Flink type at column " + columnIndex + ": " + dataType.getLogicalType());

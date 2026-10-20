@@ -573,7 +573,9 @@ public final class IoTDBUtils {
       TimestampData timestamp, TimestampPrecision timestampPrecision) {
     long units =
         timestampPrecision.toUnits(timestamp.getMillisecond(), timestamp.getNanoOfMillisecond());
-    return "CAST(" + units + " AS TIMESTAMP)";
+    // A plain number, not CAST(... AS TIMESTAMP): IoTDB turns a time-column predicate into a time
+    // filter only from an integer literal, and fails the query with error 301 on the CAST form.
+    return Long.toString(units);
   }
 
   private static boolean isFinite(float value) {

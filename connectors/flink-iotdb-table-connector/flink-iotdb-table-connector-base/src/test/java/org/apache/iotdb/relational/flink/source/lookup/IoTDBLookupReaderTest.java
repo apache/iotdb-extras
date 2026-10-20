@@ -61,7 +61,7 @@ public class IoTDBLookupReaderTest {
 
     assertEquals(
         "SELECT \"time\", \"device_id\", \"temperature\" FROM \"sensor\" "
-            + "WHERE \"device_id\" = 'd1' AND \"time\" = CAST(1704112200000 AS TIMESTAMP)",
+            + "WHERE \"device_id\" = 'd1' AND \"time\" = 1704112200000",
         reader.buildLookupSql(keyRow));
   }
 
