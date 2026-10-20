@@ -130,7 +130,10 @@ public class RowDataSinkDataConverter implements SinkDataConverter<RowData> {
 
     @Override
     public Timestamp getTimestamp(int columnIndex) {
-      return current.getTimestamp(columnIndex, timestampPrecisions[columnIndex]).toTimestamp();
+      // toTimestamp() goes through LocalDateTime and the JVM default time zone; toInstant() keeps
+      // the epoch value, which is what the IoTDB time column stores.
+      return Timestamp.from(
+          current.getTimestamp(columnIndex, timestampPrecisions[columnIndex]).toInstant());
     }
   }
 }

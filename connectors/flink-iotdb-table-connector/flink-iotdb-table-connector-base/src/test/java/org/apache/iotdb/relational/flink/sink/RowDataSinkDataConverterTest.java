@@ -31,6 +31,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.TimeZone;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -74,6 +75,20 @@ public class RowDataSinkDataConverterTest {
       assertEquals(2.5d, iterator.getDouble(3), 0.0d);
       assertEquals(LocalDate.ofEpochDay(10), iterator.getDate(4));
       assertArrayEquals(new byte[] {1, 2}, binary(iterator.getBlob(5)));
+    }
+  }
+
+  @Test
+  public void testTimestampDoesNotDependOnDefaultTimeZone() throws IOException {
+    TimeZone defaultZone = TimeZone.getDefault();
+    try {
+      TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+      try (SinkDataConverter.Iterator iterator = converter.getIterator(rowData())) {
+        assertTrue(iterator.next());
+        assertEquals(1000L, iterator.getTimestamp(0).getTime());
+      }
+    } finally {
+      TimeZone.setDefault(defaultZone);
     }
   }
 
