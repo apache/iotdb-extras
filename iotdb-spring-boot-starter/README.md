@@ -29,7 +29,7 @@ Auto-configures the native IoTDB tree and table session pools. This is a Session
 - Default build line: Spring Boot 3.5.1 / Spring Framework 6.2.8.
 - Spring Boot 4.1.1 / Spring Framework 7.0.9 is validated in CI.
 - IoTDB Java client 2.0.11, with TsFile 2.4.0.
-- The Extras artifact version is `2.0.11`, matching the IoTDB release it targets.
+- The Extras artifact version is `2.0.12-SNAPSHOT`; released versions follow the IoTDB release they target.
 
 From the repository root, install the starter and its parent locally:
 
@@ -43,7 +43,7 @@ Use the locally built artifact (or the version of Extras you have actually publi
 <dependency>
     <groupId>org.apache.iotdb</groupId>
     <artifactId>iotdb-spring-boot-starter</artifactId>
-    <version>2.0.11</version>
+    <version>2.0.12-SNAPSHOT</version>
 </dependency>
 ```
 

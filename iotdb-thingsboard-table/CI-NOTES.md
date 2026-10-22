@@ -26,7 +26,7 @@ The `iotdb-extras` parent reactor builds and tests this module through the named
 integrates ThingsBoard SPIs, so it is an explicit opt-in rather than part of the
 default reactor). CI activates it on the JDK 17+ jobs by passing `-P with-thingsboard`
 (see `.github/workflows/compile-check.yml`). CI uses JDK 17 and 21. IoTDB client,
-TsFile and Guava versions follow the reactor (2.0.11 / 2.4.0 / 32.1.2-jre).
+TsFile and Guava versions follow the reactor (2.0.12-SNAPSHOT / 2.4.0 / 32.1.2-jre).
 Jakarta validation remains a module-local 3.0.2 override to match the ThingsBoard
 Spring Boot 3 host. Run dependency convergence separately after dependency changes;
 a compile result does not establish convergence or real-host binary compatibility.

@@ -71,7 +71,7 @@ This repository includes:
 - Maven 3.6 or later
 - Git
 
-IoTDB Java dependencies use **2.0.11**, paired with **TsFile 2.4.0** and **Thrift 0.23.0**. Extras is released as **2.0.11** as well, so the Extras version states which IoTDB release it targets. The dependency baseline is the released IoTDB `v2.0.11` tag, not unreleased `master` snapshots.
+IoTDB Java dependencies use **2.0.11**, paired with **TsFile 2.4.0** and **Thrift 0.23.0**. Extras releases follow the version of the IoTDB release they target (the last one is 2.0.11), so a single number identifies both. The dependency baseline is the released IoTDB `v2.0.11` tag, not unreleased `master` snapshots.
 
 JDK 17 is the minimum supported version; CI also covers JDK 21. External engines must support the chosen JDK independently. In particular, the legacy Spark 2.4/Scala 2.11 modules still require a runtime migration before deployment on JDK 17.
 
@@ -285,7 +285,7 @@ This repository includes a variety of examples demonstrating how to use IoTDB wi
 - **Introduction**: Shows how to use iotdb-spring-boot-starter
 - **Version**:
   - IoTDB: 2.0.11
-  - iotdb-spring-boot-starter: 2.0.11
+  - iotdb-spring-boot-starter: 2.0.12-SNAPSHOT
   - Starter build line: Spring Boot 3.5.1 by default; Spring Boot 4.1.1 is CI-validated
 - **Setup**:
   1. Install IoTDB
@@ -312,7 +312,7 @@ This repository includes a variety of examples demonstrating how to use IoTDB wi
 - **Introduction**: Shows how to use IoTDB-Mybatis-Generator
 - **Version**:
   - IoTDB: 2.0.11
-  - mybatis-generator-plugin: 2.0.11
+  - mybatis-generator-plugin: 2.0.12-SNAPSHOT
 - **Setup**:
   1. Install and start IoTDB
   2. Create necessary database and tables

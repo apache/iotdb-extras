@@ -21,7 +21,7 @@
 
 # IoTDB MyBatis Generator 插件
 
-为 IoTDB **表模型**生成 Model、Mapper 和 XML，提供批量插入、Lombok、序列化、Swagger 注释和 JDBC 类型映射。要求 **JDK 17+、IoTDB/JDBC 2.0.11、MBG 1.4.2**。插件由 Extras 发布，本仓库版本为 `2.0.11`，与所对齐的 IoTDB 版本一致。
+为 IoTDB **表模型**生成 Model、Mapper 和 XML，提供批量插入、Lombok、序列化、Swagger 注释和 JDBC 类型映射。要求 **JDK 17+、IoTDB/JDBC 2.0.11、MBG 1.4.2**。插件由 Extras 发布，本仓库版本为 `2.0.12-SNAPSHOT`，与所对齐的 IoTDB 版本一致。
 
 ## 安装与配置
 

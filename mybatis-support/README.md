@@ -39,7 +39,7 @@ Add this application dependency (it is separate from the build-time generator pl
 <dependency>
     <groupId>org.apache.iotdb</groupId>
     <artifactId>mybatis-support</artifactId>
-    <version>2.0.11</version>
+    <version>2.0.12-SNAPSHOT</version>
 </dependency>
 ```
 

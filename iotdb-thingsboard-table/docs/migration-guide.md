@@ -65,8 +65,8 @@ TsFile versions are inherited from the `iotdb-extras` parent reactor.
 
 | Component | Coordinate / image | Version | Where it is fixed |
 | --- | --- | --- | --- |
-| Module | `org.apache.iotdb:iotdb-thingsboard-table` | `2.0.11` (parent version) | module `pom.xml` `<parent>` |
-| Parent reactor | `org.apache.iotdb:iotdb-extras-parent` | `2.0.11` | module `pom.xml` `<parent>` |
+| Module | `org.apache.iotdb:iotdb-thingsboard-table` | `2.0.12-SNAPSHOT` (parent version) | module `pom.xml` `<parent>` |
+| Parent reactor | `org.apache.iotdb:iotdb-extras-parent` | `2.0.12-SNAPSHOT` | module `pom.xml` `<parent>` |
 | IoTDB session client | `org.apache.iotdb:iotdb-session` | `2.0.11` | inherited from parent `iotdb.version`; module declares the dependency with no `<version>` |
 | TsFile | `org.apache.tsfile:tsfile` | `2.4.0` | inherited from parent `tsfile.version` (transitive of `iotdb-session`) |
 | Guava | `com.google.guava:guava` | `32.1.2-jre` | inherited from parent `guava.version`; `provided` scope |
