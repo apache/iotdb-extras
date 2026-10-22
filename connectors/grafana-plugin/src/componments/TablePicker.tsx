@@ -79,31 +79,35 @@ function errorMessage(err: unknown): string {
 
 // useLoaded runs one metadata lookup whenever its key changes. State is only
 // written when a lookup settles, and a result is only used while its key is
-// current. A failed lookup keeps its message; the pickers still accept a typed
-// name, so the editor stays usable when metadata cannot be read. With
-// keepPrevious, the last value stays available while a new lookup is running.
-function useLoaded<T>(key: string, load: (() => Promise<T>) | undefined, keepPrevious = false): Loaded<T> {
+// current: when the key changes or the picker unmounts, the lookup's signal is
+// aborted, which cancels its request. A failed lookup keeps its message; the
+// pickers still accept a typed name, so the editor stays usable when metadata
+// cannot be read. With keepPrevious, the last value stays available while a
+// new lookup is running.
+function useLoaded<T>(
+  key: string,
+  load: ((signal: AbortSignal) => Promise<T>) | undefined,
+  keepPrevious = false
+): Loaded<T> {
   const [result, setResult] = useState<{ key: string; value?: T; error?: string }>();
   useEffect(() => {
     if (!load) {
       return;
     }
-    let cancelled = false;
-    load().then(
+    const controller = new AbortController();
+    load(controller.signal).then(
       (value) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setResult({ key, value });
         }
       },
       (err) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setResult({ key, error: errorMessage(err) });
         }
       }
     );
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
     // The key identifies the lookup; `load` is a fresh closure on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -157,17 +161,24 @@ export function TablePicker({
   // changes value fetches the new database's tables and columns.
   const resolvedDatabase = database ? datasource.resolveTemplate(database, scopedVars) : '';
   const resolvedTable = table ? datasource.resolveTemplate(table, scopedVars) : '';
-  // Opening the database list asks the server again, so a database created
-  // later, or a lookup that failed, is picked up without reopening the editor.
+  // Opening the database list asks the server again, past the datasource's
+  // cache, so a database created later, or a lookup that failed, is picked up
+  // without reopening the editor.
   const [databaseRefresh, setDatabaseRefresh] = useState(0);
-  const databases = useLoaded(`databases|${databaseRefresh}`, () => datasource.getTableDatabases(), true);
+  const databases = useLoaded(
+    `databases|${databaseRefresh}`,
+    (signal) => datasource.getTableDatabases({ signal, refresh: databaseRefresh > 0 }),
+    true
+  );
   const tables = useLoaded(
     `tables|${resolvedDatabase}`,
-    resolvedDatabase ? () => datasource.getTableTables(resolvedDatabase) : undefined
+    resolvedDatabase ? (signal) => datasource.getTableTables(resolvedDatabase, { signal }) : undefined
   );
   const columns = useLoaded<TableColumn[]>(
     `columns|${resolvedDatabase}|${resolvedTable}`,
-    resolvedDatabase && resolvedTable ? () => datasource.getTableColumns(resolvedDatabase, resolvedTable) : undefined
+    resolvedDatabase && resolvedTable
+      ? (signal) => datasource.getTableColumns(resolvedDatabase, resolvedTable, { signal })
+      : undefined
   );
   const errors = Array.from(new Set([databases.error, tables.error, columns.error].filter(Boolean)));
 

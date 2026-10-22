@@ -20,6 +20,18 @@ import { IoTDBOptions, IoTDBQuery, TableColumn } from './types';
 import { toMetricFindValue } from './functions';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 
+// How long a table-model metadata lookup is reused. Short, so that a table
+// created meanwhile shows up soon; opening the database list always asks the
+// server again (see TableMetadataOptions.refresh).
+export const tableMetadataTtlMs = 30000;
+
+export interface TableMetadataOptions {
+  // Cancels the request when the caller no longer needs its result.
+  signal?: AbortSignal;
+  // Asks the server even when a recent result is cached, and caches the answer.
+  refresh?: boolean;
+}
+
 function variableQueryText(query: unknown): string | undefined {
   if (typeof query === 'string') {
     return query;
@@ -190,16 +202,44 @@ export class DataSource extends DataSourceWithBackend<IoTDBQuery, IoTDBOptions> 
   // Metadata behind the table-model editor's pickers. Callers pass names that
   // resolveTemplate has already expanded. The editor shows a failed lookup
   // inline, so it is not also raised as a global error alert.
-  getTableDatabases(): Promise<string[]> {
-    return this.getResource('tableDatabases', undefined, { showErrorAlert: false });
+  getTableDatabases(options?: TableMetadataOptions): Promise<string[]> {
+    return this.tableMetadata('tableDatabases', {}, options);
   }
 
-  getTableTables(database: string): Promise<string[]> {
-    return this.getResource('tableTables', { database }, { showErrorAlert: false });
+  getTableTables(database: string, options?: TableMetadataOptions): Promise<string[]> {
+    return this.tableMetadata('tableTables', { database }, options);
   }
 
-  getTableColumns(database: string, table: string): Promise<TableColumn[]> {
-    return this.getResource('tableColumns', { database, table }, { showErrorAlert: false });
+  getTableColumns(database: string, table: string, options?: TableMetadataOptions): Promise<TableColumn[]> {
+    return this.tableMetadata('tableColumns', { database, table }, options);
+  }
+
+  // A successful lookup is kept for tableMetadataTtlMs, keyed on the endpoint
+  // and the names it was asked about, so that opening the editor again or
+  // switching between queries does not ask the server for names it has just
+  // listed. A failed lookup is not kept, so the next one asks again.
+  private tableMetadataCache = new Map<string, { expires: number; value: unknown }>();
+
+  private async tableMetadata<T>(
+    path: string,
+    names: Record<string, string>,
+    { signal, refresh = false }: TableMetadataOptions = {}
+  ): Promise<T> {
+    const key = JSON.stringify([path, names]);
+    const cached = this.tableMetadataCache.get(key);
+    if (cached && !refresh && cached.expires > Date.now()) {
+      return cached.value as T;
+    }
+    const params = Object.keys(names).length > 0 ? names : undefined;
+    const value = await this.getResource<T>(path, params, { showErrorAlert: false, abortSignal: signal });
+    const now = Date.now();
+    for (const [staleKey, entry] of this.tableMetadataCache) {
+      if (entry.expires <= now) {
+        this.tableMetadataCache.delete(staleKey);
+      }
+    }
+    this.tableMetadataCache.set(key, { expires: now + tableMetadataTtlMs, value });
+    return value;
   }
 
   async getVariablesResult(sql: string) {
